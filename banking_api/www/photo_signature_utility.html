@@ -1494,12 +1494,18 @@
 				const userRoles = rolesResponse;
 				const designation = designationResponse;
 
-				console.log("[photo_signature_utility] User Roles:", userRoles);
+				// console.log("[photo_signature_utility] User Roles:", userRoles);
 				console.log("[photo_signature_utility] Designation:", designation || "Not found");
 
 				// 3. Check if they have the Operations Support role
 				if (userRoles.includes("Operations Support Executive")) {
 					console.log("[photo_signature_utility] Access granted via Operations role.");
+					initUtilityApp();
+					return;
+				}
+
+				if (userRoles.includes("Netwin Photo & Sign")) {
+					console.log("[photo_signature_utility] Access granted via Netwin Photo & Sign role.");
 					initUtilityApp();
 					return;
 				}
