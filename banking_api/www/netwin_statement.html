@@ -853,8 +853,11 @@
 
 					function renderOptions(filter = "") {
 						dropdown.innerHTML = "";
-						branches.filter(b => b.branch_code.toLowerCase().includes(filter.toLowerCase())).forEach(b => {
-							const item = document.createElement("div");
+						branches
+							.filter((b) => (b.branch_code || "").toLowerCase().includes(filter.toLowerCase()))
+							.forEach((b) => {
+								if (!b.branch_code) return;
+								const item = document.createElement("div");
 							item.textContent = b.branch_code;
 							item.style.padding = "8px";
 							item.style.cursor = "pointer";
@@ -986,7 +989,7 @@
 				// API request
 				try {
 					const response = await fetch(
-						"/api/method/banking_api.api.download_netwin_statement",
+						"/api/method/banking_api.statement_api.test_db",
 						{
 							method: "POST",
 							headers: { "Content-Type": "application/json" },

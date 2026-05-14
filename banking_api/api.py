@@ -306,12 +306,20 @@ def fetch_photo_and_signature(gmst_code=None, ac_no=None, acmastcode=None):
 		)
 
 	try:
-		import cx_Oracle
+		import oracledb
 	except ImportError:
 		return {
 			"status": "error",
-			"message": _("`cx_Oracle` is not installed on this server."),
+			"message": _("`oracledb` is not installed on this server."),
 		}
+
+	try:
+		oracledb.init_oracle_client()
+	except oracledb.ProgrammingError:
+		pass  # Already initialized
+	except Exception:
+		# Fallback to Thin mode if Thick mode initialization fails
+		pass
 
 	username = settings.username
 	password = settings.get_password("password")
@@ -329,8 +337,8 @@ def fetch_photo_and_signature(gmst_code=None, ac_no=None, acmastcode=None):
 	cursor = None
 
 	try:
-		dsn = cx_Oracle.makedsn(host, port, service_name=sid)
-		connection = cx_Oracle.connect(user=username, password=password, dsn=dsn)
+		dsn = oracledb.makedsn(host, port, service_name=sid)
+		connection = oracledb.connect(user=username, password=password, dsn=dsn)
 		cursor = connection.cursor()
 		cursor.execute(
 			QUERY,
@@ -355,7 +363,7 @@ def fetch_photo_and_signature(gmst_code=None, ac_no=None, acmastcode=None):
 			"status": "success",
 			"data": data,
 		}
-	except cx_Oracle.DatabaseError as exc:
+	except oracledb.DatabaseError as exc:
 		error = exc.args[0] if exc.args else exc
 		message = getattr(error, "message", str(error))
 		return {
