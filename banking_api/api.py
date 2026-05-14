@@ -400,7 +400,15 @@ def download_netwin_statement(branch_code, ac_code, ac_no, start_date, end_date,
 	settings = frappe.get_single("Netwin Settings")
 
 	if not _should_proxy_to_remote(settings.api_base_url):
-		frappe.throw(_("Remote proxy is not required for the current Netwin Settings base URL."))
+		from banking_api.statement_api import test_db
+		return test_db(
+			branch_code=branch_code,
+			ac_code=ac_code,
+			ac_no=ac_no,
+			start_date=start_date,
+			end_date=end_date,
+			export_format=export_format
+		)
 
 	_proxy_remote_statement_download(
 		settings.api_base_url,
