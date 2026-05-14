@@ -154,7 +154,10 @@ def fetch_photo_and_signature(gmst_code=None, ac_no=None, acmastcode=None):
 		}
 
 	try:
-		oracledb.init_oracle_client()
+		if settings.oracle_client_path:
+			oracledb.init_oracle_client(lib_dir=settings.oracle_client_path)
+		else:
+			oracledb.init_oracle_client()
 	except oracledb.ProgrammingError:
 		pass  # Already initialized
 	except Exception:

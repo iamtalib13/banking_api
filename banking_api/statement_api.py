@@ -19,8 +19,12 @@ def test_db(branch_code, ac_code, ac_no, start_date, end_date, export_format="pd
 	cursor = None
 	try:
 		# Initialize Oracle Client for Thick Mode
+		settings = frappe.get_single("Netwin Settings")
 		try:
-			oracledb.init_oracle_client()
+			if settings.oracle_client_path:
+				oracledb.init_oracle_client(lib_dir=settings.oracle_client_path)
+			else:
+				oracledb.init_oracle_client()
 		except oracledb.ProgrammingError:
 			pass  # Already initialized
 		except Exception as e:
@@ -279,7 +283,10 @@ def check_credentials():
 
 	try:
 		try:
-			oracledb.init_oracle_client()
+			if settings.oracle_client_path:
+				oracledb.init_oracle_client(lib_dir=settings.oracle_client_path)
+			else:
+				oracledb.init_oracle_client()
 		except oracledb.ProgrammingError:
 			pass
 			
@@ -301,7 +308,11 @@ def check_netwin():
 
 	try:
 		try:
-			oracledb.init_oracle_client()
+			settings = frappe.get_single("Netwin Settings")
+			if settings.oracle_client_path:
+				oracledb.init_oracle_client(lib_dir=settings.oracle_client_path)
+			else:
+				oracledb.init_oracle_client()
 		except oracledb.ProgrammingError:
 			pass
 			

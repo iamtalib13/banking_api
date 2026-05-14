@@ -14,12 +14,16 @@ class NetwinSettings(Document):
 		except ImportError:
 			frappe.throw(_("`oracledb` is not installed on this server."))
 
+		client_path = self.oracle_client_path
 		try:
-			oracledb.init_oracle_client()
+			if client_path:
+				oracledb.init_oracle_client(lib_dir=client_path)
+			else:
+				oracledb.init_oracle_client()
 		except oracledb.ProgrammingError:
 			pass  # Already initialized
 		except Exception as e:
-			frappe.msgprint(_("Warning: Could not initialize Oracle Client for Thick mode. Falling back to Thin mode. Error: {0}").format(str(e)))
+			frappe.msgprint(_("Warning: Could not initialize Oracle Client for Thick mode. Error: {0}").format(str(e)))
 
 		username = self.username
 		password = self.get_password("password")
