@@ -354,6 +354,107 @@
 					gap: 10px;
 				}
 			}
+
+			/* Results table styling */
+			.results-container {
+				margin: 30px auto;
+				max-width: 1100px;
+				background: white;
+				border-radius: 14px;
+				padding: 20px;
+				box-shadow: 0 8px 28px rgba(0, 0, 0, 0.13);
+				display: none;
+				overflow-x: auto;
+			}
+
+			.results-table {
+				width: 100%;
+				border-collapse: collapse;
+				font-size: 14px;
+			}
+
+			.results-table th,
+			.results-table td {
+				padding: 12px;
+				text-align: left;
+				border-bottom: 1px solid #eee;
+			}
+
+			.results-table th {
+				background-color: #f8f9fa;
+				color: #006768;
+				font-weight: 600;
+				white-space: nowrap;
+			}
+
+			.results-table tr:hover {
+				background-color: #f1f3f5;
+			}
+
+			.btn-secondary {
+				background-color: #006768;
+				color: white;
+				border: none;
+				padding: 12px 20px;
+				border-radius: 7px;
+				font-weight: 600;
+				cursor: pointer;
+				font-size: 16px;
+				transition: background 0.3s;
+				flex: 1;
+			}
+
+			.btn-secondary:hover {
+				background-color: #028079;
+			}
+
+			.button-group {
+				display: flex;
+				gap: 10px;
+				margin-top: 20px;
+			}
+
+			/* Side-by-Side Layout */
+			.main-wrapper {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				width: 100%;
+				transition: all 0.4s ease;
+				max-width: 1400px;
+				margin: 0 auto;
+			}
+
+			.main-wrapper.side-by-side {
+				flex-direction: row;
+				align-items: flex-start;
+				justify-content: center;
+				gap: 20px;
+				padding: 0 20px;
+			}
+
+			.main-wrapper.side-by-side .container {
+				margin: 30px 0;
+				flex: 0 0 450px;
+			}
+
+			.main-wrapper.side-by-side .results-container {
+				margin: 30px 0;
+				flex: 1;
+				display: block; /* Ensure it shows up */
+			}
+
+			@media (max-width: 1100px) {
+				.main-wrapper.side-by-side {
+					flex-direction: column;
+					align-items: center;
+				}
+				.main-wrapper.side-by-side .container,
+				.main-wrapper.side-by-side .results-container {
+					width: 100%;
+					max-width: 620px;
+				}
+			}
 		</style>
 	</head>
 
@@ -364,93 +465,114 @@
 			<div>Netwin Banking Statement Portal</div>
 		</header>
 
-		<div class="container">
-			<div
-				style="
-					color: #d35400;
+		<div class="main-wrapper" id="main-layout-wrapper">
+			<div class="container">
+				<div
+					style="
+						color: #d35400;
 
-					text-align: center;
+						text-align: center;
 
-					font-weight: 500;
+						font-weight: 500;
 
-					font-size: 14px;
-				"
-			>
-				<!-- Portal valid till December 6, 2024 only. -->
+						font-size: 14px;
+					"
+				>
+					<!-- Portal valid till December 6, 2024 only. -->
+				</div>
+
+				<h1>Transaction Statement</h1>
+
+				<form id="statement-form" novalidate>
+					<div class="form-row">
+						<div class="form-group">
+							<label for="ac_no" class="form-label">Account No</label>
+
+							<input
+								type="text"
+								class="form-control"
+								id="ac_no"
+								placeholder="Enter Account No"
+								required
+								autofocus
+							/>
+
+							<span class="error-hint" id="err-ac_no"></span>
+						</div>
+
+						<div class="form-group">
+							<label for="ac_code" class="form-label">GL Code</label>
+
+							<input
+								type="text"
+								class="form-control"
+								id="ac_code"
+								placeholder="Enter GL Code"
+								required
+							/>
+
+							<span class="error-hint" id="err-ac_code"></span>
+						</div>
+					</div>
+
+					<div class="form-row">
+						<div class="form-group">
+							<label for="branch_code" class="form-label">Branch Code</label>
+
+							<input
+								type="text"
+								class="form-control"
+								id="branch_code"
+								placeholder="Enter Branch Code"
+								required
+							/>
+
+							<span class="error-hint" id="err-branch_code"></span>
+						</div>
+
+						<div class="form-group">
+							<label for="start_date" class="form-label">Start Date</label>
+
+							<input type="date" class="form-control" id="start_date" required />
+
+							<span class="error-hint" id="err-start_date"></span>
+						</div>
+
+						<div class="form-group">
+							<label for="end_date" class="form-label">End Date</label>
+
+							<input type="date" class="form-control" id="end_date" required />
+
+							<span class="error-hint" id="err-end_date"></span>
+						</div>
+					</div>
+
+					<div class="button-group">
+						<button type="submit" class="btn-primary" id="btn-download" style="display: none;">
+							⬇ Download Statement
+						</button>
+						<button type="button" class="btn-secondary" id="btn-view" onclick="handleView()">
+							👁 View Statement
+						</button>
+					</div>
+				</form>
+
+				<div class="loader" id="loader"><span></span><span></span><span></span></div>
+
+				<div id="alert-container" class="alert"></div>
 			</div>
 
-			<h1>Transaction Statement</h1>
-
-			<form id="statement-form" novalidate>
-				<div class="form-row">
-					<div class="form-group">
-						<label for="ac_no" class="form-label">Account No</label>
-
-						<input
-							type="text"
-							class="form-control"
-							id="ac_no"
-							placeholder="Enter Account No"
-							required
-							autofocus
-						/>
-
-						<span class="error-hint" id="err-ac_no"></span>
-					</div>
-
-					<div class="form-group">
-						<label for="ac_code" class="form-label">GL Code</label>
-
-						<input
-							type="text"
-							class="form-control"
-							id="ac_code"
-							placeholder="Enter GL Code"
-							required
-						/>
-
-						<span class="error-hint" id="err-ac_code"></span>
-					</div>
+			<!-- Result Section Container -->
+			<div id="results-container" class="results-container">
+				<div id="pdf-preview-wrapper" style="display: none">
+					<iframe
+						id="pdf-iframe"
+						width="100%"
+						height="800px"
+						style="border: 1px solid #ccc; border-radius: 8px"
+					></iframe>
 				</div>
-
-				<div class="form-row">
-					<div class="form-group">
-						<label for="branch_code" class="form-label">Branch Code</label>
-
-						<input
-							type="text"
-							class="form-control"
-							id="branch_code"
-							placeholder="Enter Branch Code"
-							required
-						/>
-
-						<span class="error-hint" id="err-branch_code"></span>
-					</div>
-
-					<div class="form-group">
-						<label for="start_date" class="form-label">Start Date</label>
-
-						<input type="date" class="form-control" id="start_date" required />
-
-						<span class="error-hint" id="err-start_date"></span>
-					</div>
-
-					<div class="form-group">
-						<label for="end_date" class="form-label">End Date</label>
-
-						<input type="date" class="form-control" id="end_date" required />
-
-						<span class="error-hint" id="err-end_date"></span>
-					</div>
-				</div>
-
-				<button type="submit" class="btn-primary">⬇ Download Statement</button>
-			</form>
-
-			<div class="loader" id="loader"><span></span><span></span><span></span></div>
-
-			<div id="alert-container" class="alert"></div>
+			</div>
 		</div>
 
 		<!-- Format Selection Modal -->
@@ -475,421 +597,143 @@
 
 		{% else %} {% include "/templates/not-found.html" %} {% endif %}
 
-		<!-- 
-    <script>
-
-        // Util for showing/hiding loader
-
-        function setLoading(isLoading) {
-
-            document.getElementById("loader").style.display = isLoading
-
-                ? "block"
-
-                : "none";
-
-        }
-
-
-
-        // Util for showing feedback alert
-
-        function showAlert(message, type) {
-
-            const alertContainer = document.getElementById("alert-container");
-
-            alertContainer.textContent = message;
-
-            alertContainer.className = "alert " + type;
-
-            alertContainer.style.display = "block";
-
-            setTimeout(() => (alertContainer.style.display = "none"), 6000);
-
-            alertContainer.scrollIntoView({ behavior: "smooth" });
-
-        }
-
-
-
-        // Helper: highlight fields if error
-
-        function showFieldError(fieldName, msg) {
-
-            const input = document.getElementById(fieldName);
-
-            const errHint = document.getElementById("err-" + fieldName);
-
-            if (input && errHint) {
-
-                input.classList.add("error");
-
-                errHint.textContent = msg;
-
-                errHint.classList.add("active");
-
-            }
-
-        }
-
-        // Remove highlight from all fields
-
-        function clearFieldErrors() {
-
-            ["ac_no", "ac_code", "branch_code", "start_date", "end_date"].forEach(
-
-                (f) => {
-
-                    document.getElementById(f).classList.remove("error");
-
-                    const eh = document.getElementById("err-" + f);
-
-                    eh.textContent = "";
-
-                    eh.classList.remove("active");
-
-                }
-
-            );
-
-        }
-
-
-
-        // Example: Fetch branch code auto-fill on page load
-
-        async function fetchBranchCode() {
-
-            try {
-
-                const response = await fetch(
-
-                    "/api/method/share_holder_management.share_holder_management.netwin.netwin"
-
-                );
-
-                if (response.ok) {
-
-                    const data = await response.json();
-
-                    const branchCode = data.message;
-
-                    if (branchCode && branchCode !== "All") {
-
-                        const branchCodeField = document.getElementById("branch_code");
-
-                        branchCodeField.value = branchCode;
-
-                        branchCodeField.readOnly = true;
-
-                    }
-
-                }
-
-            } catch (_) { }
-
-        }
-
-        window.addEventListener("load", fetchBranchCode);
-
-
-
-        // Modal Handlers
-
-        function openModal() {
-
-            document.getElementById("format-modal").style.display = "flex";
-
-        }
-
-        function closeModal() {
-
-            document.getElementById("format-modal").style.display = "none";
-
-        }
-
-
-
-        // Core: Form submission logic with advanced error handling
-
-        document
-
-            .getElementById("statement-form")
-
-            .addEventListener("submit", async (event) => {
-
-                event.preventDefault();
-
-                clearFieldErrors();
-
-
-
-                // Validate first before showing modal
-
-                const acNo = document.getElementById("ac_no").value.trim();
-
-                const acCode = document.getElementById("ac_code").value.trim();
-
-                const branchCode = document.getElementById("branch_code").value.trim();
-
-                const startDate = document.getElementById("start_date").value;
-
-                const endDate = document.getElementById("end_date").value;
-
-
-
-                let clientErrors = {};
-
-                if (!acNo) clientErrors["ac_no"] = "Account number is required.";
-
-                if (!acCode) clientErrors["ac_code"] = "GL Code is required.";
-
-                if (!branchCode) clientErrors["branch_code"] = "Branch Code is required.";
-
-                if (!startDate) clientErrors["start_date"] = "Start date is required.";
-
-                if (!endDate) clientErrors["end_date"] = "End date is required.";
-
-
-
-                if (Object.keys(clientErrors).length) {
-
-                    Object.entries(clientErrors).forEach(([field, msg]) =>
-
-                        showFieldError(field, msg)
-
-                    );
-
-                    showAlert("Please correct the errors and try again.", "error");
-
-                    return;
-
-                }
-
-
-
-                openModal();
-
-            });
-
-
-
-        async function handleDownload(format) {
-
-            closeModal();
-
-            setLoading(true);
-
-
-
-            const submitButton = document.querySelector(".btn-primary");
-
-            submitButton.disabled = true;
-
-
-
-            // Collect form data
-
-            const acNo = document.getElementById("ac_no").value.trim();
-
-            const acCode = document.getElementById("ac_code").value.trim().toUpperCase();
-
-            const branchCode = document.getElementById("branch_code").value.trim().toUpperCase();
-
-            const startDate = document.getElementById("start_date").value;
-
-            const endDate = document.getElementById("end_date").value;
-
-
-
-            // API request
-
-            try {
-
-                const response = await fetch(
-
-                    "/api/method/share_holder_management.share_holder_management.share_api.test_db",
-
-                    {
-
-                        method: "POST",
-
-                        headers: { "Content-Type": "application/json" },
-
-                        body: JSON.stringify({
-
-                            branch_code: branchCode,
-
-                            ac_code: acCode,
-
-                            ac_no: acNo,
-
-                            start_date: startDate,
-
-                            end_date: endDate,
-
-                            export_format: format,
-
-                        }),
-
-                    }
-
-                );
-
-
-
-                if (response.ok) {
-
-                    // Success: Download File
-
-                    const blob = await response.blob();
-
-                    const url = window.URL.createObjectURL(blob);
-
-                    const a = document.createElement("a");
-
-                    a.href = url;
-
-                    a.download = `Transaction_Statement_${acNo}.${format}`;
-
-                    document.body.appendChild(a);
-
-                    a.click();
-
-                    document.body.removeChild(a);
-
-                    showAlert(
-
-                        `Transaction statement (${format.toUpperCase()}) downloaded successfully! ✅`,
-
-                        "success"
-
-                    );
-
-                } else {
-
-                    let errorMessage = "An error occurred. Please check your data.";
-
-                    let errorContent;
-
-                    try {
-
-                        errorContent = await response.clone().json();
-
-                        if (errorContent.message) {
-
-                            errorMessage = errorContent.message;
-
-                        }
-
-                    } catch {
-
-                        errorContent = await response.clone().text();
-
-                        errorMessage = errorContent;
-
-                    }
-
-                    showAlert(errorMessage, "error");
-
-                }
-
-            } catch (error) {
-
-                showAlert("Network error. Please try again.", "error");
-
-            } finally {
-
-                setLoading(false);
-
-                submitButton.disabled = false;
-
-            }
-
-        }
-
-    </script> -->
-
-		<script type="application/json" id="employee-data">
-			{{ frappe.db.get_value("Employee", {"user_id": frappe.session.user}, ["name", "netwin_statement", "sol_id"]) | json }}
-		</script>
-		<script type="application/json" id="branch-data">
-			{{ frappe.db.get_all("Sahayog Branch", fields=["branch_code"], distinct=True) | json }}
-		</script>
-
-		<script type="application/json" id="user-context">
-			{
-				"user": "{{ frappe.session.user }}",
-				"employee": {{ frappe.db.get_value("Employee", {"user_id": frappe.session.user}, ["name", "netwin_statement", "sol_id"]) | tojson }},
-				"branches": {{ frappe.db.get_all("Sahayog Branch", fields=["branch_code"], distinct=True) | tojson }}
-			}
-		</script>
-
 		<script>
-			window.addEventListener("load", () => {
+			window.csrf_token = "{{ frappe.session.csrf_token }}";
+
+			window.addEventListener("load", async () => {
+				console.log("Page load listener fired.");
 				const branchField = document.getElementById("branch_code");
-				if (!branchField) return;
+				if (!branchField) {
+					console.log("Branch field not found.");
+					return;
+				}
 				const branchGroup = branchField.closest(".form-group");
-				
-				const context = JSON.parse(document.getElementById("user-context").textContent);
-				const currentUser = context.user;
-				const employee = context.employee;
-				const branches = context.branches;
-				
-				console.log("Employee Data:", employee);
-				console.log("Current User:", currentUser);
 
-				function createDropdown(container, branchField, branches) {
-					const dropdown = document.createElement("div");
-					dropdown.className = "dropdown-menu";
-					dropdown.style.display = "none";
-					dropdown.style.position = "absolute";
-					dropdown.style.width = "100%";
-					dropdown.style.maxHeight = "200px";
-					dropdown.style.overflowY = "auto";
-					dropdown.style.background = "white";
-					dropdown.style.border = "1px solid #ccc";
-					dropdown.style.zIndex = "1000";
+				// Fetch context via native fetch
+				console.log("Fetching context via native fetch...");
+				try {
+					const response = await fetch("/api/method/banking_api.api.get_user_context", {
+						method: "GET",
+						headers: { Accept: "application/json" },
+					});
 
-					function renderOptions(filter = "") {
-						dropdown.innerHTML = "";
-						branches
-							.filter((b) => (b.branch_code || "").toLowerCase().includes(filter.toLowerCase()))
-							.forEach((b) => {
-								if (!b.branch_code) return;
-								const item = document.createElement("div");
-							item.textContent = b.branch_code;
-							item.style.padding = "8px";
-							item.style.cursor = "pointer";
-							item.onclick = () => {
-								branchField.value = b.branch_code;
-								dropdown.style.display = "none";
-							};
-							dropdown.appendChild(item);
+					if (!response.ok) {
+						throw new Error(`HTTP error! status: ${response.status}`);
+					}
+
+					const res = await response.json();
+					const context = res.message;
+					if (!context) {
+						throw new Error("API returned no message content");
+					}
+
+					const currentUser = context.user;
+					const employee = context.employee;
+					const branches = context.branches;
+					const userBranch = context.user_branch;
+
+					// ✅ 1. Check if branches is valid array
+					if (!Array.isArray(branches)) {
+						console.error("Branches is not an array:", branches);
+						return; // stop execution to avoid crash
+					}
+
+					// ✅ 2. Log invalid records
+					console.log(
+						"Invalid branch records:",
+						branches.filter((b) => !b || !b.branch_code),
+					);
+
+					console.log("Current User Detail:", currentUser);
+					console.log("Employee Data:", employee);
+					console.log("Sahayog Branches Data:", branches);
+
+					function createDropdown(container, branchField, branches) {
+						const dropdown = document.createElement("div");
+						dropdown.className = "dropdown-menu";
+						dropdown.style.display = "none";
+						dropdown.style.position = "absolute";
+						dropdown.style.width = "100%";
+						dropdown.style.maxHeight = "200px";
+						dropdown.style.overflowY = "auto";
+						dropdown.style.background = "white";
+						dropdown.style.border = "1px solid #ccc";
+						dropdown.style.zIndex = "1000";
+
+						function renderOptions(filter = "") {
+							dropdown.innerHTML = "";
+							const search = (filter || "").toLowerCase();
+
+							branches
+								.filter((b) => {
+									if (!b || !b.branch_code) return false;
+									if (typeof b.branch_code !== "string") return false;
+
+									return b.branch_code.toLowerCase().includes(search);
+								})
+								.forEach((b) => {
+									const item = document.createElement("div");
+									item.textContent = b.branch_code;
+									item.style.padding = "8px";
+									item.style.cursor = "pointer";
+
+									item.onclick = () => {
+										branchField.value = b.branch_code;
+										dropdown.style.display = "none";
+									};
+
+									dropdown.appendChild(item);
+								});
+						}
+
+						renderOptions();
+						container.appendChild(dropdown);
+
+						branchField.onclick = () => (dropdown.style.display = "block");
+						branchField.oninput = () => {
+							dropdown.style.display = "block";
+							renderOptions(branchField.value);
+						};
+
+						document.addEventListener("click", (e) => {
+							if (!container.contains(e.target)) dropdown.style.display = "none";
 						});
 					}
 
-					renderOptions();
-					container.appendChild(dropdown);
-					
-					branchField.onclick = () => dropdown.style.display = "block";
-					branchField.oninput = () => {
-						dropdown.style.display = "block";
-						renderOptions(branchField.value);
-					};
-					
-					document.addEventListener("click", (e) => {
-						if (!container.contains(e.target)) dropdown.style.display = "none";
-					});
+					const isAdmin = currentUser === "Administrator";
+
+					if (isAdmin) {
+						// ✅ ALWAYS allow admin
+						branchField.value = "";
+						branchField.readOnly = false;
+						createDropdown(branchGroup, branchField, branches);
+					} else if (employee) {
+						const isChecked = !!employee.netwin_statement;
+
+						if (isChecked) {
+							branchField.value = "";
+							branchField.readOnly = false;
+							createDropdown(branchGroup, branchField, branches);
+						} else {
+							if (userBranch) {
+								branchField.value = userBranch;
+								branchField.readOnly = true;
+							}
+						}
+					} else {
+						console.log(
+							"Netwin Statement Status: No Employee record found for this user",
+						);
+					}
+				} catch (e) {
+					console.error("Fetch API Call Failed:", e);
 				}
 
-				if (currentUser === "Administrator" || currentUser === "NT6681" || (employee && employee[1])) {
-					console.log("Showing dropdown for all branches");
-					createDropdown(branchGroup, branchField, branches);
-				} else if (employee && employee[2]) {
-					console.log("Showing searchable dropdown for all branches (editable)");
-					createDropdown(branchGroup, branchField, branches);
-				}
+				// Reset buttons if form is changed
+				document.getElementById("statement-form").addEventListener("input", () => {
+					document.getElementById("btn-view").style.display = "block";
+					document.getElementById("btn-download").style.display = "none";
+				});
 			});
 		</script>
 		<script>
@@ -907,7 +751,6 @@
 				alertContainer.className = "alert " + type;
 				alertContainer.style.display = "block";
 				setTimeout(() => (alertContainer.style.display = "none"), 6000);
-				alertContainer.scrollIntoView({ behavior: "smooth" });
 			}
 
 			// Helper: highlight fields if error
@@ -942,31 +785,41 @@
 			// Core: Form submission logic with advanced error handling
 			document.getElementById("statement-form").addEventListener("submit", async (event) => {
 				event.preventDefault();
-				clearFieldErrors();
 
-				// Validate first before showing modal
-				const acNo = document.getElementById("ac_no").value.trim();
-				const acCode = document.getElementById("ac_code").value.trim();
-				const branchCode = document.getElementById("branch_code").value.trim();
-				const startDate = document.getElementById("start_date").value;
-				const endDate = document.getElementById("end_date").value;
+				const btnView = document.getElementById("btn-view");
+				const isViewVisible = window.getComputedStyle(btnView).display !== "none";
 
-				let clientErrors = {};
-				if (!acNo) clientErrors["ac_no"] = "Account number is required.";
-				if (!acCode) clientErrors["ac_code"] = "GL Code is required.";
-				if (!branchCode) clientErrors["branch_code"] = "Branch Code is required.";
-				if (!startDate) clientErrors["start_date"] = "Start date is required.";
-				if (!endDate) clientErrors["end_date"] = "End date is required.";
+				if (isViewVisible) {
+					// If View button is visible, Enter key should trigger handleView
+					handleView();
+				} else {
+					// If Download button is visible (View was already clicked), Enter key should trigger modal
+					clearFieldErrors();
 
-				if (Object.keys(clientErrors).length) {
-					Object.entries(clientErrors).forEach(([field, msg]) =>
-						showFieldError(field, msg),
-					);
-					showAlert("Please correct the errors and try again.", "error");
-					return;
+					// Validate first before showing modal
+					const acNo = document.getElementById("ac_no").value.trim();
+					const acCode = document.getElementById("ac_code").value.trim();
+					const branchCode = document.getElementById("branch_code").value.trim();
+					const startDate = document.getElementById("start_date").value;
+					const endDate = document.getElementById("end_date").value;
+
+					let clientErrors = {};
+					if (!acNo) clientErrors["ac_no"] = "Account number is required.";
+					if (!acCode) clientErrors["ac_code"] = "GL Code is required.";
+					if (!branchCode) clientErrors["branch_code"] = "Branch Code is required.";
+					if (!startDate) clientErrors["start_date"] = "Start date is required.";
+					if (!endDate) clientErrors["end_date"] = "End date is required.";
+
+					if (Object.keys(clientErrors).length) {
+						Object.entries(clientErrors).forEach(([field, msg]) =>
+							showFieldError(field, msg),
+						);
+						showAlert("Please correct the errors and try again.", "error");
+						return;
+					}
+
+					openModal();
 				}
-
-				openModal();
 			});
 
 			async function handleDownload(format) {
@@ -989,10 +842,13 @@
 				// API request
 				try {
 					const response = await fetch(
-						"/api/method/banking_api.statement_api.test_db",
+						"/api/method/banking_api.api.download_netwin_statement",
 						{
 							method: "POST",
-							headers: { "Content-Type": "application/json" },
+							headers: {
+								"Content-Type": "application/json",
+								"X-Frappe-CSRF-Token": window.csrf_token,
+							},
 							body: JSON.stringify({
 								branch_code: branchCode,
 								ac_code: acCode,
@@ -1037,6 +893,85 @@
 				} finally {
 					setLoading(false);
 					submitButton.disabled = false;
+				}
+			}
+
+			async function handleView() {
+				clearFieldErrors();
+
+				const acNo = document.getElementById("ac_no").value.trim();
+				const acCode = document.getElementById("ac_code").value.trim().toUpperCase();
+				const branchCode = document
+					.getElementById("branch_code")
+					.value.trim()
+					.toUpperCase();
+				const startDate = document.getElementById("start_date").value;
+				const endDate = document.getElementById("end_date").value;
+
+				let clientErrors = {};
+				if (!acNo) clientErrors["ac_no"] = "Account number is required.";
+				if (!acCode) clientErrors["ac_code"] = "GL Code is required.";
+				if (!branchCode) clientErrors["branch_code"] = "Branch Code is required.";
+				if (!startDate) clientErrors["start_date"] = "Start date is required.";
+				if (!endDate) clientErrors["end_date"] = "End date is required.";
+
+				if (Object.keys(clientErrors).length) {
+					Object.entries(clientErrors).forEach(([field, msg]) =>
+						showFieldError(field, msg),
+					);
+					showAlert("Please correct the errors and try again.", "error");
+					return;
+				}
+
+				setLoading(true);
+				const resultsContainer = document.getElementById("results-container");
+				resultsContainer.style.display = "none";
+
+				try {
+					// 1. Fetch PDF Blob for Preview
+					const pdfResponse = await fetch(
+						"/api/method/banking_api.api.download_netwin_statement",
+						{
+							method: "POST",
+							headers: {
+								"Content-Type": "application/json",
+								"X-Frappe-CSRF-Token": window.csrf_token,
+							},
+							body: JSON.stringify({
+								branch_code: branchCode,
+								ac_code: acCode,
+								ac_no: acNo,
+								start_date: startDate,
+								end_date: endDate,
+								export_format: "pdf",
+							}),
+						},
+					);
+
+					if (pdfResponse.ok) {
+						const blob = await pdfResponse.blob();
+						const url = window.URL.createObjectURL(blob);
+						const iframe = document.getElementById("pdf-iframe");
+						// Append parameters to hide toolbar and nav panes
+						iframe.src = url + "#toolbar=0&navpanes=0&view=FitH";
+
+						document.getElementById("main-layout-wrapper").classList.add("side-by-side");
+						document.getElementById("pdf-preview-wrapper").style.display = "block";
+						resultsContainer.style.display = "block";
+						
+						// Toggle buttons
+						document.getElementById("btn-view").style.display = "none";
+						document.getElementById("btn-download").style.display = "block";
+
+						showAlert("Statement preview loaded! ✅", "success");
+					} else {
+						showAlert("Failed to load PDF preview.", "error");
+					}
+				} catch (error) {
+					showAlert("An error occurred while fetching data.", "error");
+					console.error(error);
+				} finally {
+					setLoading(false);
 				}
 			}
 		</script>

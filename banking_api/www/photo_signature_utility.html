@@ -1454,485 +1454,467 @@
 </script>
  -->
 
-
 <script>
 	document.addEventListener("DOMContentLoaded", function () {
-		frappe.ready(function () {
-			const loggedInUser = frappe.session.user;
-			// console.log("[photo_signature_utility] Logged-in User:", loggedInUser);
 
-			// Immediately grant access if the user is the Administrator
+		frappe.ready(async function () {
+			const loggedInUser = frappe.session.user;
+			console.log("[photo_signature_utility] Logged-in User:", loggedInUser);
+
+			// 1. Immediately grant access if the user is the Administrator
 			if (loggedInUser === "Administrator") {
 				console.log("[photo_signature_utility] Access granted to Administrator.");
+				initUtilityApp();
 				return; // Exits the check, leaving the page fully visible and functional!
 			}
 
-			const allowedDesignations = [
-				"branch officer",
-				"branch operation manager",
-				"branch manager",
-				"customer service officer",
-				"customer service manager",
-				"asst. branch manager",
-			];
+			try {
+				// 2. Fetch the user's Roles and Designation safely
+				const [rolesResponse, designationResponse] = await Promise.all([
+					new Promise(resolve => {
+						frappe.call({
+							method: "frappe.core.doctype.user.user.get_roles",
+							args: { uid: loggedInUser },
+							callback: r => resolve(r.message || [])
+						});
+					}),
+					new Promise(resolve => {
+						frappe.call({
+							method: "frappe.client.get_value",
+							args: {
+								doctype: "Employee",
+								filters: { user_id: loggedInUser },
+								fieldname: ["designation"]
+							},
+							callback: r => resolve(r.message ? r.message.designation : "")
+						});
+					})
+				]);
 
-			frappe.call({
-				method: "frappe.client.get_value",
-				args: {
-					doctype: "Employee",
-					filters: { user_id: loggedInUser },
-					fieldname: ["designation"]
-				},
-				callback: function (r) {
-					const designation = r.message ? r.message.designation : "";
-					// console.log("[photo_signature_utility] Designation:", designation || "Not found");
+				const userRoles = rolesResponse;
+				const designation = designationResponse;
 
-					const normalizedDesignation = (designation || "").trim().toLowerCase();
-					const isAllowed = allowedDesignations.includes(normalizedDesignation);
+				// console.log("[photo_signature_utility] User Roles:", userRoles);
+				console.log("[photo_signature_utility] Designation:", designation || "Not found");
 
-					// console.log("[photo_signature_utility] Access Allowed:", isAllowed);
-
-					if (!isAllowed) {
-						const userRole = designation || "your current role";
-
-						document.body.innerHTML = `
-        <div class="photo-signature-utility" style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: radial-gradient(circle at 50% 0%, rgba(255, 115, 115, 0.08), transparent 50%), var(--utility-bg-deep);">
-            <div style="
-                max-width: 440px; 
-                width: 100%; 
-                padding: 40px 32px; 
-                border: 1px solid var(--utility-border); 
-                border-radius: 24px; 
-                background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)), var(--utility-glass); 
-                backdrop-filter: blur(24px); 
-                -webkit-backdrop-filter: blur(24px); 
-                text-align: center; 
-                box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4);
-            ">
-                <!-- Glowing Lock Icon -->
-                <div style="
-                    width: 72px; 
-                    height: 72px; 
-                    margin: 0 auto 24px; 
-                    border-radius: 50%; 
-                    background: rgba(255, 115, 115, 0.1); 
-                    border: 1px solid rgba(255, 115, 115, 0.25); 
-                    display: flex; 
-                    align-items: center; 
-                    justify-content: center; 
-                    color: #ff9b9b;
-                    box-shadow: 0 0 30px rgba(255, 115, 115, 0.15);
-                ">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                    </svg>
-                </div>
-
-                <!-- Text Content -->
-                <h2 style="margin: 0 0 12px; font-size: 26px; color: var(--utility-text); letter-spacing: -0.02em; font-weight: 600;">
-                    Access Restricted
-                </h2>
-                
-                <p style="margin: 0 0 32px; color: var(--utility-text-soft); font-size: 15px; line-height: 1.6;">
-                    Your account is assigned as <strong style="color: var(--utility-text); font-weight: 600;">${userRole}</strong>, which does not have the required permissions to use the Customer Verification utility.
-                </p>
-
-                <!-- Action Button -->
-                <button onclick="window.location.href='/app'" style="
-                    width: 100%;
-                    height: 52px; 
-                    border-radius: 16px; 
-                    border: 1px solid var(--utility-border); 
-                    background: rgba(255, 255, 255, 0.06); 
-                    color: var(--utility-text); 
-                    font-size: 15px; 
-                    font-weight: 600; 
-                    cursor: pointer; 
-                    transition: all 0.2s ease;
-                " onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">
-                    Return to Dashboard
-                </button>
-            </div>
-        </div>
-    `;
-						return;
-					}
-
-					// console.log("[photo_signature_utility] Access granted.");
-				},
-				error: function (err) {
-					// console.error("[photo_signature_utility] Error fetching designation:", err);
-					document.body.innerHTML = `
-        <div class="photo-signature-utility" style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--utility-bg-deep);">
-            <div style="max-width: 440px; width: 100%; padding: 40px 32px; border: 1px solid var(--utility-border); border-radius: 24px; background: var(--utility-glass); backdrop-filter: blur(24px); text-align: center;">
-                <div style="width: 72px; height: 72px; margin: 0 auto 24px; border-radius: 50%; background: rgba(255, 211, 106, 0.1); border: 1px solid rgba(255, 211, 106, 0.25); display: flex; align-items: center; justify-content: center; color: #ffd36a;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                </div>
-                <h2 style="margin: 0 0 12px; font-size: 26px; color: var(--utility-text);">Verification Failed</h2>
-                <p style="margin: 0 0 32px; color: var(--utility-text-soft); font-size: 15px; line-height: 1.6;">We couldn't verify your access rights at this moment. Please check your connection and try again.</p>
-                <button onclick="window.location.reload()" style="width: 100%; height: 52px; border-radius: 16px; border: 1px solid var(--utility-border); background: rgba(255,255,255,0.06); color: var(--utility-text); font-size: 15px; font-weight: 600; cursor: pointer;">Try Again</button>
-            </div>
-        </div>
-    `;
+				// 3. Check if they have the Operations Support role
+				if (userRoles.includes("Operations Support Executive")) {
+					console.log("[photo_signature_utility] Access granted via Operations role.");
+					initUtilityApp();
+					return;
 				}
-			});
+
+				if (userRoles.includes("Netwin Photo & Sign")) {
+					console.log("[photo_signature_utility] Access granted via Netwin Photo & Sign role.");
+					initUtilityApp();
+					return;
+				}
+
+				// 4. Check if they have an allowed Employee Designation
+				const allowedDesignations = [
+					"branch officer",
+					"branch operation manager",
+					"branch manager",
+					"customer service officer",
+					"customer service manager",
+					"asst. branch manager",
+					"accounts executive",
+					"branch manager jll"
+				];
+
+				const normalizedDesignation = (designation || "").trim().toLowerCase();
+				const isAllowed = allowedDesignations.includes(normalizedDesignation);
+
+				if (!isAllowed) {
+					const userRole = designation || "your current role";
+
+					document.body.innerHTML = `
+                    <div class="photo-signature-utility" style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: radial-gradient(circle at 50% 0%, rgba(255, 115, 115, 0.08), transparent 50%), var(--utility-bg-deep);">
+                        <div style="max-width: 440px; width: 100%; padding: 40px 32px; border: 1px solid var(--utility-border); border-radius: 24px; background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)), var(--utility-glass); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); text-align: center; box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4);">
+                            <div style="width: 72px; height: 72px; margin: 0 auto 24px; border-radius: 50%; background: rgba(255, 115, 115, 0.1); border: 1px solid rgba(255, 115, 115, 0.25); display: flex; align-items: center; justify-content: center; color: #ff9b9b; box-shadow: 0 0 30px rgba(255, 115, 115, 0.15);">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                </svg>
+                            </div>
+                            <h2 style="margin: 0 0 12px; font-size: 26px; color: var(--utility-text); letter-spacing: -0.02em; font-weight: 600;">Access Restricted</h2>
+                            <p style="margin: 0 0 32px; color: var(--utility-text-soft); font-size: 15px; line-height: 1.6;">Your account is assigned as <strong style="color: var(--utility-text); font-weight: 600;">${userRole}</strong>, which does not have the required permissions to use the Customer Verification utility.</p>
+                            <button onclick="window.location.href='/app'" style="width: 100%; height: 52px; border-radius: 16px; border: 1px solid var(--utility-border); background: rgba(255, 255, 255, 0.06); color: var(--utility-text); font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">Return to Dashboard</button>
+                        </div>
+                    </div>`;
+					return;
+				}
+
+				console.log("[photo_signature_utility] Access granted.");
+				initUtilityApp();
+
+			} catch (err) {
+				console.error("[photo_signature_utility] Error validation:", err);
+				document.body.innerHTML = `
+                <div class="photo-signature-utility" style="min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--utility-bg-deep);">
+                    <div style="max-width: 440px; width: 100%; padding: 40px 32px; border: 1px solid var(--utility-border); border-radius: 24px; background: var(--utility-glass); backdrop-filter: blur(24px); text-align: center;">
+                        <div style="width: 72px; height: 72px; margin: 0 auto 24px; border-radius: 50%; background: rgba(255, 211, 106, 0.1); border: 1px solid rgba(255, 211, 106, 0.25); display: flex; align-items: center; justify-content: center; color: #ffd36a;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        </div>
+                        <h2 style="margin: 0 0 12px; font-size: 26px; color: var(--utility-text);">Verification Failed</h2>
+                        <p style="margin: 0 0 32px; color: var(--utility-text-soft); font-size: 15px; line-height: 1.6;">We couldn't verify your access rights at this moment. Please check your connection and try again.</p>
+                        <button onclick="window.location.reload()" style="width: 100%; height: 52px; border-radius: 16px; border: 1px solid var(--utility-border); background: rgba(255,255,255,0.06); color: var(--utility-text); font-size: 15px; font-weight: 600; cursor: pointer;">Try Again</button>
+                    </div>
+                </div>`;
+			}
 		});
 
-		// const apiBaseUrl = "{{ api_base_url }}".trim().replace(/\/$/, "");
+		// ==========================================
+		// 🚀 THIS FUNCTION HOLDS YOUR ENTIRE ORIGINAL APP
+		// ==========================================
+		function initUtilityApp() {
+			const apiBaseUrl = "{{ api_base_url }}".trim().replace(/\/$/, "");
+			const localApiBaseUrl = window.location.origin.replace(/\/$/, "");
+			const button = document.getElementById("fetch-records");
+			const resetButton = document.getElementById("reset-form");
+			const photoEl = document.getElementById("photo-preview");
+			const signEl = document.getElementById("sign-preview");
+			const photoEmptyEl = document.getElementById("photo-empty");
+			const signEmptyEl = document.getElementById("sign-empty");
+			const customerCifEl = document.getElementById("customer-cif");
+			const customerNameEl = document.getElementById("customer-name");
+			const utilityLayoutEl = document.getElementById("utility-layout");
+			const resultMessageEl = document.getElementById("result-message");
+			const resultPreviewGridEl = document.getElementById("result-preview-grid");
+			const gmstCodeEl = document.getElementById("gmst-code");
+			const acNoEl = document.getElementById("ac-no");
+			const cifSearchGroupEl = document.getElementById("cif-search-group");
+			const accountSearchGroupEl = document.getElementById("account-search-group");
+			const searchModeEls = document.querySelectorAll('input[name="search-mode"]');
+			const searchMetaEl = document.querySelector(".utility-search-meta");
+			const baseUrlStatusEl = document.getElementById("base-url-status");
+			const baseUrlStatusTextEl = document.getElementById("base-url-status-text");
 
-		const apiBaseUrl = "{{ api_base_url }}".trim().replace(/\/$/, "");
-		const localApiBaseUrl = window.location.origin.replace(/\/$/, "");
-		const button = document.getElementById("fetch-records");
-		const resetButton = document.getElementById("reset-form");
-		const photoEl = document.getElementById("photo-preview");
-		const signEl = document.getElementById("sign-preview");
-		const photoEmptyEl = document.getElementById("photo-empty");
-		const signEmptyEl = document.getElementById("sign-empty");
-		const customerCifEl = document.getElementById("customer-cif");
-		const customerNameEl = document.getElementById("customer-name");
-		const utilityLayoutEl = document.getElementById("utility-layout");
-		const resultMessageEl = document.getElementById("result-message");
-		const resultPreviewGridEl = document.getElementById("result-preview-grid");
-		const gmstCodeEl = document.getElementById("gmst-code");
-		const acNoEl = document.getElementById("ac-no");
-		const cifSearchGroupEl = document.getElementById("cif-search-group");
-		const accountSearchGroupEl = document.getElementById("account-search-group");
-		const searchModeEls = document.querySelectorAll('input[name="search-mode"]');
-		const searchMetaEl = document.querySelector(".utility-search-meta");
-		const baseUrlStatusEl = document.getElementById("base-url-status");
-		const baseUrlStatusTextEl = document.getElementById("base-url-status-text");
-
-		function allowOnlyDigits(el) {
-			el.addEventListener("input", function () {
-				el.value = el.value.replace(/\D/g, "");
-			});
-		}
-
-		function setImage(el, value) {
-			const emptyEl = el === photoEl ? photoEmptyEl : signEmptyEl;
-
-			if (!value) {
-				el.style.display = "none";
-				el.removeAttribute("src");
-				emptyEl.style.display = "flex";
-				return;
+			function allowOnlyDigits(el) {
+				el.addEventListener("input", function () {
+					el.value = el.value.replace(/\D/g, "");
+				});
 			}
 
-			el.src = "data:image/*;base64," + value;
-			el.style.display = "block";
-			emptyEl.style.display = "none";
-		}
+			function setImage(el, value) {
+				const emptyEl = el === photoEl ? photoEmptyEl : signEmptyEl;
 
-		function setCustomerCif(value) {
-			customerCifEl.textContent = value || "Not loaded";
-		}
+				if (!value) {
+					el.style.display = "none";
+					el.removeAttribute("src");
+					emptyEl.style.display = "flex";
+					return;
+				}
 
-		function setCustomerName(value) {
-			customerNameEl.textContent = value || "Not loaded";
-		}
-
-		function setResultVisibility(visible) {
-			resultMessageEl.style.display = visible ? "block" : "none";
-			resultPreviewGridEl.style.display = visible ? "grid" : "none";
-		}
-
-		function buildApiUrl(path, options) {
-			const useConfiguredBase = options && options.useConfiguredBase;
-			const baseUrl = useConfiguredBase ? apiBaseUrl : localApiBaseUrl;
-			return new URL(baseUrl + path);
-		}
-
-		function setBaseUrlStatus(status) {
-			baseUrlStatusEl.classList.remove("is-checking", "is-available", "is-unavailable");
-
-			if (status === "available") {
-				baseUrlStatusEl.classList.add("is-available");
-				baseUrlStatusTextEl.textContent = "Available";
-				return;
+				el.src = "data:image/*;base64," + value;
+				el.style.display = "block";
+				emptyEl.style.display = "none";
 			}
 
-			if (status === "unavailable") {
-				baseUrlStatusEl.classList.add("is-unavailable");
-				baseUrlStatusTextEl.textContent = "Not Available";
-				return;
+			function setCustomerCif(value) {
+				customerCifEl.textContent = value || "Not loaded";
 			}
 
-			baseUrlStatusEl.classList.add("is-checking");
-			baseUrlStatusTextEl.textContent = "Checking...";
-		}
-
-		async function checkBaseUrlAvailability() {
-			if (!apiBaseUrl) {
-				setBaseUrlStatus("unavailable");
-				return false;
+			function setCustomerName(value) {
+				customerNameEl.textContent = value || "Not loaded";
 			}
 
-			setBaseUrlStatus("checking");
+			function setResultVisibility(visible) {
+				resultMessageEl.style.display = visible ? "block" : "none";
+				resultPreviewGridEl.style.display = visible ? "grid" : "none";
+			}
 
-			try {
-				const probeUrl = new URL(apiBaseUrl + "/");
-				probeUrl.searchParams.set("_base_url_probe", Date.now().toString());
+			function buildApiUrl(path, options) {
+				const useConfiguredBase = options && options.useConfiguredBase;
+				const baseUrl = useConfiguredBase ? apiBaseUrl : localApiBaseUrl;
+				return new URL(baseUrl + path);
+			}
 
-				await fetch(probeUrl.toString(), {
-					method: "GET",
-					mode: "no-cors",
-					cache: "no-store",
+			function setBaseUrlStatus(status) {
+				if (!baseUrlStatusEl) return;
+
+				baseUrlStatusEl.classList.remove("is-checking", "is-available", "is-unavailable");
+
+				if (status === "available") {
+					baseUrlStatusEl.classList.add("is-available");
+					if (baseUrlStatusTextEl) baseUrlStatusTextEl.textContent = "Available";
+					return;
+				}
+
+				if (status === "unavailable") {
+					baseUrlStatusEl.classList.add("is-unavailable");
+					if (baseUrlStatusTextEl) baseUrlStatusTextEl.textContent = "Not Available";
+					return;
+				}
+
+				baseUrlStatusEl.classList.add("is-checking");
+				if (baseUrlStatusTextEl) baseUrlStatusTextEl.textContent = "Checking...";
+			}
+
+			async function checkBaseUrlAvailability() {
+				if (!apiBaseUrl) {
+					setBaseUrlStatus("unavailable");
+					return false;
+				}
+
+				setBaseUrlStatus("checking");
+
+				try {
+					const probeUrl = new URL(apiBaseUrl + "/");
+					probeUrl.searchParams.set("_base_url_probe", Date.now().toString());
+
+					await fetch(probeUrl.toString(), {
+						method: "GET",
+						mode: "no-cors",
+						cache: "no-store",
+					});
+
+					setBaseUrlStatus("available");
+					return true;
+				} catch (error) {
+					setBaseUrlStatus("unavailable");
+					return false;
+				}
+			}
+
+			function getSearchMode() {
+				const selected = Array.from(searchModeEls).find(function (el) {
+					return el.checked;
 				});
 
-				setBaseUrlStatus("available");
-				return true;
-			} catch (error) {
-				setBaseUrlStatus("unavailable");
-				return false;
+				return selected ? selected.value : "account";
 			}
-		}
 
-		function getSearchMode() {
-			const selected = Array.from(searchModeEls).find(function (el) {
-				return el.checked;
-			});
+			function updateSearchModeUI() {
+				const isAccountMode = getSearchMode() === "account";
 
-			return selected ? selected.value : "account";
-		}
+				accountSearchGroupEl.style.display = isAccountMode ? "block" : "none";
+				cifSearchGroupEl.style.display = isAccountMode ? "none" : "block";
 
-		function updateSearchModeUI() {
-			const isAccountMode = getSearchMode() === "account";
+				if (isAccountMode) {
+					gmstCodeEl.value = "";
+					acNoEl.placeholder = "Ask with account number";
+					searchMetaEl.textContent = "Acc No. mode resolves CIF first, then fetches verification.";
+				} else {
+					acNoEl.value = "";
+					gmstCodeEl.placeholder = "Ask with CIF ID";
+					searchMetaEl.textContent = "CIF ID mode sends a direct verification request.";
+				}
+			}
 
-			accountSearchGroupEl.style.display = isAccountMode ? "block" : "none";
-			cifSearchGroupEl.style.display = isAccountMode ? "none" : "block";
-
-			if (isAccountMode) {
-				gmstCodeEl.value = "";
-				acNoEl.placeholder = "Ask with account number";
-				searchMetaEl.textContent = "Acc No. mode resolves CIF first, then fetches verification.";
-			} else {
+			function resetForm() {
 				acNoEl.value = "";
-				gmstCodeEl.placeholder = "Ask with CIF ID";
-				searchMetaEl.textContent = "CIF ID mode sends a direct verification request.";
+				gmstCodeEl.value = "";
+				searchModeEls.forEach(function (el) {
+					el.checked = el.value === "account";
+				});
+				updateSearchModeUI();
+				setCustomerCif("");
+				setCustomerName("");
+				setImage(photoEl, null);
+				setImage(signEl, null);
+				setResultVisibility(false);
+				utilityLayoutEl.classList.remove("utility-loading");
+				utilityLayoutEl.classList.remove("utility-has-results");
 			}
-		}
 
-		function resetForm() {
-			acNoEl.value = "";
-			gmstCodeEl.value = "";
+			allowOnlyDigits(gmstCodeEl);
+			allowOnlyDigits(acNoEl);
+			[gmstCodeEl, acNoEl].forEach(function (el) {
+				el.addEventListener("keydown", function (event) {
+					if (event.key === "Enter") {
+						event.preventDefault();
+						button.click();
+					}
+				});
+			});
 			searchModeEls.forEach(function (el) {
-				el.checked = el.value === "account";
+				el.addEventListener("change", updateSearchModeUI);
 			});
 			updateSearchModeUI();
-			setCustomerCif("");
-			setCustomerName("");
-			setImage(photoEl, null);
-			setImage(signEl, null);
 			setResultVisibility(false);
-			utilityLayoutEl.classList.remove("utility-loading");
-			utilityLayoutEl.classList.remove("utility-has-results");
-		}
+			checkBaseUrlAvailability();
 
-		allowOnlyDigits(gmstCodeEl);
-		allowOnlyDigits(acNoEl);
-		[gmstCodeEl, acNoEl].forEach(function (el) {
-			el.addEventListener("keydown", function (event) {
-				if (event.key === "Enter") {
-					event.preventDefault();
-					button.click();
-				}
-			});
-		});
-		searchModeEls.forEach(function (el) {
-			el.addEventListener("change", updateSearchModeUI);
-		});
-		updateSearchModeUI();
-		setResultVisibility(false);
-		checkBaseUrlAvailability();
+			button.addEventListener("click", async function () {
+				const searchMode = getSearchMode();
+				const acNo = searchMode === "account" ? acNoEl.value.trim() : "";
+				const cifInput = searchMode === "cif" ? gmstCodeEl.value.trim() : "";
+				let gmstCode = cifInput;
+				setCustomerCif("");
+				setCustomerName("");
+				setImage(photoEl, null);
+				setImage(signEl, null);
+				setResultVisibility(false);
+				utilityLayoutEl.classList.remove("utility-has-results");
+				utilityLayoutEl.classList.add("utility-loading");
 
-		button.addEventListener("click", async function () {
-			const searchMode = getSearchMode();
-			const acNo = searchMode === "account" ? acNoEl.value.trim() : "";
-			const cifInput = searchMode === "cif" ? gmstCodeEl.value.trim() : "";
-			let gmstCode = cifInput;
-			setCustomerCif("");
-			setCustomerName("");
-			setImage(photoEl, null);
-			setImage(signEl, null);
-			setResultVisibility(false);
-			utilityLayoutEl.classList.remove("utility-has-results");
-			utilityLayoutEl.classList.add("utility-loading");
+				try {
+					if (!apiBaseUrl) {
+						throw new Error("API Base URL is not configured in Netwin Settings.");
+					}
+					if (searchMode === "account" && !acNo) {
+						throw new Error("Please enter Ac-no.");
+					}
+					if (searchMode === "cif" && !gmstCode) {
+						throw new Error("Please enter CIF Id.");
+					}
 
-			try {
-				if (!apiBaseUrl) {
-					throw new Error("API Base URL is not configured in Netwin Settings.");
-				}
-				if (searchMode === "account" && !acNo) {
-					throw new Error("Please enter Ac-no.");
-				}
-				if (searchMode === "cif" && !gmstCode) {
-					throw new Error("Please enter CIF Id.");
-				}
+					if (searchMode === "account") {
+						const helperUrl = buildApiUrl(
+							"/api/method/banking_api.api.fetch_cif_id",
+						);
+						helperUrl.searchParams.set("ac_no", acNo);
 
-				if (searchMode === "account") {
-					const helperUrl = buildApiUrl(
-						"/api/method/banking_api.api.fetch_cif_id",
+						const helperResponse = await fetch(helperUrl.toString(), {
+							method: "GET",
+							headers: {
+								Accept: "application/json",
+							},
+							credentials: "include",
+						});
+						const helperResult = await helperResponse.json();
+						const helperPayload = helperResult.message || helperResult;
+
+						if (
+							helperPayload.status !== "success" ||
+							!helperPayload.data ||
+							!helperPayload.data.gmst_code
+						) {
+							throw new Error(helperPayload.message || "Unable to fetch CIF Id.");
+						}
+
+						gmstCode = helperPayload.data.gmst_code;
+						setCustomerCif(gmstCode);
+					}
+
+					const url = buildApiUrl(
+						"/api/method/banking_api.api.fetch_photo_and_signature",
 					);
-					helperUrl.searchParams.set("ac_no", acNo);
+					url.searchParams.set("gmst_code", gmstCode);
+					url.searchParams.set("ac_no", "");
 
-					const helperResponse = await fetch(helperUrl.toString(), {
+					const response = await fetch(url.toString(), {
 						method: "GET",
 						headers: {
 							Accept: "application/json",
 						},
 						credentials: "include",
 					});
-					const helperResult = await helperResponse.json();
-					const helperPayload = helperResult.message || helperResult;
+					const result = await response.json();
+					const payload = result.message || result;
 
-					if (
-						helperPayload.status !== "success" ||
-						!helperPayload.data ||
-						!helperPayload.data.gmst_code
-					) {
-						throw new Error(helperPayload.message || "Unable to fetch CIF Id.");
+					if (payload.status === "success" && payload.data) {
+						setCustomerCif(payload.data.gmst_code || gmstCode);
+						setCustomerName(payload.data.name);
+						setImage(photoEl, payload.data.photo_long);
+						setImage(signEl, payload.data.sign_long);
+						setResultVisibility(true);
+						utilityLayoutEl.classList.remove("utility-loading");
+						utilityLayoutEl.classList.add("utility-has-results");
+						return;
 					}
 
-					gmstCode = helperPayload.data.gmst_code;
-					setCustomerCif(gmstCode);
-				}
-
-				const url = buildApiUrl(
-					"/api/method/banking_api.api.fetch_photo_and_signature",
-				);
-				url.searchParams.set("gmst_code", gmstCode);
-				url.searchParams.set("ac_no", "");
-
-				const response = await fetch(url.toString(), {
-					method: "GET",
-					headers: {
-						Accept: "application/json",
-					},
-					credentials: "include",
-				});
-				const result = await response.json();
-				const payload = result.message || result;
-
-				if (payload.status === "success" && payload.data) {
-					setCustomerCif(payload.data.gmst_code || gmstCode);
-					setCustomerName(payload.data.name);
-					setImage(photoEl, payload.data.photo_long);
-					setImage(signEl, payload.data.sign_long);
-					setResultVisibility(true);
+					throw new Error(payload.message || "Unable to fetch records.");
+				} catch (error) {
 					utilityLayoutEl.classList.remove("utility-loading");
-					utilityLayoutEl.classList.add("utility-has-results");
-					return;
+					frappe.msgprint({
+						title: "Error",
+						message: error.message,
+						indicator: "red",
+					});
 				}
+			});
 
-				throw new Error(payload.message || "Unable to fetch records.");
-			} catch (error) {
-				utilityLayoutEl.classList.remove("utility-loading");
-				frappe.msgprint({
-					title: "Error",
-					message: error.message,
-					indicator: "red",
-				});
+			resetButton.addEventListener("click", function () {
+				resetForm();
+			});
+
+			// --- IMAGE ZOOM & PAN LOGIC ---
+			const modal = document.getElementById("image-zoom-modal");
+			const modalImg = document.getElementById("modal-image");
+			const closeBtn = document.getElementById("modal-close-btn");
+
+			let currentScale = 1;
+			let isDragging = false;
+			let startX, startY, translateX = 0, translateY = 0;
+
+			function updateTransform() {
+				modalImg.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
 			}
-		});
 
-		resetButton.addEventListener("click", function () {
-			resetForm();
-		});
-
-		// --- IMAGE ZOOM & PAN LOGIC ---
-		// Moved INSIDE the DOMContentLoaded event listener
-		const modal = document.getElementById("image-zoom-modal");
-		const modalImg = document.getElementById("modal-image");
-		const closeBtn = document.getElementById("modal-close-btn");
-
-		let currentScale = 1;
-		let isDragging = false;
-		let startX, startY, translateX = 0, translateY = 0;
-
-		function updateTransform() {
-			modalImg.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
-		}
-
-		function openModal(imgSrc) {
-			modalImg.src = imgSrc;
-			modal.classList.add("show");
-			// Reset transforms
-			currentScale = 1;
-			translateX = 0;
-			translateY = 0;
-			updateTransform();
-		}
-
-		function closeModal() {
-			modal.classList.remove("show");
-			setTimeout(() => { modalImg.src = ""; }, 300); // Clear image after fade out
-		}
-
-		// Attach click events to the original preview images
-		photoEl.addEventListener("click", function () {
-			if (photoEl.src) openModal(photoEl.src);
-		});
-
-		signEl.addEventListener("click", function () {
-			if (signEl.src) openModal(signEl.src);
-		});
-
-		// Close events
-		closeBtn.addEventListener("click", closeModal);
-		document.getElementById("modal-container").addEventListener("click", function (e) {
-			if (e.target === this) closeModal(); // Close if background clicked
-		});
-
-		// Zoom button controls
-		document.getElementById("zoom-in-btn").addEventListener("click", () => {
-			currentScale += 0.2;
-			updateTransform();
-		});
-
-		document.getElementById("zoom-out-btn").addEventListener("click", () => {
-			currentScale = Math.max(0.2, currentScale - 0.2);
-			updateTransform();
-		});
-
-		document.getElementById("zoom-reset-btn").addEventListener("click", () => {
-			currentScale = 1;
-			translateX = 0;
-			translateY = 0;
-			updateTransform();
-		});
-
-		// Mouse wheel to zoom
-		modalImg.addEventListener("wheel", function (e) {
-			e.preventDefault();
-			const zoomAmount = 0.1;
-			if (e.deltaY < 0) {
-				currentScale += zoomAmount; // Scroll up -> zoom in
-			} else {
-				currentScale = Math.max(0.2, currentScale - zoomAmount); // Scroll down -> zoom out
+			function openModal(imgSrc) {
+				modalImg.src = imgSrc;
+				modal.classList.add("show");
+				currentScale = 1;
+				translateX = 0;
+				translateY = 0;
+				updateTransform();
 			}
-			updateTransform();
-		});
 
-		// Drag to Pan
-		modalImg.addEventListener("mousedown", function (e) {
-			e.preventDefault();
-			isDragging = true;
-			startX = e.clientX - translateX;
-			startY = e.clientY - translateY;
-		});
+			function closeModal() {
+				modal.classList.remove("show");
+				setTimeout(() => { modalImg.src = ""; }, 300);
+			}
 
-		window.addEventListener("mousemove", function (e) {
-			if (!isDragging) return;
-			translateX = e.clientX - startX;
-			translateY = e.clientY - startY;
-			updateTransform();
-		});
+			photoEl.addEventListener("click", function () {
+				if (photoEl.src) openModal(photoEl.src);
+			});
 
-		window.addEventListener("mouseup", function () {
-			isDragging = false;
-		});
+			signEl.addEventListener("click", function () {
+				if (signEl.src) openModal(signEl.src);
+			});
 
-	}); // <-- This is the final closing bracket for DOMContentLoaded
+			closeBtn.addEventListener("click", closeModal);
+			document.getElementById("modal-container").addEventListener("click", function (e) {
+				if (e.target === this) closeModal();
+			});
+
+			document.getElementById("zoom-in-btn").addEventListener("click", () => {
+				currentScale += 0.2;
+				updateTransform();
+			});
+
+			document.getElementById("zoom-out-btn").addEventListener("click", () => {
+				currentScale = Math.max(0.2, currentScale - 0.2);
+				updateTransform();
+			});
+
+			document.getElementById("zoom-reset-btn").addEventListener("click", () => {
+				currentScale = 1;
+				translateX = 0;
+				translateY = 0;
+				updateTransform();
+			});
+
+			modalImg.addEventListener("wheel", function (e) {
+				e.preventDefault();
+				const zoomAmount = 0.1;
+				if (e.deltaY < 0) {
+					currentScale += zoomAmount;
+				} else {
+					currentScale = Math.max(0.2, currentScale - zoomAmount);
+				}
+				updateTransform();
+			});
+
+			modalImg.addEventListener("mousedown", function (e) {
+				e.preventDefault();
+				isDragging = true;
+				startX = e.clientX - translateX;
+				startY = e.clientY - translateY;
+			});
+
+			window.addEventListener("mousemove", function (e) {
+				if (!isDragging) return;
+				translateX = e.clientX - startX;
+				translateY = e.clientY - startY;
+				updateTransform();
+			});
+
+			window.addEventListener("mouseup", function () {
+				isDragging = false;
+			});
+		}
+	}); 
 </script>
 {% endblock %}

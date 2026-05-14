@@ -244,3 +244,38 @@ def download_netwin_statement(branch_code, ac_code, ac_no, start_date, end_date,
 		export_format=export_format
 	)
 
+@frappe.whitelist()
+def get_user_context():
+	user = frappe.session.user
+
+	emp = frappe.db.get_value(
+		"Employee",
+		{"user_id": user},
+		["name", "netwin_statement", "sol_id"],
+		as_dict=True
+	)
+
+	branch = None
+	if emp and emp.get("sol_id"):
+		branch = frappe.db.get_value(
+			"Sahayog Branch",
+			{"sol_id": emp["sol_id"]},
+			"branch_code"
+		)
+
+	branches = frappe.db.get_all(
+		"Sahayog Branch",
+		filters=[
+			["branch_code", "is", "set"],   # remove NULL
+			["branch_code", "!=", ""]       # remove empty
+		],
+		fields=["branch_code"],
+		distinct=True
+	)
+
+	return {
+		"user": user,
+		"employee": emp,
+		"user_branch": branch,
+		"branches": branches
+	}
