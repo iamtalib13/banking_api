@@ -597,11 +597,6 @@
 
 		{% else %} {% include "/templates/not-found.html" %} {% endif %}
 
-		<!-- 
-    <script>
-        // ... (existing commented-out code preserved)
-    </script> -->
-
 		<script>
 			window.csrf_token = "{{ frappe.session.csrf_token }}";
 
