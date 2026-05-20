@@ -272,7 +272,7 @@ def get_user_context():
 			["branch_code", "is", "set"],   # remove NULL
 			["branch_code", "!=", ""]       # remove empty
 		],
-		fields=["branch_code"],
+		fields=["branch_code", "branch"],
 		distinct=True
 	)
 

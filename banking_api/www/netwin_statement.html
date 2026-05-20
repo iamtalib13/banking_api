@@ -5,6 +5,8 @@
 		<title>Transaction Statement</title>
 
 		<link rel="stylesheet" href="/assets/frappe/css/bootstrap.css" />
+		<!-- Flatpickr CSS -->
+		<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
 		<style>
 			body {
@@ -41,6 +43,12 @@
 				padding: 36px 30px 26px 30px;
 
 				box-shadow: 0 8px 28px rgba(0, 0, 0, 0.13);
+
+				transition: transform 0.3s ease, box-shadow 0.3s ease;
+			}
+
+			.container:hover {
+				box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
 			}
 
 			.logo {
@@ -167,6 +175,19 @@
 
 			.btn-primary:hover {
 				background-color: #028079;
+				transform: translateY(-1px);
+				box-shadow: 0 4px 12px rgba(0, 103, 104, 0.2);
+			}
+
+			.btn-primary:active {
+				transform: translateY(0);
+			}
+
+			.btn-primary:disabled {
+				background-color: #ccc;
+				cursor: not-allowed;
+				transform: none;
+				box-shadow: none;
 			}
 
 			.alert {
@@ -414,6 +435,31 @@
 				margin-top: 20px;
 			}
 
+			/* Flatpickr Custom Green Theme */
+			.flatpickr-day.selected, .flatpickr-day.startRange, .flatpickr-day.endRange, 
+			.flatpickr-day.selected.inRange, .flatpickr-day.startRange.inRange, 
+			.flatpickr-day.endRange.inRange, .flatpickr-day.selected:focus, 
+			.flatpickr-day.startRange:focus, .flatpickr-day.endRange:focus, 
+			.flatpickr-day.selected:hover, .flatpickr-day.startRange:hover, 
+			.flatpickr-day.endRange:hover, .flatpickr-day.selected.prevMonthDay, 
+			.flatpickr-day.startRange.prevMonthDay, .flatpickr-day.endRange.prevMonthDay, 
+			.flatpickr-day.selected.nextMonthDay, .flatpickr-day.startRange.nextMonthDay, 
+			.flatpickr-day.endRange.nextMonthDay {
+				background: #006768;
+				border-color: #006768;
+			}
+			.flatpickr-months .flatpickr-month {
+				background: #006768;
+				color: #fff;
+				fill: #fff;
+			}
+			.flatpickr-current-month .flatpickr-monthDropdown-months:hover {
+				background: #028079;
+			}
+			.flatpickr-calendar {
+				border: 1px solid #006768;
+			}
+
 			/* Side-by-Side Layout */
 			.main-wrapper {
 				display: flex;
@@ -483,7 +529,7 @@
 
 				<h1>Transaction Statement</h1>
 
-				<form id="statement-form" novalidate>
+				<form id="statement-form" autocomplete="off" novalidate>
 					<div class="form-row">
 						<div class="form-group">
 							<label for="ac_no" class="form-label">Account No</label>
@@ -495,6 +541,8 @@
 								placeholder="Enter Account No"
 								required
 								autofocus
+								inputmode="numeric"
+								oninput="this.value = this.value.replace(/[^0-9]/g, '')"
 							/>
 
 							<span class="error-hint" id="err-ac_no"></span>
@@ -529,11 +577,13 @@
 
 							<span class="error-hint" id="err-branch_code"></span>
 						</div>
+					</div>
 
+					<div class="form-row">
 						<div class="form-group">
 							<label for="start_date" class="form-label">Start Date</label>
 
-							<input type="date" class="form-control" id="start_date" required />
+							<input type="text" class="form-control" id="start_date" placeholder="DD/MM/YYYY" required />
 
 							<span class="error-hint" id="err-start_date"></span>
 						</div>
@@ -541,18 +591,18 @@
 						<div class="form-group">
 							<label for="end_date" class="form-label">End Date</label>
 
-							<input type="date" class="form-control" id="end_date" required />
+							<input type="text" class="form-control" id="end_date" placeholder="DD/MM/YYYY" required />
 
 							<span class="error-hint" id="err-end_date"></span>
 						</div>
 					</div>
 
 					<div class="button-group">
-						<button type="submit" class="btn-primary" id="btn-download" style="display: none;">
-							⬇ Download Statement
+						<button type="button" class="btn-primary" id="btn-pdf" onclick="handleDownload('pdf')">
+							📄 Download PDF
 						</button>
-						<button type="button" class="btn-secondary" id="btn-view" onclick="handleView()">
-							👁 View Statement
+						<button type="button" class="btn-primary" id="btn-csv" style="background-color: #28a745;" onclick="handleDownload('csv')">
+							📊 Download CSV
 						</button>
 					</div>
 				</form>
@@ -561,47 +611,203 @@
 
 				<div id="alert-container" class="alert"></div>
 			</div>
-
-			<!-- Result Section Container -->
-			<div id="results-container" class="results-container">
-				<div id="pdf-preview-wrapper" style="display: none">
-					<iframe
-						id="pdf-iframe"
-						width="100%"
-						height="800px"
-						style="border: 1px solid #ccc; border-radius: 8px"
-					></iframe>
-				</div>
-			</div>
-		</div>
-
-		<!-- Format Selection Modal -->
-
-		<div class="modal-overlay" id="format-modal">
-			<div class="modal-content">
-				<div class="modal-title">Select Export Format</div>
-
-				<div class="modal-buttons">
-					<button class="btn-option" onclick="handleDownload('pdf')">
-						📄 Download as PDF
-					</button>
-
-					<button class="btn-option" onclick="handleDownload('csv')">
-						📊 Download as CSV
-					</button>
-				</div>
-
-				<button class="btn-cancel" onclick="closeModal()">Cancel</button>
-			</div>
 		</div>
 
 		{% else %} {% include "/templates/not-found.html" %} {% endif %}
 
+		<!-- Flatpickr JS -->
+		<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
 		<script>
 			window.csrf_token = "{{ frappe.session.csrf_token }}";
 
+			const GL_CODES = [
+				{ code: "B101", name: "RECURRING DEPOSIT PLAN2" },
+				{ code: "B102", name: "FIXED DEPOSIT PLAN 2" },
+				{ code: "B103", name: "SECURITY DEPOSITS" },
+				{ code: "B104", name: "RECURRING DEPOSIT PLAN1" },
+				{ code: "K201", name: "ADVANCES TO EMPLOYEES" },
+				{ code: "K102", name: "PERSONAL LOAN" },
+				{ code: "K103", name: "STAFF LOAN ACCOUNT" },
+				{ code: "K203", name: "ADVANCES  TO BRANCH OPENING" },
+				{ code: "K104", name: "GROUP LOAN" },
+				{ code: "K105", name: "TARAN LOAN" },
+				{ code: "K206", name: "OTHER ADVANCES" },
+				{ code: "K107", name: "GROUP TARAN" },
+				{ code: "K108", name: "LOAN AGAINST FD" },
+				{ code: "K210", name: "GOAT LOAN ISSUE" },
+				{ code: "R106", name: "PROCESSING FEES" },
+				{ code: "X101", name: "OFFICE MAINTENANCE" },
+				{ code: "X105", name: "STAFF SALARY EXPENSE" },
+				{ code: "X113", name: "AGENT COMMISSION PAID" },
+				{ code: "X116", name: "MISC EXPENSES" },
+				{ code: "X117", name: "OFFICE RENT A\\C" },
+				{ code: "Y103", name: "INTEREST PAID - RECURRING DEPOSIT" },
+				{ code: "AGNT", name: "AGENT" },
+				{ code: "SAV", name: "SAVING DEPOSIT" },
+				{ code: "DAM", name: "DAMDUPPAT DEPOSIT AC" },
+				{ code: "FD", name: "MONTHLY INCOME SCHEME DEPOSIT" },
+				{ code: "PERLON", name: "PERSONAL LOAN OF SALARY" },
+				{ code: "RD", name: "RECURRING DEPOSIT" },
+				{ code: "SKBG", name: "SAHAYOG KISAN BACHAT GAT" },
+				{ code: "B108", name: "CURRENT ACCOUNT" },
+				{ code: "K109", name: "SALARY LOAN" },
+				{ code: "INV", name: "NON OF USE" },
+				{ code: "B107", name: "DAILY DEPOSIT" },
+				{ code: "DLYLO", name: "TARAN AGAINST DAILY DEPOSIT" },
+				{ code: "INDLO", name: "INDIVIDUAL LOAN" },
+				{ code: "DD", name: "DAILY DEPOSIT" },
+				{ code: "K106", name: "C.C.LIMIT" },
+				{ code: "K202", name: "MOBILE ADVANCE" },
+				{ code: "LFD", name: "LOCKER SECURITY DEPOSIT" },
+				{ code: "K110", name: "TERM LOAN" },
+				{ code: "FD3", name: "FIXED DEPOSITS PLAN 3" },
+				{ code: "K111", name: "DATTAK GRAM LOAN" },
+				{ code: "SHLINK", name: "SHARE LINKAGE ACCOUNT" },
+				{ code: "B105", name: "AGENT SECURITY DEPOSIT" },
+				{ code: "PF", name: "EMPLOYEE PROVIDENT FUND" },
+				{ code: "SWF", name: "STAFF WELFARE FUND" },
+				{ code: "PT", name: "EMPLOYEE PROFESSIONAL TAX" },
+				{ code: "ITS", name: "INCOME TAX SALARY (92B)" },
+				{ code: "INVADM", name: "INVESTMENT IN AADHAR MULTISTATE" },
+				{ code: "B109", name: "RETIREMENT FUTURE FUND" },
+				{ code: "SH", name: "SHARE ACCOUNT" },
+				{ code: "K205", name: "PURPOSE ADVANCE A/C" },
+				{ code: "PL", name: "PROFIT & LOSS" },
+				{ code: "B110", name: "AGENT SECURITY A/C" },
+				{ code: "AGNSUS", name: "AGENT SUSPENSE A/C" },
+				{ code: "EMSAAD", name: "EMPLOYEES SALARY ADVANCE" },
+				{ code: "K112", name: "SMALL BUSINESS LOAN" },
+				{ code: "MOBAPP", name: "MOBILE APP" },
+				{ code: "BACHTL", name: "JOINT LIABILITIES LOAN" },
+				{ code: "VL", name: "VEHICLE LOAN" },
+				{ code: "USEVL", name: "USE TWO WHEELER LOAN" },
+				{ code: "EMPINS", name: "EMPLOYEES INSURANCE" },
+				{ code: "VLGSA", name: "NOT USE (VEHICAL LOAN GUARANTOR SAVINGS)" },
+				{ code: "JLLEXE", name: "JLL EXECUTIVE" },
+				{ code: "TAVL", name: "TRADING ADVANCE VEHICAL LOAN" },
+				{ code: "BACSAV", name: "JLL SAVING A/C" },
+				{ code: "HSLO", name: "HOSPITAL AND SCHOOL STAFF LOAN" },
+				{ code: "VLMIS", name: "VEHICLE LOAN MISCELLANEOUS" },
+				{ code: "INVESA", name: "INVESTMENT IN ESAF SMALL FINANCE BANK" },
+				{ code: "EHOLO", name: "EMPLOYEES HOME LOAN" },
+				{ code: "BDE", name: "BUSINESS DEVELOPMENT EXECUTIVE" },
+				{ code: "UNT", name: "UNTRACEABLE" },
+				{ code: "VL21", name: "SEASON SCHEME VEHICLE LOAN 21" },
+				{ code: "SILSAV", name: "SILVER SAVING AC" },
+				{ code: "FD4", name: "FIXED DEPOSIT PLAN 4" },
+				{ code: "PURPO", name: "PURPOSE ADVANCE ACCOUNTS" },
+				{ code: "CUGOLD", name: "CURRENT GOLD ACCOUNT" },
+				{ code: "CUWEAL", name: "CURRENT WEALTH ACCOUNT" },
+				{ code: "SAVSIL", name: "SAVING SILVER ACCOUNT" },
+				{ code: "INVBOB", name: "INVESTMENT IN BANK OF BARODA" },
+				{ code: "EVL", name: "ELECTRIC VEHICLE LOAN" },
+				{ code: "SWEES", name: "SAHAYOG WOMAN E.E.SCHEME" },
+				{ code: "EMPRLO", name: "EMPLOYEES PERSONAL LOAN" },
+				{ code: "LWF", name: "LABOUR WELFARE FUND EMPLOYEE" },
+				{ code: "DDLOAN", name: "DAILY DEPOSIT LOAN" },
+				{ code: "BRNET", name: "BR NET JOINT LIABILITY LOAN" },
+				{ code: "HOSCLO", name: "STAFF OF HOSPITAL AND SCHOOL LOAN" },
+				{ code: "DDGIFT", name: "DAILY DEPOSIT GIFT" },
+				{ code: "JLLSUS", name: "JLL EXECUTIVE SUSPENSE AC" },
+				{ code: "INDRD", name: "INDIAN BANK RD Ac 7393401276" },
+				{ code: "BLLOAN", name: "BUSINESS LOAN ACCOUNT" },
+				{ code: "INVCEB", name: "INVESTMENT IN CENTRAL BANK OF INDIA" },
+				{ code: "VL23", name: "VEHICAL LOAN INT 2023" },
+				{ code: "INVSGB", name: "INVESTMENT IN SAHAYOG GRAMIN BIGAR SHETT" },
+				{ code: "INVJNP", name: "INVESTMENT IN JANHIT NAGRI SAH PAT SANSTHA" },
+				{ code: "EMINRE", name: "EMPLOYEE INSURANCE REIMBURSMENT" },
+				{ code: "MOBAIL", name: "MOBAILE LOAN" },
+				{ code: "EVLSS", name: "EVL SPECIAL SCHEME 10.99" },
+				{ code: "VL24", name: "VL SPECIAL SCHEME 24" },
+				{ code: "SAVSCH", name: "SAVING SCHOOL" },
+				{ code: "INVYUB", name: "INVESTMENT IN THE YAVATMAL URBAN CO OP BANK" },
+				{ code: "BSD", name: "BUILDING SECURITY DEPOSIT" },
+				{ code: "INVPNB", name: "INVESTMENT IN PANJAB NATIONAL BANK" },
+				{ code: "JLLRD", name: "JOINT LIABILITY RECURRING DEPOSIT" },
+				{ code: "JLLSA", name: "JOINT LIABILITY SAVING ACCOUNT" },
+				{ code: "INVHDF", name: "INVESTMENT IN HDFC BANK" },
+				{ code: "FDL60", name: "FD TARAN 60 PERCENT" },
+				{ code: "FDL70", name: "FD TARAN 70 PERCENT" },
+				{ code: "DAML50", name: "DAMDUPPAT TARAN 50" },
+				{ code: "DAMTL6", name: "DAMDUPPAT TARAN 60 PERCENT" },
+				{ code: "DAMTL7", name: "DAMDUPPAT TARAN 70 PERCENT" },
+				{ code: "DAMTL8", name: "DAMDUPPAT TARAN 80 PERCENT" },
+				{ code: "DAMOD", name: "DAMDUPPAT OVER DRAFT" },
+				{ code: "FDL50", name: "FD TARAN 50 PERSENT" },
+				{ code: "TASSIL", name: "TASC SAVING SILVER" },
+				{ code: "TASCUW", name: "TASC CURRENT WEALTH" },
+				{ code: "ESIC", name: "ESIC PAYABLE" },
+				{ code: "NPS", name: "NATIONAL PENSION SCHEME" },
+				{ code: "ADUSCH", name: "EDUCATION SCHIME" }
+			];
+
+			function createSearchableDropdown(container, inputField, data, keyProp, nameProp) {
+				const dropdown = document.createElement("div");
+				dropdown.className = "dropdown-menu";
+				dropdown.style.display = "none";
+				dropdown.style.position = "absolute";
+				dropdown.style.width = "100%";
+				dropdown.style.maxHeight = "250px";
+				dropdown.style.overflowY = "auto";
+				dropdown.style.background = "white";
+				dropdown.style.border = "1px solid #006768";
+				dropdown.style.zIndex = "1000";
+				dropdown.style.boxShadow = "0 8px 16px rgba(0,0,0,0.1)";
+				dropdown.style.borderRadius = "0 0 7px 7px";
+
+				function renderOptions(filter = "") {
+					dropdown.innerHTML = "";
+					const search = (filter || "").toLowerCase();
+
+					data.filter(item => {
+						const code = (item[keyProp] || "").toString().toLowerCase();
+						const name = (item[nameProp] || "").toString().toLowerCase();
+						return code.includes(search) || name.includes(search);
+					}).forEach(item => {
+						const div = document.createElement("div");
+						div.style.padding = "10px 12px";
+						div.style.cursor = "pointer";
+						div.style.borderBottom = "1px solid #f0f0f0";
+						div.innerHTML = `<strong>${item[keyProp]}</strong> - <span style="font-size: 0.85em; color: #555;">${item[nameProp]}</span>`;
+
+						div.onmouseover = () => div.style.background = "#f0f7f7";
+						div.onmouseout = () => div.style.background = "white";
+
+						div.onclick = () => {
+							inputField.value = item[keyProp];
+							dropdown.style.display = "none";
+						};
+
+						dropdown.appendChild(div);
+					});
+				}
+
+				renderOptions();
+				container.appendChild(dropdown);
+
+				inputField.onfocus = () => {
+					dropdown.style.display = "block";
+					renderOptions(inputField.value);
+				};
+				inputField.oninput = () => {
+					dropdown.style.display = "block";
+					renderOptions(inputField.value);
+				};
+
+				document.addEventListener("click", (e) => {
+					if (!container.contains(e.target)) dropdown.style.display = "none";
+				});
+			}
+
 			window.addEventListener("load", async () => {
+				// Initialize GL Code Dropdown
+				const acCodeField = document.getElementById("ac_code");
+				const acCodeGroup = acCodeField.closest(".form-group");
+				createSearchableDropdown(acCodeGroup, acCodeField, GL_CODES, "code", "name");
+
 				console.log("Page load listener fired.");
+
 				const branchField = document.getElementById("branch_code");
 				if (!branchField) {
 					console.log("Branch field not found.");
@@ -706,14 +912,14 @@
 						// ✅ ALWAYS allow admin
 						branchField.value = "";
 						branchField.readOnly = false;
-						createDropdown(branchGroup, branchField, branches);
+						createSearchableDropdown(branchGroup, branchField, branches, "branch_code", "branch");
 					} else if (employee) {
 						const isChecked = !!employee.netwin_statement;
 
 						if (isChecked) {
 							branchField.value = "";
 							branchField.readOnly = false;
-							createDropdown(branchGroup, branchField, branches);
+							createSearchableDropdown(branchGroup, branchField, branches, "branch_code", "branch");
 						} else {
 							if (userBranch) {
 								branchField.value = userBranch;
@@ -729,12 +935,25 @@
 					console.error("Fetch API Call Failed:", e);
 				}
 
-				// Reset buttons if form is changed
-				document.getElementById("statement-form").addEventListener("input", () => {
-					document.getElementById("btn-view").style.display = "block";
-					document.getElementById("btn-download").style.display = "none";
+				// Re-initialize Flatpickr (fixing the overwrite)
+				const startPicker = flatpickr("#start_date", {
+					dateFormat: "d/m/Y",
+					allowInput: true,
+					defaultDate: "01/01/2014",
+					onChange: function(selectedDates, dateStr, instance) {
+						endPicker.set('minDate', dateStr);
+					}
+				});
+				const endPicker = flatpickr("#end_date", {
+					dateFormat: "d/m/Y",
+					allowInput: true,
+					defaultDate: "09/12/2024",
+					onChange: function(selectedDates, dateStr, instance) {
+						startPicker.set('maxDate', dateStr);
+					}
 				});
 			});
+
 		</script>
 		<script>
 			// Util for showing/hiding loader
@@ -774,60 +993,9 @@
 				});
 			}
 
-			// Modal Handlers
-			function openModal() {
-				document.getElementById("format-modal").style.display = "flex";
-			}
-			function closeModal() {
-				document.getElementById("format-modal").style.display = "none";
-			}
-
-			// Core: Form submission logic with advanced error handling
-			document.getElementById("statement-form").addEventListener("submit", async (event) => {
-				event.preventDefault();
-
-				const btnView = document.getElementById("btn-view");
-				const isViewVisible = window.getComputedStyle(btnView).display !== "none";
-
-				if (isViewVisible) {
-					// If View button is visible, Enter key should trigger handleView
-					handleView();
-				} else {
-					// If Download button is visible (View was already clicked), Enter key should trigger modal
-					clearFieldErrors();
-
-					// Validate first before showing modal
-					const acNo = document.getElementById("ac_no").value.trim();
-					const acCode = document.getElementById("ac_code").value.trim();
-					const branchCode = document.getElementById("branch_code").value.trim();
-					const startDate = document.getElementById("start_date").value;
-					const endDate = document.getElementById("end_date").value;
-
-					let clientErrors = {};
-					if (!acNo) clientErrors["ac_no"] = "Account number is required.";
-					if (!acCode) clientErrors["ac_code"] = "GL Code is required.";
-					if (!branchCode) clientErrors["branch_code"] = "Branch Code is required.";
-					if (!startDate) clientErrors["start_date"] = "Start date is required.";
-					if (!endDate) clientErrors["end_date"] = "End date is required.";
-
-					if (Object.keys(clientErrors).length) {
-						Object.entries(clientErrors).forEach(([field, msg]) =>
-							showFieldError(field, msg),
-						);
-						showAlert("Please correct the errors and try again.", "error");
-						return;
-					}
-
-					openModal();
-				}
-			});
-
+			// Core: Download logic with validation
 			async function handleDownload(format) {
-				closeModal();
-				setLoading(true);
-
-				const submitButton = document.querySelector(".btn-primary");
-				submitButton.disabled = true;
+				clearFieldErrors();
 
 				// Collect form data
 				const acNo = document.getElementById("ac_no").value.trim();
@@ -838,6 +1006,28 @@
 					.toUpperCase();
 				const startDate = document.getElementById("start_date").value;
 				const endDate = document.getElementById("end_date").value;
+
+				// Client side validation
+				let clientErrors = {};
+				if (!acNo) clientErrors["ac_no"] = "Account number is required.";
+				if (!acCode) clientErrors["ac_code"] = "GL Code is required.";
+				if (!branchCode) clientErrors["branch_code"] = "Branch Code is required.";
+				if (!startDate) clientErrors["start_date"] = "Start date is required.";
+				if (!endDate) clientErrors["end_date"] = "End date is required.";
+
+				if (Object.keys(clientErrors).length) {
+					Object.entries(clientErrors).forEach(([field, msg]) =>
+						showFieldError(field, msg),
+					);
+					showAlert("Please correct the errors and try again.", "error");
+					return;
+				}
+
+				setLoading(true);
+				const btnPdf = document.getElementById("btn-pdf");
+				const btnCsv = document.getElementById("btn-csv");
+				btnPdf.disabled = true;
+				btnCsv.disabled = true;
 
 				// API request
 				try {
@@ -892,88 +1082,17 @@
 					showAlert("Network error. Please try again.", "error");
 				} finally {
 					setLoading(false);
-					submitButton.disabled = false;
+					btnPdf.disabled = false;
+					btnCsv.disabled = false;
 				}
 			}
 
-			async function handleView() {
-				clearFieldErrors();
+			// Handle Enter key on form
+			document.getElementById("statement-form").addEventListener("submit", (e) => {
+				e.preventDefault();
+				handleDownload('pdf'); // Default to PDF on enter
+			});
 
-				const acNo = document.getElementById("ac_no").value.trim();
-				const acCode = document.getElementById("ac_code").value.trim().toUpperCase();
-				const branchCode = document
-					.getElementById("branch_code")
-					.value.trim()
-					.toUpperCase();
-				const startDate = document.getElementById("start_date").value;
-				const endDate = document.getElementById("end_date").value;
-
-				let clientErrors = {};
-				if (!acNo) clientErrors["ac_no"] = "Account number is required.";
-				if (!acCode) clientErrors["ac_code"] = "GL Code is required.";
-				if (!branchCode) clientErrors["branch_code"] = "Branch Code is required.";
-				if (!startDate) clientErrors["start_date"] = "Start date is required.";
-				if (!endDate) clientErrors["end_date"] = "End date is required.";
-
-				if (Object.keys(clientErrors).length) {
-					Object.entries(clientErrors).forEach(([field, msg]) =>
-						showFieldError(field, msg),
-					);
-					showAlert("Please correct the errors and try again.", "error");
-					return;
-				}
-
-				setLoading(true);
-				const resultsContainer = document.getElementById("results-container");
-				resultsContainer.style.display = "none";
-
-				try {
-					// 1. Fetch PDF Blob for Preview
-					const pdfResponse = await fetch(
-						"/api/method/banking_api.api.download_netwin_statement",
-						{
-							method: "POST",
-							headers: {
-								"Content-Type": "application/json",
-								"X-Frappe-CSRF-Token": window.csrf_token,
-							},
-							body: JSON.stringify({
-								branch_code: branchCode,
-								ac_code: acCode,
-								ac_no: acNo,
-								start_date: startDate,
-								end_date: endDate,
-								export_format: "pdf",
-							}),
-						},
-					);
-
-					if (pdfResponse.ok) {
-						const blob = await pdfResponse.blob();
-						const url = window.URL.createObjectURL(blob);
-						const iframe = document.getElementById("pdf-iframe");
-						// Append parameters to hide toolbar and nav panes
-						iframe.src = url + "#toolbar=0&navpanes=0&view=FitH";
-
-						document.getElementById("main-layout-wrapper").classList.add("side-by-side");
-						document.getElementById("pdf-preview-wrapper").style.display = "block";
-						resultsContainer.style.display = "block";
-						
-						// Toggle buttons
-						document.getElementById("btn-view").style.display = "none";
-						document.getElementById("btn-download").style.display = "block";
-
-						showAlert("Statement preview loaded! ✅", "success");
-					} else {
-						showAlert("Failed to load PDF preview.", "error");
-					}
-				} catch (error) {
-					showAlert("An error occurred while fetching data.", "error");
-					console.error(error);
-				} finally {
-					setLoading(false);
-				}
-			}
 		</script>
 	</body>
 </html>

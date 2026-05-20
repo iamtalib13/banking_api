@@ -30,9 +30,17 @@ def test_db(branch_code, ac_code, ac_no, start_date, end_date, export_format="pd
 		except Exception as e:
 			frappe.log_error(f"Oracle Client Init Error: {str(e)}", "test_db")
 
-		# Convert string dates to datetime objects
-		start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
-		end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
+		# Flexible date parsing
+		def parse_date(date_str):
+			for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d"):
+				try:
+					return datetime.strptime(date_str, fmt)
+				except ValueError:
+					continue
+			frappe.throw(_("Invalid date format: {0}. Please use DD/MM/YYYY.").format(date_str))
+
+		start_date_obj = parse_date(start_date)
+		end_date_obj = parse_date(end_date)
 
 		# Fetch connection details from "Netwin Settings" (Modified from "Netwin Database Settings" to match existing DocType)
 		settings = frappe.get_single("Netwin Settings")
@@ -98,13 +106,14 @@ def test_db(branch_code, ac_code, ac_no, start_date, end_date, export_format="pd
 		if not table_name:
 			frappe.throw(_("Table mapping not found for ACMASTCODE: {0}").format(acmastcode))
 
-		# Step 3: Dynamically fetch GMST_CODE
+		# Step 3: Dynamically fetch GMST_CODE and Customer details in one query
 		query = f"""
-			SELECT GMST_CODE
-			FROM SAHYOG.{table_name}
-			WHERE AC_NO = :ac_no
-			AND ACMASTCODE = :acmastcode
-			AND BRANCHCODE = :branch_code
+			SELECT t.GMST_CODE, b.name, b.addr, b.city, b.adharno, b.mobileno
+			FROM SAHYOG.{table_name} t
+			JOIN SAHYOG.BANKMAS b ON t.GMST_CODE = b.GMST_CODE
+			WHERE t.AC_NO = :ac_no
+			AND t.ACMASTCODE = :acmastcode
+			AND t.BRANCHCODE = :branch_code
 		"""
 
 		cursor.execute(query, {
@@ -112,63 +121,40 @@ def test_db(branch_code, ac_code, ac_no, start_date, end_date, export_format="pd
 			'acmastcode': acmastcode,
 			'branch_code': branch_code
 		})
-		gmst_code_result = cursor.fetchone()
+		customer_result = cursor.fetchone()
 
-		if not gmst_code_result:
-			frappe.throw(_("GMST_CODE not found for the given criteria."))
+		if not customer_result:
+			frappe.throw(_("Customer details or GMST_CODE not found for the given criteria."))
 
-		gmst_code = gmst_code_result[0]
-
-		# 4. Fetch customer details using GMST_CODE
-		cursor.execute(
-			"""
-			SELECT name, addr, city, adharno, mobileno
-			FROM SAHYOG.BANKMAS
-			WHERE GMST_CODE = :gmst_code
-			""",
-			{'gmst_code': gmst_code}
-		)
-		customer_details = cursor.fetchone()
-		if not customer_details:
-			frappe.throw(_("Customer details not found for the provided GMST_CODE."))
+		gmst_code, cust_name, cust_addr, cust_city, cust_aadhar, cust_mobile = customer_result
 
 		customer_info = {
-			"name": customer_details[0],
-			"address": customer_details[1],
-			"city": customer_details[2],
-			"aadhar": customer_details[3],
-			"telephone": customer_details[4],
+			"name": cust_name,
+			"address": cust_addr,
+			"city": cust_city,
+			"aadhar": cust_aadhar,
+			"telephone": cust_mobile,
 		}
 
-		# 5. Calculate opening balance
-		cursor.execute(
-			"""
-			SELECT 
-				NVL(SUM(CASE WHEN credit > 0 THEN credit ELSE 0 END), 0) - 
-				NVL(SUM(CASE WHEN debit > 0 THEN debit ELSE 0 END), 0) AS opening_balance
-			FROM 
-				SAHYOG.ACBK
-			WHERE 
-				AC_NO = :ac_no 
-				AND FORBRANCH = :branch_code 
-				AND ACMASTCODE = :acmastcode 
-				AND tdate < :start_date
-				AND POST = 1
-				AND (cncled != 1 OR cncled IS NULL)
-			""",
-			{
-				'ac_no': ac_no,
-				'branch_code': branch_code,
-				'acmastcode': acmastcode,
-				'start_date': start_date_obj
-			}
-		)
-		opening_balance = cursor.fetchone()[0] or 0
-
-		# 7. Fetch transactions within the specified date range
-		cursor.execute(
-			"""
-			SELECT tdate, credit, debit, prtcls, doc_no
+		# Step 4: Fetch opening balance and transactions in one query using UNION ALL
+		# Row 1 is Opening Balance (identified by sort_order = -1)
+		# Remaining rows are transactions
+		query = """
+			SELECT NULL as tdate, 
+			       NVL(SUM(CASE WHEN credit > 0 THEN credit ELSE 0 END), 0) as credit,
+			       NVL(SUM(CASE WHEN debit > 0 THEN debit ELSE 0 END), 0) as debit,
+			       'OPENING BALANCE' as prtcls, 
+			       NULL as doc_no, 
+			       -1 as sort_order
+			FROM SAHYOG.ACBK
+			WHERE AC_NO = :ac_no 
+			  AND FORBRANCH = :branch_code 
+			  AND ACMASTCODE = :acmastcode 
+			  AND tdate < :start_date
+			  AND POST = 1
+			  AND (cncled != 1 OR cncled IS NULL)
+			UNION ALL
+			SELECT tdate, credit, debit, prtcls, doc_no, ctrnno as sort_order
 			FROM SAHYOG.ACBK
 			WHERE AC_NO = :ac_no 
 			  AND FORBRANCH = :branch_code 
@@ -176,30 +162,34 @@ def test_db(branch_code, ac_code, ac_no, start_date, end_date, export_format="pd
 			  AND tdate BETWEEN :start_date AND :end_date
 			  AND POST = 1
 			  AND (cncled != 1 OR cncled IS NULL)
-			ORDER BY ctrnno
-			""",
-			{
-				'ac_no': ac_no,
-				'branch_code': branch_code,
-				'acmastcode': acmastcode,
-				'start_date': start_date_obj,
-				'end_date': end_date_obj
-			}
-		)
-		transactions = cursor.fetchall()
+			ORDER BY sort_order
+		"""
+
+		cursor.execute(query, {
+			'ac_no': ac_no,
+			'branch_code': branch_code,
+			'acmastcode': acmastcode,
+			'start_date': start_date_obj,
+			'end_date': end_date_obj
+		})
+		results = cursor.fetchall()
+
+		opening_row = results[0]
+		opening_balance = float(opening_row[1]) - float(opening_row[2])
 
 		# 8. Prepare transaction data for rendering
 		transaction_data = []
 		current_balance = opening_balance
 
-		for record in transactions:
-			tdate, credit, debit, prtcls, doc_no = record
+		# Skip the first row as it's the opening balance row
+		for record in results[1:]:
+			tdate, credit, debit, prtcls, doc_no, _ = record
 			credit = float(credit) if credit else 0.0
 			debit = float(debit) if debit else 0.0
 			current_balance += (credit - debit)
 			
 			transaction_data.append({
-				'transaction_date': tdate.strftime("%d/%m/%Y"),
+				'transaction_date': tdate.strftime("%d/%m/%Y") if tdate else "",
 				'transaction_type': 'Debit' if debit > 0 else 'Credit',
 				'description': prtcls,
 				'doc_no': doc_no,
@@ -207,6 +197,7 @@ def test_db(branch_code, ac_code, ac_no, start_date, end_date, export_format="pd
 				'credit': round(credit, 2),
 				'balance': round(current_balance, 2)
 			})
+
 
 		# Prepare context
 		context = {
