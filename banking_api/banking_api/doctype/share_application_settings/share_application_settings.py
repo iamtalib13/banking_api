@@ -6,7 +6,7 @@ import psycopg2
 import psycopg2.extras
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import now_datetime
+from frappe.utils import now_datetime, now
 
 
 class ShareApplicationSettings(Document):
@@ -170,7 +170,7 @@ def run_share_application_sync():
         frappe.db.set_single_value(
             "Share Application Settings",
             "last_sync_run",
-            now_datetime()
+            now()
         )
         frappe.db.commit()
 

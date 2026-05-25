@@ -84,7 +84,8 @@
   {
    "fieldname": "last_sync_run",
    "fieldtype": "Datetime",
-   "label": "Last Sync Run"
+   "label": "Last Sync Run",
+   "read_only": 1
   },
   {
    "fieldname": "transfer_interval_in_minutes",
@@ -99,7 +100,8 @@
   {
    "fieldname": "last_transfer_run",
    "fieldtype": "Datetime",
-   "label": "Last Transfer Run"
+   "label": "Last Transfer Run",
+   "read_only": 1
   },
   {
    "collapsible": 1,
@@ -161,7 +163,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-05-25 13:07:18.201639",
+ "modified": "2026-05-25 16:40:34.908810",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Share Application Settings",
