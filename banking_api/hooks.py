@@ -166,6 +166,15 @@ app_license = "mit"
 # 	],
 # }
 
+scheduler_events = {
+    "hourly": [
+        "banking_api.banking_api.doctype.share_application_settings.share_application_settings.hourly_share_application_sync"
+    ],
+    "daily": [
+        "banking_api.banking_api.doctype.share_application_settings.share_application_settings.daily_share_application_sync"
+    ]
+}
+
 # Testing
 # -------
 
@@ -246,4 +255,3 @@ app_license = "mit"
 # ------------
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
-
