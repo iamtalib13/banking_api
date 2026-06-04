@@ -421,6 +421,30 @@ def pay_now_share_application(entry_name):
         status = (host_transaction.get("Status") or "").strip().upper()
         transaction_id = (trn_identifier.get("TrnId") or "").strip()
 
+        # if status == "SUCCESS" and transaction_id:
+        #     frappe.db.set_value(
+        #         "Share Application",
+        #         doc.name,
+        #         {
+        #             "transaction_id": transaction_id,
+        #             "fund_transfer_date": now_datetime(),
+        #             "status": "Success",
+        #             "error_log": ""
+        #         },
+        #         update_modified=True
+        #     )
+        #     frappe.db.set_single_value(
+        #         "Share Application Settings", "last_transfer_run", now())
+        #     frappe.db.set_single_value(
+        #         "Share Application Settings", "total_debit_amount", total_debit_amount)
+        #     frappe.db.commit()
+
+        #     return {
+        #         "status": "success",
+        #         "message": f"Fund transfer completed successfully. Transaction ID: {transaction_id}",
+        #         "transaction_id": transaction_id
+        #     }
+
         if status == "SUCCESS" and transaction_id:
             frappe.db.set_value(
                 "Share Application",
@@ -433,10 +457,16 @@ def pay_now_share_application(entry_name):
                 },
                 update_modified=True
             )
+
             frappe.db.set_single_value(
                 "Share Application Settings", "last_transfer_run", now())
             frappe.db.set_single_value(
                 "Share Application Settings", "total_debit_amount", total_debit_amount)
+
+            submitted_doc = frappe.get_doc("Share Application", doc.name)
+            if submitted_doc.docstatus == 0:
+                submitted_doc.submit()
+
             frappe.db.commit()
 
             return {
