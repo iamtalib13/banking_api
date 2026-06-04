@@ -306,6 +306,91 @@ def pay_now_share_application(entry_name):
                 "message": "Account Number is missing on Share Application."
             }
 
+        conn = None
+        cursor = None
+        try:
+            conn = db_connection()
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+            closed_account_query = """
+                SELECT
+                    foracid,
+                    acct_name,
+                    cust_id,
+                    schm_code,
+                    acct_opn_date,
+                    acct_cls_flg,
+                    acct_cls_date
+                FROM tbaadm.gam
+                WHERE foracid = %s
+                  AND (
+                        (acct_cls_flg = 'N' AND acct_cls_date IS NOT NULL)
+                        OR
+                        (acct_cls_flg = 'Y' AND acct_cls_date IS NOT NULL)
+                      )
+            """
+            cursor.execute(closed_account_query, (debit_account,))
+            closed_account_row = cursor.fetchone()
+
+            if closed_account_row:
+                error_message = f"Debit account number is closed: {debit_account}"
+                _set_share_application_error(doc.name, error_message)
+                frappe.db.commit()
+                return {
+                    "status": "error",
+                    "message": error_message
+                }
+
+            balance_query = """
+                SELECT
+                    g.foracid,
+                    g.acct_name,
+                    g.sol_id,
+                    g.clr_bal_amt
+                FROM tbaadm.gam g
+                WHERE g.del_flg = 'N'
+                  AND g.foracid = %s
+            """
+            cursor.execute(balance_query, (debit_account,))
+            balance_row = cursor.fetchone()
+
+            if not balance_row:
+                error_message = f"Debit account not found or inactive: {debit_account}"
+                _set_share_application_error(doc.name, error_message)
+                frappe.db.commit()
+                return {
+                    "status": "error",
+                    "message": error_message
+                }
+
+            available_balance = float(balance_row.get("clr_bal_amt") or 0)
+
+            if available_balance < float(total_debit_amount):
+                error_message = (
+                    f"Insufficient balance in debit account {debit_account}. "
+                    f"Available balance is {available_balance}, required amount is {total_debit_amount}."
+                )
+                _set_share_application_error(doc.name, error_message)
+                frappe.db.commit()
+                return {
+                    "status": "error",
+                    "message": error_message
+                }
+
+        except Exception as db_check_error:
+            error_message = f"Debit account validation failed: {str(db_check_error)}"
+            _set_share_application_error(doc.name, error_message)
+            frappe.db.commit()
+            return {
+                "status": "error",
+                "message": error_message
+            }
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()
+
         current_date = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]
         guid = random.randint(1000000000, 9999999999)
         url = settings.finacle_api_url
