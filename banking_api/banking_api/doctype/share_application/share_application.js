@@ -2,7 +2,7 @@ frappe.ui.form.on("Share Application", {
 	refresh(frm) {
 		if (frm.is_new()) return;
 
-		const can_pay = frm.doc.docstatus === 0 && frm.doc.status !== "Success";
+		const can_pay = frm.doc.docstatus === 0 && frm.doc.payment_status !== "Success";
 		if (!can_pay) return;
 
 		frm.add_custom_button(__("Pay Now"), function () {

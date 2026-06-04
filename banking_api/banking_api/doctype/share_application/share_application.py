@@ -9,7 +9,7 @@ from frappe.model.document import Document
 class ShareApplication(Document):
     def validate(self):
         if self.docstatus == 1:
-            if self.status != "Success":
+            if self.payment_status != "Success":
                 frappe.throw(
                     _("Only documents with Status = 'Success' can be submitted."))
 
