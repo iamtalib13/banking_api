@@ -7,6 +7,12 @@ import psycopg2.extras
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils import now_datetime, now
+import random
+from datetime import datetime
+
+import requests
+import xmltodict
+from requests.exceptions import ConnectionError, HTTPError, ReadTimeout, Timeout
 
 
 class ShareApplicationSettings(Document):
@@ -225,3 +231,260 @@ def daily_share_application_sync():
         return
 
     run_share_application_sync()
+
+
+@frappe.whitelist()
+def pay_now_share_application(entry_name):
+    settings = frappe.get_single("Share Application Settings")
+    lock_name = f"share_application_pay_now::{entry_name}"
+
+    if not entry_name:
+        frappe.throw(_("Share Application document name is required."))
+
+    if not settings.enable_fund_transfer:
+        return {
+            "status": "skipped",
+            "message": "Fund transfer is disabled in Share Application Settings."
+        }
+
+    if not settings.finacle_api_url:
+        frappe.throw(
+            _("Finacle API URL is mandatory in Share Application Settings."))
+
+    share_amount = cint_safe(settings.share_account_credit_amount, 0)
+    member_fee_amount = cint_safe(settings.member_fee_credit_amount, 0)
+    total_debit_amount = share_amount + member_fee_amount
+
+    if not settings.share_account_gl:
+        frappe.throw(
+            _("Share Account GL is mandatory in Share Application Settings."))
+
+    if not settings.share_member_fee_gl:
+        frappe.throw(
+            _("Share Member Fee GL is mandatory in Share Application Settings."))
+
+    if share_amount <= 0 and member_fee_amount <= 0:
+        frappe.throw(
+            _("At least one credit amount must be greater than zero."))
+
+    if total_debit_amount <= 0:
+        frappe.throw(_("Total debit amount must be greater than zero."))
+
+    try:
+        if frappe.cache().get_value(lock_name):
+            frappe.throw(
+                _("A fund transfer is already in progress for this Share Application."))
+        frappe.cache().set_value(lock_name, frappe.session.user, expires_in_sec=120)
+    except frappe.ValidationError:
+        raise
+    except Exception:
+        pass
+
+    try:
+        doc = frappe.get_doc("Share Application", entry_name)
+
+        if doc.docstatus != 0:
+            return {
+                "status": "warning",
+                "message": "Only draft Share Application documents can be processed."
+            }
+
+        if doc.status == "Success":
+            return {
+                "status": "warning",
+                "message": "This Share Application is already processed successfully."
+            }
+
+        debit_account = str(doc.account_number).strip(
+        ) if doc.account_number else ""
+        if not debit_account:
+            _set_share_application_error(
+                doc.name, "Account Number is missing on Share Application.")
+            frappe.db.commit()
+            return {
+                "status": "error",
+                "message": "Account Number is missing on Share Application."
+            }
+
+        current_date = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]
+        guid = random.randint(1000000000, 9999999999)
+        url = settings.finacle_api_url
+
+        xml_parts = []
+        xml_parts.append(
+            f"""<PartTrnRec><AcctId><AcctId>{debit_account}</AcctId></AcctId><CreditDebitFlg>D</CreditDebitFlg><TrnAmt><amountValue>{total_debit_amount}</amountValue><currencyCode>INR</currencyCode></TrnAmt><TrnParticulars>Share Fund Debited</TrnParticulars><ValueDt>{current_date}</ValueDt></PartTrnRec>""")
+
+        if share_amount > 0:
+            xml_parts.append(
+                f"""<PartTrnRec><AcctId><AcctId>{settings.share_account_gl}</AcctId></AcctId><CreditDebitFlg>C</CreditDebitFlg><TrnAmt><amountValue>{share_amount}</amountValue><currencyCode>INR</currencyCode></TrnAmt><TrnParticulars>SHARE ACCOUNT</TrnParticulars><ValueDt>{current_date}</ValueDt></PartTrnRec>""")
+
+        if member_fee_amount > 0:
+            xml_parts.append(
+                f"""<PartTrnRec><AcctId><AcctId>{settings.share_member_fee_gl}</AcctId></AcctId><CreditDebitFlg>C</CreditDebitFlg><TrnAmt><amountValue>{member_fee_amount}</amountValue><currencyCode>INR</currencyCode></TrnAmt><TrnParticulars>SHARE MEMBER FEE</TrnParticulars><ValueDt>{current_date}</ValueDt></PartTrnRec>""")
+
+        xml_data = f"""<?xml version="1.0" encoding="UTF-8"?>
+<FIXML xsi:schemaLocation="http://www.finacle.com/fixml XferTrnAdd.xsd" xmlns="http://www.finacle.com/fixml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <Header>
+        <RequestHeader>
+            <MessageKey>
+                <RequestUUID>{guid}</RequestUUID>
+                <ServiceRequestId>XferTrnAdd</ServiceRequestId>
+                <ServiceRequestVersion>10.2</ServiceRequestVersion>
+                <ChannelId>COR</ChannelId>
+            </MessageKey>
+            <RequestMessageInfo>
+                <BankId>01</BankId>
+                <MessageDateTime>{current_date}</MessageDateTime>
+            </RequestMessageInfo>
+            <Security>
+                <Token>
+                    <PasswordToken>
+                        <UserId></UserId>
+                        <Password></Password>
+                    </PasswordToken>
+                </Token>
+            </Security>
+        </RequestHeader>
+    </Header>
+    <Body>
+        <XferTrnAddRequest>
+            <XferTrnAddRq>
+                <XferTrnHdr>
+                    <TrnType>T</TrnType>
+                    <TrnSubType>CI</TrnSubType>
+                </XferTrnHdr>
+                <XferTrnDetail>
+                    {''.join(xml_parts)}
+                </XferTrnDetail>
+            </XferTrnAddRq>
+        </XferTrnAddRequest>
+    </Body>
+</FIXML>"""
+
+        try:
+            response = requests.post(
+                url,
+                data=xml_data.encode("utf-8"),
+                headers={"Content-Type": "application/xml"},
+                verify=False,
+                timeout=(10, 30)
+            )
+            response.raise_for_status()
+        except (Timeout, ReadTimeout):
+            error_message = "Finacle API timeout occurred while processing the transaction. Transaction status is unknown; verify before retrying."
+            _set_share_application_error(doc.name, error_message)
+            frappe.db.commit()
+            return {
+                "status": "error",
+                "message": error_message
+            }
+        except ConnectionError:
+            error_message = "Unable to connect to Finacle API. Please verify network or server availability before retrying."
+            _set_share_application_error(doc.name, error_message)
+            frappe.db.commit()
+            return {
+                "status": "error",
+                "message": error_message
+            }
+        except HTTPError:
+            error_message = f"Finacle API returned HTTP {getattr(response, 'status_code', 'error')}. Response: {getattr(response, 'text', '')}"
+            _set_share_application_error(doc.name, error_message)
+            frappe.db.commit()
+            return {
+                "status": "error",
+                "message": "Finacle API returned an error response."
+            }
+
+        response_text = response.text or ""
+
+        try:
+            res_dict = xmltodict.parse(response_text)
+        except Exception:
+            error_message = f"Unable to parse Finacle API response. Raw response: {response_text}"
+            _set_share_application_error(doc.name, error_message)
+            frappe.db.commit()
+            return {
+                "status": "error",
+                "message": "Unable to parse Finacle API response."
+            }
+
+        fixml_root = res_dict.get("FIXML", {}) if isinstance(
+            res_dict, dict) else {}
+        header = fixml_root.get("Header", {}) or {}
+        response_header = header.get("ResponseHeader", {}) or {}
+        host_transaction = response_header.get("HostTransaction", {}) or {}
+        body = fixml_root.get("Body", {}) or {}
+        xfer_response = body.get("XferTrnAddResponse", {}) or {}
+        xfer_rs = xfer_response.get("XferTrnAddRs", {}) or {}
+        trn_identifier = xfer_rs.get("TrnIdentifier", {}) or {}
+
+        status = (host_transaction.get("Status") or "").strip().upper()
+        transaction_id = (trn_identifier.get("TrnId") or "").strip()
+
+        if status == "SUCCESS" and transaction_id:
+            frappe.db.set_value(
+                "Share Application",
+                doc.name,
+                {
+                    "transaction_id": transaction_id,
+                    "fund_transfer_date": now_datetime(),
+                    "status": "Success",
+                    "error_log": ""
+                },
+                update_modified=True
+            )
+            frappe.db.set_single_value(
+                "Share Application Settings", "last_transfer_run", now())
+            frappe.db.set_single_value(
+                "Share Application Settings", "total_debit_amount", total_debit_amount)
+            frappe.db.commit()
+
+            return {
+                "status": "success",
+                "message": f"Fund transfer completed successfully. Transaction ID: {transaction_id}",
+                "transaction_id": transaction_id
+            }
+
+        error_message = response_text or "Finacle API did not return a success status."
+        _set_share_application_error(doc.name, error_message)
+        frappe.db.set_single_value(
+            "Share Application Settings", "last_transfer_run", now())
+        frappe.db.commit()
+        return {
+            "status": "error",
+            "message": "Fund transfer failed. Error log updated in Share Application."
+        }
+
+    except Exception as e:
+        frappe.db.rollback()
+        frappe.log_error(frappe.get_traceback(),
+                         "Share Application Pay Now Failed")
+        try:
+            _set_share_application_error(entry_name, str(e))
+            frappe.db.commit()
+        except Exception:
+            frappe.db.rollback()
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+    finally:
+        try:
+            frappe.cache().delete_value(lock_name)
+        except Exception:
+            pass
+
+
+def _set_share_application_error(docname, error_message):
+    if not docname:
+        return
+
+    frappe.db.set_value(
+        "Share Application",
+        docname,
+        {
+            "error_log": (error_message or "")[:65535],
+            "status": "Failed"
+        },
+        update_modified=True
+    )
