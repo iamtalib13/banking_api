@@ -603,3 +603,86 @@ def _set_share_application_error(docname, error_message):
         },
         update_modified=True
     )
+
+
+@frappe.whitelist()
+def run_bulk_share_application_payment():
+    settings = frappe.get_single("Share Application Settings")
+
+    if not settings.enable_fund_transfer:
+        return {
+            "status": "skipped",
+            "message": "Fund transfer is disabled in Share Application Settings."
+        }
+
+    share_applications = frappe.get_all(
+        "Share Application",
+        filters={
+            "status": ["!=", "Success"],
+            "docstatus": 0
+        },
+        fields=["name", "status"]
+    )
+
+    if not share_applications:
+        return {
+            "status": "success",
+            "message": "No pending Share Application records found for bulk payment.",
+            "processed_count": 0,
+            "success_count": 0,
+            "failed_count": 0,
+            "skipped_count": 0
+        }
+
+    processed_count = 0
+    success_count = 0
+    failed_count = 0
+    skipped_count = 0
+    result_lines = []
+
+    for row in share_applications:
+        docname = row.get("name")
+        if not docname:
+            skipped_count += 1
+            continue
+
+        processed_count += 1
+
+        try:
+            result = pay_now_share_application(docname)
+
+            if isinstance(result, dict):
+                result_status = (result.get("status") or "").lower()
+                result_message = result.get("message") or ""
+
+                if result_status == "success":
+                    success_count += 1
+                elif result_status in ("skipped", "warning"):
+                    skipped_count += 1
+                else:
+                    failed_count += 1
+
+                result_lines.append(f"{docname}: {result_message}")
+            else:
+                failed_count += 1
+                result_lines.append(
+                    f"{docname}: Unexpected response returned.")
+
+        except Exception as e:
+            failed_count += 1
+            frappe.log_error(frappe.get_traceback(),
+                             f"Bulk Share Payment Failed for {docname}")
+            result_lines.append(f"{docname}: {str(e)}")
+
+    return {
+        "status": "success" if failed_count == 0 else "warning",
+        "message": (
+            f"Bulk payment completed. Processed: {processed_count}, "
+            f"Success: {success_count}, Failed: {failed_count}, Skipped: {skipped_count}."
+            + ("<br><br>" + "<br>".join(result_lines) if result_lines else "")
+        ),
+        "processed_count": processed_count,
+        "success_count": success_count,
+        "failed_count": failed_count,
+        "skipped_count": skipped_count
+    }
