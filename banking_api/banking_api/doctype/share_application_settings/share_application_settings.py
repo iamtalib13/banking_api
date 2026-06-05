@@ -51,37 +51,44 @@ def cint_safe(value, default=0):
 def get_share_application_query(sync_days=None):
     return """
         SELECT cif_id,
-               foracid,
-               sol_id,
-               cif_opening_date
-        FROM (
-            SELECT  g.cif_id,
-                    g.foracid,
-                    g.sol_id,
-                    a.orgkey,
-                    a.relationshipopeningdate AS cif_opening_date,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY g.cif_id
-                        ORDER BY g.foracid
-                    ) AS rn
-            FROM tbaadm.gam g
-            JOIN crmuser.accounts a
-              ON g.cif_id = a.orgkey
-            WHERE g.schm_type IN ('SBA', 'CAA')
-              AND g.schm_code NOT IN ('1010')
-              AND a.relationshipopeningdate IS NOT NULL
-              AND a.relationshipopeningdate <= DATE '2026-06-03'
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM tbaadm.htd h
-                  WHERE h.acid = g.acid
-                    AND (
-                          h.tran_particular = 'SHARE FUND DEBITED'
-                          OR h.part_tran_type = 'D'
-                        )
-              )
-        ) x
-        WHERE x.rn = 1
+       foracid,
+       sol_id,
+       cif_opening_date
+FROM (
+    SELECT  g.cif_id,
+            g.foracid,
+            g.sol_id,
+            a.orgkey,
+            a.relationshipopeningdate AS cif_opening_date,
+            ROW_NUMBER() OVER (
+                PARTITION BY g.cif_id
+                ORDER BY g.foracid
+            ) AS rn
+    FROM tbaadm.gam g
+    JOIN crmuser.accounts a
+      ON g.cif_id = a.orgkey
+    WHERE --g.schm_type IN ('SBA', 'CAA')
+       g.schm_code IN (
+             '1001','1002','1003','1004','1005','1006','1008',
+             '1009','1011','1012','1013','1101','1102','1103','1104','1117'
+         )
+      AND g.schm_code NOT IN ('1010')
+      AND a.relationshipopeningdate IS NOT NULL
+      AND a.relationshipopeningdate <= DATE '2026-06-03'
+      AND g.entity_cre_flg = 'Y' and g.del_flg = 'N'
+      AND g.acct_cls_flg = 'N'
+      AND g.clr_bal_amt >= 20
+      AND NOT EXISTS (
+          SELECT 1
+          FROM tbaadm.htd h
+          WHERE h.acid = g.acid
+            AND (
+                  h.tran_particular = 'SHARE FUND DEBITED'
+                  OR h.part_tran_type = 'D'
+                )
+      )
+) x
+WHERE x.rn = 1;
     """
 
 
@@ -1398,7 +1405,7 @@ def run_bulk_share_application_payment():
             result_lines.append(f"{docname}: {str(e)}")
             print(f"[ERROR] {docname}: {str(e)}", flush=True)
 
-        if processed_count % 200 == 0:
+        if processed_count % 500 == 0:
             print(
                 f"[WAIT] Processed {processed_count} records. Waiting 5 seconds before continuing...",
                 flush=True
