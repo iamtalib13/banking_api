@@ -198,7 +198,7 @@ def get_share_application_by_cif(cif):
     if not cif:
         frappe.throw("CIF is required")
 
-    return frappe.db.get_value(
+    doc = frappe.db.get_value(
         "Share Application",
         {"cif": cif},
         [
@@ -218,6 +218,11 @@ def get_share_application_by_cif(cif):
         ],
         as_dict=True
     )
+
+    if doc:
+        doc["sol_desc"] = get_sol_description(doc.get("sol_id"))
+
+    return doc
 
 
 def clear_share_tracker_cache():

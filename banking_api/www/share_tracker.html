@@ -1473,10 +1473,14 @@
 
         function formatDateTime(value) {
             if (!value) return "-";
-            try {
-                if (window.frappe && frappe.datetime) return frappe.datetime.str_to_user(value);
-            } catch (e) { }
-            return value;
+
+            let cleaned = String(value).trim();
+
+            if (cleaned.includes(".")) {
+                cleaned = cleaned.split(".")[0];
+            }
+
+            return cleaned;
         }
 
         function cintLike(val) {
@@ -2164,6 +2168,7 @@
                 body.innerHTML = `
                 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;">
                     ${detailCard("SOL ID", doc.sol_id)}
+                    ${detailCard("SOL Description", doc.sol_desc || "-")}
                     ${detailCard("CIF", doc.cif)}
                     ${detailCard("Account Number", doc.account_number)}
                     ${detailCard("Transaction ID", doc.transaction_id || "-")}
