@@ -1220,7 +1220,7 @@
 
             <!-- METRICS -->
             <div class="metrics">
-                <div class="metric total" onclick="switchTab('pending')" title="View all tabs">
+                <div class="metric total" onclick="switchTab('all')" title="View all records">
                     <div class="metric-icon">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1336,8 +1336,6 @@
                                     <circle cx="11" cy="11" r="8" />
                                     <line x1="21" y1="21" x2="16.65" y2="16.65" />
                                 </svg>
-                                <!-- <input class="fp-search" type="text" id="fpSearchInput" placeholder="Search Sol IDs…"
-                                    oninput="renderFpList()"> -->
                                 <input class="fp-search" type="text" id="fpSearchInput"
                                     placeholder="Search Sol IDs or paste comma separated values…"
                                     oninput="handleFpSearchInput()">
@@ -1438,385 +1436,22 @@
         </main>
     </div>
 
-    <!-- <script>
-        const PER_PAGE = 10;
-        let currentTab = 'pending';
-        let currentPage = 1;
-        let sortCol = null;
-        let sortDir = 1;
-        let searchQ = '';
-        let selectedSolIds = new Set();   // applied filter
-        let pendingSolIds = new Set();    // in-popup draft
-
-        const allData = {
-            pending: [
-                { solId: 'SOL-001', solDesc: 'Branch Operations', cifDate: '12 Jan 2024', cifDateTs: new Date('2024-01-12'), cif: 'CIF10021', accNo: 'ACC-884-221-001', txnId: 'TXN-9920', txnDate: '15 Mar 2024', txnDateTs: new Date('2024-03-15'), status: 'pending' },
-                { solId: 'SOL-002', solDesc: 'Retail Banking', cifDate: '03 Feb 2024', cifDateTs: new Date('2024-02-03'), cif: 'CIF10034', accNo: 'ACC-774-112-002', txnId: 'TXN-9921', txnDate: '16 Mar 2024', txnDateTs: new Date('2024-03-16'), status: 'pending' },
-                { solId: 'SOL-003', solDesc: 'Corporate Finance', cifDate: '18 Feb 2024', cifDateTs: new Date('2024-02-18'), cif: 'CIF10047', accNo: 'ACC-662-334-003', txnId: 'TXN-9922', txnDate: '17 Mar 2024', txnDateTs: new Date('2024-03-17'), status: 'pending' },
-                { solId: 'SOL-004', solDesc: 'Treasury Ops', cifDate: '25 Feb 2024', cifDateTs: new Date('2024-02-25'), cif: 'CIF10058', accNo: 'ACC-551-445-004', txnId: 'TXN-9923', txnDate: '18 Mar 2024', txnDateTs: new Date('2024-03-18'), status: 'pending' },
-                { solId: 'SOL-005', solDesc: 'Investment Desk', cifDate: '01 Mar 2024', cifDateTs: new Date('2024-03-01'), cif: 'CIF10063', accNo: 'ACC-440-556-005', txnId: 'TXN-9924', txnDate: '19 Mar 2024', txnDateTs: new Date('2024-03-19'), status: 'pending' },
-                { solId: 'SOL-006', solDesc: 'Wealth Management', cifDate: '05 Mar 2024', cifDateTs: new Date('2024-03-05'), cif: 'CIF10071', accNo: 'ACC-339-667-006', txnId: 'TXN-9925', txnDate: '20 Mar 2024', txnDateTs: new Date('2024-03-20'), status: 'pending' },
-                { solId: 'SOL-007', solDesc: 'SME Lending', cifDate: '08 Mar 2024', cifDateTs: new Date('2024-03-08'), cif: 'CIF10082', accNo: 'ACC-228-778-007', txnId: 'TXN-9926', txnDate: '21 Mar 2024', txnDateTs: new Date('2024-03-21'), status: 'pending' },
-                { solId: 'SOL-008', solDesc: 'Priority Banking', cifDate: '10 Mar 2024', cifDateTs: new Date('2024-03-10'), cif: 'CIF10090', accNo: 'ACC-117-889-008', txnId: 'TXN-9927', txnDate: '22 Mar 2024', txnDateTs: new Date('2024-03-22'), status: 'pending' },
-                { solId: 'SOL-009', solDesc: 'Digital Banking', cifDate: '12 Mar 2024', cifDateTs: new Date('2024-03-12'), cif: 'CIF10101', accNo: 'ACC-006-990-009', txnId: 'TXN-9928', txnDate: '23 Mar 2024', txnDateTs: new Date('2024-03-23'), status: 'pending' },
-                { solId: 'SOL-010', solDesc: 'Home Loans', cifDate: '14 Mar 2024', cifDateTs: new Date('2024-03-14'), cif: 'CIF10115', accNo: 'ACC-995-001-010', txnId: 'TXN-9929', txnDate: '24 Mar 2024', txnDateTs: new Date('2024-03-24'), status: 'pending' },
-                { solId: 'SOL-011', solDesc: 'Auto Finance', cifDate: '16 Mar 2024', cifDateTs: new Date('2024-03-16'), cif: 'CIF10122', accNo: 'ACC-884-112-011', txnId: 'TXN-9930', txnDate: '25 Mar 2024', txnDateTs: new Date('2024-03-25'), status: 'pending' },
-                { solId: 'SOL-012', solDesc: 'NRI Services', cifDate: '18 Mar 2024', cifDateTs: new Date('2024-03-18'), cif: 'CIF10130', accNo: 'ACC-773-223-012', txnId: 'TXN-9931', txnDate: '26 Mar 2024', txnDateTs: new Date('2024-03-26'), status: 'pending' },
-            ],
-            insuf: [
-                { solId: 'SOL-013', solDesc: 'Branch Operations', cifDate: '05 Jan 2024', cifDateTs: new Date('2024-01-05'), cif: 'CIF20021', accNo: 'ACC-662-334-013', txnId: 'TXN-8801', txnDate: '10 Mar 2024', txnDateTs: new Date('2024-03-10'), status: 'insuf' },
-                { solId: 'SOL-014', solDesc: 'Retail Banking', cifDate: '09 Jan 2024', cifDateTs: new Date('2024-01-09'), cif: 'CIF20034', accNo: 'ACC-551-445-014', txnId: 'TXN-8802', txnDate: '11 Mar 2024', txnDateTs: new Date('2024-03-11'), status: 'insuf' },
-                { solId: 'SOL-015', solDesc: 'Corporate Finance', cifDate: '14 Jan 2024', cifDateTs: new Date('2024-01-14'), cif: 'CIF20047', accNo: 'ACC-440-556-015', txnId: 'TXN-8803', txnDate: '12 Mar 2024', txnDateTs: new Date('2024-03-12'), status: 'insuf' },
-                { solId: 'SOL-016', solDesc: 'SME Lending', cifDate: '20 Jan 2024', cifDateTs: new Date('2024-01-20'), cif: 'CIF20058', accNo: 'ACC-329-667-016', txnId: 'TXN-8804', txnDate: '13 Mar 2024', txnDateTs: new Date('2024-03-13'), status: 'insuf' },
-                { solId: 'SOL-017', solDesc: 'Investment Desk', cifDate: '27 Jan 2024', cifDateTs: new Date('2024-01-27'), cif: 'CIF20063', accNo: 'ACC-218-778-017', txnId: 'TXN-8805', txnDate: '14 Mar 2024', txnDateTs: new Date('2024-03-14'), status: 'insuf' },
-                { solId: 'SOL-018', solDesc: 'Treasury Ops', cifDate: '02 Feb 2024', cifDateTs: new Date('2024-02-02'), cif: 'CIF20071', accNo: 'ACC-107-889-018', txnId: 'TXN-8806', txnDate: '15 Mar 2024', txnDateTs: new Date('2024-03-15'), status: 'insuf' },
-                { solId: 'SOL-019', solDesc: 'Home Loans', cifDate: '08 Feb 2024', cifDateTs: new Date('2024-02-08'), cif: 'CIF20082', accNo: 'ACC-996-990-019', txnId: 'TXN-8807', txnDate: '16 Mar 2024', txnDateTs: new Date('2024-03-16'), status: 'insuf' },
-            ],
-            closed: [
-                { solId: 'SOL-020', solDesc: 'Wealth Management', cifDate: '10 Dec 2023', cifDateTs: new Date('2023-12-10'), cif: 'CIF30021', accNo: 'ACC-885-001-020', txnId: 'TXN-7701', txnDate: '05 Mar 2024', txnDateTs: new Date('2024-03-05'), status: 'closed' },
-                { solId: 'SOL-021', solDesc: 'Priority Banking', cifDate: '15 Dec 2023', cifDateTs: new Date('2023-12-15'), cif: 'CIF30034', accNo: 'ACC-774-112-021', txnId: 'TXN-7702', txnDate: '06 Mar 2024', txnDateTs: new Date('2024-03-06'), status: 'closed' },
-                { solId: 'SOL-022', solDesc: 'NRI Services', cifDate: '20 Dec 2023', cifDateTs: new Date('2023-12-20'), cif: 'CIF30047', accNo: 'ACC-663-223-022', txnId: 'TXN-7703', txnDate: '07 Mar 2024', txnDateTs: new Date('2024-03-07'), status: 'closed' },
-                { solId: 'SOL-023', solDesc: 'Digital Banking', cifDate: '26 Dec 2023', cifDateTs: new Date('2023-12-26'), cif: 'CIF30058', accNo: 'ACC-552-334-023', txnId: 'TXN-7704', txnDate: '08 Mar 2024', txnDateTs: new Date('2024-03-08'), status: 'closed' },
-                { solId: 'SOL-024', solDesc: 'Auto Finance', cifDate: '30 Dec 2023', cifDateTs: new Date('2023-12-30'), cif: 'CIF30063', accNo: 'ACC-441-445-024', txnId: 'TXN-7705', txnDate: '09 Mar 2024', txnDateTs: new Date('2024-03-09'), status: 'closed' },
-            ]
-        };
-
-        /* ─── FILTER POPUP ─── */
-        function toggleFilterPopup() {
-            const popup = document.getElementById('filterPopup');
-            const isOpen = popup.classList.contains('open');
-            if (isOpen) { closeFilterPopup(); return; }
-            // sync draft with applied
-            pendingSolIds = new Set(selectedSolIds);
-            document.getElementById('fpSearchInput').value = '';
-            popup.classList.add('open');
-            document.getElementById('filterBtn').classList.add('filter-active');
-            renderFpList();
-            // close on outside click
-            setTimeout(() => document.addEventListener('click', outsideClickHandler), 0);
-        }
-
-        function closeFilterPopup() {
-            document.getElementById('filterPopup').classList.remove('open');
-            document.getElementById('filterBtn').classList.remove('filter-active');
-            document.removeEventListener('click', outsideClickHandler);
-        }
-
-        function outsideClickHandler(e) {
-            const wrap = document.getElementById('filterWrap');
-            if (!wrap.contains(e.target)) closeFilterPopup();
-        }
-
-        function renderFpList() {
-            const q = document.getElementById('fpSearchInput').value.toLowerCase();
-            const solIds = allData[currentTab].map(r => r.solId);
-            const visible = q ? solIds.filter(id => id.toLowerCase().includes(q)) : solIds;
-
-            const list = document.getElementById('fpList');
-            if (visible.length === 0) {
-                list.innerHTML = '<div class="fp-empty-msg">No Sol IDs match your search</div>';
-                document.getElementById('fpSelectAll').indeterminate = false;
-                document.getElementById('fpSelectAll').checked = false;
-                return;
-            }
-
-            list.innerHTML = visible.map(id => `
-    <label class="fp-item">
-      <input type="checkbox" value="${id}" ${pendingSolIds.has(id) ? 'checked' : ''}
-        onchange="fpToggleItem('${id}', this.checked)"
-        style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer;flex-shrink:0">
-      <span class="fp-item-label">${id}</span>
-    </label>`).join('');
-
-            updateFpMeta(visible);
-        }
-
-        function fpToggleItem(id, checked) {
-            if (checked) pendingSolIds.add(id);
-            else pendingSolIds.delete(id);
-            const solIds = allData[currentTab].map(r => r.solId);
-            const q = document.getElementById('fpSearchInput').value.toLowerCase();
-            const visible = q ? solIds.filter(s => s.toLowerCase().includes(q)) : solIds;
-            updateFpMeta(visible);
-        }
-
-        function updateFpMeta(visible) {
-            const checkedVisible = visible.filter(id => pendingSolIds.has(id)).length;
-            const saEl = document.getElementById('fpSelectAll');
-            saEl.checked = checkedVisible === visible.length && visible.length > 0;
-            saEl.indeterminate = checkedVisible > 0 && checkedVisible < visible.length;
-            document.getElementById('fpCount').textContent =
-                pendingSolIds.size > 0 ? `${pendingSolIds.size} selected` : '0 selected';
-        }
-
-        function fpToggleAll(cb) {
-            const q = document.getElementById('fpSearchInput').value.toLowerCase();
-            const solIds = allData[currentTab].map(r => r.solId);
-            const visible = q ? solIds.filter(id => id.toLowerCase().includes(q)) : solIds;
-            visible.forEach(id => cb.checked ? pendingSolIds.add(id) : pendingSolIds.delete(id));
-            renderFpList();
-        }
-
-        function fpReset() {
-            pendingSolIds.clear();
-            document.getElementById('fpSearchInput').value = '';
-            renderFpList();
-        }
-
-        function applyFilter() {
-            selectedSolIds = new Set(pendingSolIds);
-            currentPage = 1;
-            closeFilterPopup();
-            updateFilterUI();
-            renderTable();
-        }
-
-        function clearSolFilter() {
-            selectedSolIds.clear();
-            pendingSolIds.clear();
-            currentPage = 1;
-            updateFilterUI();
-            renderTable();
-        }
-
-        function updateFilterUI() {
-            const count = selectedSolIds.size;
-            const badge = document.getElementById('filterBadge');
-            const bar = document.getElementById('activeFiltersBar');
-            const tagsEl = document.getElementById('filterTags');
-            const btn = document.getElementById('filterBtn');
-
-            if (count > 0) {
-                badge.style.display = 'inline-flex';
-                badge.textContent = count;
-                btn.classList.add('filter-active');
-                bar.classList.add('show');
-                tagsEl.innerHTML = [...selectedSolIds].map(id => `
-      <span class="filter-tag">
-        ${id}
-        <button class="filter-tag-remove" onclick="removeSolTag('${id}')" aria-label="Remove ${id}">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </span>`).join('');
-            } else {
-                badge.style.display = 'none';
-                btn.classList.remove('filter-active');
-                bar.classList.remove('show');
-                tagsEl.innerHTML = '';
-            }
-        }
-
-        function removeSolTag(id) {
-            selectedSolIds.delete(id);
-            currentPage = 1;
-            updateFilterUI();
-            renderTable();
-        }
-
-        /* ─── DATA / FILTER ─── */
-        function getFiltered() {
-            let rows = allData[currentTab];
-            if (selectedSolIds.size > 0) {
-                rows = rows.filter(r => selectedSolIds.has(r.solId));
-            }
-            if (searchQ) {
-                const q = searchQ.toLowerCase();
-                rows = rows.filter(r =>
-                    r.solId.toLowerCase().includes(q) ||
-                    r.solDesc.toLowerCase().includes(q) ||
-                    r.cif.toLowerCase().includes(q) ||
-                    r.accNo.toLowerCase().includes(q) ||
-                    r.txnId.toLowerCase().includes(q)
-                );
-            }
-            if (sortCol) {
-                rows = [...rows].sort((a, b) => {
-                    let av = a[sortCol], bv = b[sortCol];
-                    if (sortCol === 'cifDate') { av = a.cifDateTs; bv = b.cifDateTs; }
-                    if (sortCol === 'txnDate') { av = a.txnDateTs; bv = b.txnDateTs; }
-                    if (av < bv) return -1 * sortDir;
-                    if (av > bv) return 1 * sortDir;
-                    return 0;
-                });
-            }
-            return rows;
-        }
-
-        function pillHTML(status) {
-            const map = { pending: ['pill-pending', 'Pending'], insuf: ['pill-insuf', 'Insufficient balance'], closed: ['pill-closed', 'Account closed'] };
-            const [cls, label] = map[status];
-            return `<span class="pill ${cls}">${label}</span>`;
-        }
-
-        function renderTable() {
-            const filtered = getFiltered();
-            const total = filtered.length;
-            const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
-            if (currentPage > totalPages) currentPage = totalPages;
-            const start = (currentPage - 1) * PER_PAGE;
-            const pageRows = filtered.slice(start, start + PER_PAGE);
-
-            const tbody = document.getElementById('tableBody');
-            const empty = document.getElementById('emptyState');
-
-            if (pageRows.length === 0) {
-                tbody.innerHTML = '';
-                empty.style.display = 'block';
-            } else {
-                empty.style.display = 'none';
-                tbody.innerHTML = pageRows.map(r => `
-      <tr>
-        <td class="cb-cell"><input type="checkbox" onchange="updateSelectedCount()"></td>
-        <td style="font-weight:500">${r.solId}</td>
-        <td class="muted">${r.solDesc}</td>
-        <td class="muted">${r.cifDate}</td>
-        <td class="mono">${r.cif}</td>
-        <td class="mono">${r.accNo}</td>
-        <td class="mono">${r.txnId}</td>
-        <td class="muted">${r.txnDate}</td>
-        <td>${pillHTML(r.status)}</td>
-      </tr>`).join('');
-            }
-
-            const from = total === 0 ? 0 : start + 1;
-            const to = Math.min(start + PER_PAGE, total);
-            document.getElementById('pgInfo').textContent = `Showing ${from}–${to} of ${total} records`;
-            renderPagination(totalPages);
-            document.getElementById('selectAll').checked = false;
-            updateSelectedCount();
-        }
-
-        function renderPagination(totalPages) {
-            const container = document.getElementById('pgBtns');
-            let html = `<button class="pg-btn" onclick="goPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg> Prev
-  </button>`;
-            const pages = getPaginationPages(currentPage, totalPages);
-            pages.forEach(p => {
-                if (p === '...') {
-                    html += `<span class="pg-dots">…</span>`;
-                } else {
-                    html += `<button class="pg-btn ${p === currentPage ? 'active' : ''}" onclick="goPage(${p})">${p}</button>`;
-                }
-            });
-            html += `<button class="pg-btn" onclick="goPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>
-    Next <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-  </button>`;
-            container.innerHTML = html;
-        }
-
-        function getPaginationPages(cur, total) {
-            if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-            if (cur <= 4) return [1, 2, 3, 4, 5, '...', total];
-            if (cur >= total - 3) return [1, '...', total - 4, total - 3, total - 2, total - 1, total];
-            return [1, '...', cur - 1, cur, cur + 1, '...', total];
-        }
-
-        function goPage(p) {
-            const filtered = getFiltered();
-            const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
-            if (p < 1 || p > totalPages) return;
-            currentPage = p;
-            renderTable();
-        }
-
-        function switchTab(tab) {
-            currentTab = tab;
-            currentPage = 1;
-            sortCol = null;
-            searchQ = '';
-            selectedSolIds.clear();
-            pendingSolIds.clear();
-            document.getElementById('searchInput').value = '';
-            document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-            updateFilterUI();
-            renderTable();
-        }
-
-        function onSearch() {
-            searchQ = document.getElementById('searchInput').value.trim();
-            currentPage = 1;
-            renderTable();
-        }
-
-        function clearFilters() {
-            searchQ = '';
-            selectedSolIds.clear();
-            pendingSolIds.clear();
-            document.getElementById('searchInput').value = '';
-            currentPage = 1;
-            updateFilterUI();
-            renderTable();
-        }
-
-        function sortBy(col) {
-            if (sortCol === col) { sortDir *= -1; }
-            else { sortCol = col; sortDir = 1; }
-            currentPage = 1;
-            renderTable();
-        }
-
-        function toggleSelectAll(cb) {
-            document.querySelectorAll('#tableBody input[type=checkbox]').forEach(c => c.checked = cb.checked);
-            updateSelectedCount();
-        }
-
-        function updateSelectedCount() {
-            const checked = document.querySelectorAll('#tableBody input[type=checkbox]:checked').length;
-            const el = document.getElementById('selectedCount');
-            el.textContent = checked > 0 ? `${checked} selected` : '';
-        }
-
-        function toggleDateFilter() {
-            alert('Date range filter: coming soon!');
-        }
-
-        function exportCSV() {
-            const rows = getFiltered();
-            const headers = ['Sol ID', 'Sol Description', 'CIF Creation Date', 'CIF', 'Account Number', 'Transaction ID', 'Transaction Date', 'Status'];
-            const lines = [headers.join(',')];
-            rows.forEach(r => {
-                const statusMap = { pending: 'Pending', insuf: 'Insufficient Balance', closed: 'Account Closed' };
-                lines.push([r.solId, `"${r.solDesc}"`, r.cifDate, r.cif, r.accNo, r.txnId, r.txnDate, statusMap[r.status]].join(','));
-            });
-            const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `share-fund-tracker-${currentTab}.csv`;
-            a.click();
-        }
-
-        renderTable();
-    </script> -->
-
-
     <script>
         const PER_PAGE = 10;
 
-        let allRecords = [];
         let currentTab = "all";
         let currentPage = 1;
-        let sortCol = null;
-        let sortDir = 1;
+        let sortCol = "modified";
+        let sortDir = -1;
         let searchQ = "";
         let selectedSolIds = new Set();
         let pendingSolIds = new Set();
         let selectedRowNames = new Set();
-
-        const FIELD_MAP = {
-            name: "name",
-            solId: "sol_id",
-            cif: "cif",
-            accNo: "account_number",
-            txnId: "transaction_id",
-            paymentStatus: "payment_status",
-            insufficientBalance: "insufficient_balance",
-            accountClosed: "account_closed",
-            fundTransferDate: "fund_transfer_date",
-            cifDate: "cif_creation_date",
-            accountOpeningDate: "account_opening_date",
-            errorLog: "error_log"
-        };
+        let currentRows = [];
+        let currentTotal = 0;
+        let currentSolIds = [];
+        let pageCache = new Map();
+        let countCache = { data: null, ts: 0 };
 
         function escapeHtml(value) {
             if (value === null || value === undefined) return "";
@@ -1831,9 +1466,7 @@
         function formatDate(value) {
             if (!value) return "-";
             try {
-                if (window.frappe && frappe.datetime) {
-                    return frappe.datetime.str_to_user(value);
-                }
+                if (window.frappe && frappe.datetime) return frappe.datetime.str_to_user(value);
             } catch (e) { }
             return value;
         }
@@ -1841,15 +1474,9 @@
         function formatDateTime(value) {
             if (!value) return "-";
             try {
-                if (window.frappe && frappe.datetime) {
-                    return frappe.datetime.str_to_user(value);
-                }
+                if (window.frappe && frappe.datetime) return frappe.datetime.str_to_user(value);
             } catch (e) { }
             return value;
-        }
-
-        function asInt(val) {
-            return cintLike(val);
         }
 
         function cintLike(val) {
@@ -1860,21 +1487,26 @@
             return isNaN(n) ? 0 : n;
         }
 
+        function formatNumber(value) {
+            const num = Number(value || 0);
+            return num.toLocaleString("en-US");
+        }
+
         function getStatusKey(row) {
-            if (row.payment_status === "Success") return "success";
+            if (String(row.payment_status || "").trim() === "Success") return "success";
             if (cintLike(row.insufficient_balance) === 1) return "insuf";
             if (cintLike(row.account_closed) === 1) return "closed";
-            if (row.payment_status === "Pending") return "pending";
-            if (row.payment_status === "Failed") return "failed";
+            if (String(row.payment_status || "").trim() === "Pending") return "pending";
+            if (String(row.payment_status || "").trim() === "Failed") return "failed";
             return "unknown";
         }
 
         function getStatusLabel(row) {
-            if (row.payment_status === "Success") return "Success";
+            if (String(row.payment_status || "").trim() === "Success") return "Success";
             if (cintLike(row.insufficient_balance) === 1) return "Insufficient balance";
             if (cintLike(row.account_closed) === 1) return "Account closed";
-            if (row.payment_status === "Pending") return "Pending";
-            if (row.payment_status === "Failed") return "Failed";
+            if (String(row.payment_status || "").trim() === "Pending") return "Pending";
+            if (String(row.payment_status || "").trim() === "Failed") return "Failed";
             return row.payment_status || "Unknown";
         }
 
@@ -1894,93 +1526,149 @@
             return `<span class="pill ${clsMap[key] || "pill-closed"}">${escapeHtml(label)}</span>`;
         }
 
-        function getCurrentTabRows() {
-            let rows = [...allRecords];
-
-            if (currentTab === "pending") {
-                rows = rows.filter(r => r.payment_status === "Pending");
-            } else if (currentTab === "insuf") {
-                rows = rows.filter(r => cintLike(r.insufficient_balance) === 1);
-            } else if (currentTab === "closed") {
-                rows = rows.filter(r => cintLike(r.account_closed) === 1);
-            } else if (currentTab === "success") {
-                rows = rows.filter(r => r.payment_status === "Success");
-            } else {
-                rows = [...allRecords];
-            }
-
-            return rows;
+        function normalizeRecord(row) {
+            return {
+                name: row.name || "",
+                sol_id: row.sol_id || "",
+                cif: row.cif != null ? String(row.cif) : "",
+                account_number: row.account_number != null ? String(row.account_number) : "",
+                transaction_id: row.transaction_id || "",
+                payment_status: row.payment_status || "",
+                insufficient_balance: cintLike(row.insufficient_balance),
+                account_closed: cintLike(row.account_closed),
+                fund_transfer_date: row.fund_transfer_date || "",
+                cif_creation_date: row.cif_creation_date || "",
+                account_opening_date: row.account_opening_date || "",
+                error_log: row.error_log || "",
+                modified: row.modified || ""
+            };
         }
 
-        function getFiltered() {
-            let rows = getCurrentTabRows();
-
-            if (selectedSolIds.size > 0) {
-                rows = rows.filter(r => selectedSolIds.has(String(r.sol_id || "")));
-            }
-
-            if (searchQ) {
-                const q = searchQ.toLowerCase();
-                rows = rows.filter(r =>
-                    String(r.name || "").toLowerCase().includes(q) ||
-                    String(r.sol_id || "").toLowerCase().includes(q) ||
-                    String(r.cif || "").toLowerCase().includes(q) ||
-                    String(r.account_number || "").toLowerCase().includes(q) ||
-                    String(r.transaction_id || "").toLowerCase().includes(q) ||
-                    String(r.payment_status || "").toLowerCase().includes(q)
-                );
-            }
-
-            if (sortCol) {
-                rows.sort((a, b) => {
-                    let av = a[sortCol];
-                    let bv = b[sortCol];
-
-                    if (sortCol === "cif_creation_date" || sortCol === "fund_transfer_date") {
-                        av = av ? new Date(av).getTime() : 0;
-                        bv = bv ? new Date(bv).getTime() : 0;
-                    } else {
-                        av = String(av || "").toLowerCase();
-                        bv = String(bv || "").toLowerCase();
-                    }
-
-                    if (av < bv) return -1 * sortDir;
-                    if (av > bv) return 1 * sortDir;
-                    return 0;
-                });
-            }
-
-            return rows;
+        function getSortBy() {
+            const map = {
+                sol_id: "sol_id",
+                cif_creation_date: "cif_creation_date",
+                fund_transfer_date: "fund_transfer_date",
+                modified: "modified"
+            };
+            return map[sortCol] || "modified";
         }
 
-        function updateMetrics() {
-            const total = allRecords.length;
-            const pending = allRecords.filter(r => r.payment_status === "Pending").length;
-            const insuf = allRecords.filter(r => cintLike(r.insufficient_balance) === 1).length;
-            const closed = allRecords.filter(r => cintLike(r.account_closed) === 1).length;
-            // const success = allRecords.filter(r => r.payment_status === "Success").length;
-            const success = allRecords.filter(r => String(r.payment_status || "").trim() === "Success").length;
+        function getSortOrder() {
+            return sortDir === -1 ? "desc" : "asc";
+        }
 
+        function getCacheKey() {
+            return JSON.stringify({
+                tab: currentTab,
+                page: currentPage,
+                q: searchQ,
+                sol_ids: [...selectedSolIds].sort(),
+                sort_by: getSortBy(),
+                sort_order: getSortOrder()
+            });
+        }
+
+        async function apiCall(method, args = {}) {
+            const qs = new URLSearchParams();
+
+            Object.keys(args || {}).forEach(key => {
+                const val = args[key];
+                if (Array.isArray(val)) {
+                    qs.append(key, JSON.stringify(val));
+                } else if (val !== null && val !== undefined) {
+                    qs.append(key, val);
+                }
+            });
+
+            const response = await fetch(`/api/method/${method}?${qs.toString()}`, {
+                method: "GET",
+                credentials: "same-origin"
+            });
+
+            const result = await response.json();
+            if (result.exc) throw new Error(result.exc);
+            return result.message;
+        }
+
+        async function loadCounts(force = false) {
+            const now = Date.now();
+            if (!force && countCache.data && (now - countCache.ts < 15000)) {
+                renderMetrics(countCache.data);
+                return;
+            }
+
+            const data = await apiCall("banking_api.www.share_tracker.get_share_tracker_counts");
+            countCache = { data, ts: now };
+            renderMetrics(data);
+        }
+
+        function renderMetrics(data) {
             const totalEl = document.getElementById("m-total");
             const pendingEl = document.getElementById("m-pending");
             const insufEl = document.getElementById("m-insuf");
             const closedEl = document.getElementById("m-closed");
             const successEl = document.getElementById("m-success");
 
-            if (totalEl) totalEl.textContent = formatNumber(total);
-            if (pendingEl) pendingEl.textContent = formatNumber(pending);
-            if (insufEl) insufEl.textContent = formatNumber(insuf);
-            if (closedEl) closedEl.textContent = formatNumber(closed);
-            if (successEl) successEl.textContent = formatNumber(success);
-
+            if (totalEl) totalEl.textContent = formatNumber(data.total);
+            if (pendingEl) pendingEl.textContent = formatNumber(data.pending);
+            if (insufEl) insufEl.textContent = formatNumber(data.insuf);
+            if (closedEl) closedEl.textContent = formatNumber(data.closed);
+            if (successEl) successEl.textContent = formatNumber(data.success);
 
             const tcPending = document.getElementById("tc-pending");
             const tcInsuf = document.getElementById("tc-insuf");
             const tcClosed = document.getElementById("tc-closed");
 
-            if (tcPending) tcPending.textContent = formatNumber(pending);
-            if (tcInsuf) tcInsuf.textContent = formatNumber(insuf);
-            if (tcClosed) tcClosed.textContent = formatNumber(closed);
+            if (tcPending) tcPending.textContent = formatNumber(data.pending);
+            if (tcInsuf) tcInsuf.textContent = formatNumber(data.insuf);
+            if (tcClosed) tcClosed.textContent = formatNumber(data.closed);
+        }
+
+        async function loadRows(force = false) {
+            const cacheKey = getCacheKey();
+            const empty = document.getElementById("emptyState");
+            const tbody = document.getElementById("tableBody");
+
+            if (!force && pageCache.has(cacheKey)) {
+                const cached = pageCache.get(cacheKey);
+                currentRows = cached.rows;
+                currentTotal = cached.total;
+                currentSolIds = cached.sol_ids || [];
+                renderTable();
+            }
+
+            if (empty && !pageCache.has(cacheKey)) {
+                empty.style.display = "block";
+                empty.innerHTML = `
+                <div class="empty-icon">⏳</div>
+                <div class="empty-title">Loading records...</div>
+                <div class="empty-sub">Please wait</div>
+            `;
+            }
+            if (tbody && !pageCache.has(cacheKey)) tbody.innerHTML = "";
+
+            const message = await apiCall("banking_api.www.share_tracker.get_share_tracker_rows", {
+                view: currentTab,
+                page: currentPage,
+                page_length: PER_PAGE,
+                search: searchQ || null,
+                sol_ids: [...selectedSolIds],
+                sort_by: getSortBy(),
+                sort_order: getSortOrder()
+            });
+
+            currentRows = (message.rows || []).map(normalizeRecord);
+            currentTotal = cintLike(message.total);
+            currentSolIds = [...new Set(currentRows.map(r => String(r.sol_id || "")).filter(Boolean))].sort();
+
+            pageCache.set(cacheKey, {
+                rows: currentRows,
+                total: currentTotal,
+                sol_ids: currentSolIds
+            });
+
+            renderTable();
         }
 
         function updateCardSelection() {
@@ -2001,54 +1689,43 @@
         function updateTabSelection() {
             document.querySelectorAll(".tab").forEach(t => {
                 t.classList.remove("active");
-                const tab = t.dataset.tab;
-                if (tab === currentTab) t.classList.add("active");
+                if (t.dataset.tab === currentTab) t.classList.add("active");
             });
         }
 
         function renderTable() {
-            const filtered = getFiltered();
-            const total = filtered.length;
-            const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
-
-            if (currentPage > totalPages) currentPage = totalPages;
-
-            const start = (currentPage - 1) * PER_PAGE;
-            const pageRows = filtered.slice(start, start + PER_PAGE);
-
             const tbody = document.getElementById("tableBody");
             const empty = document.getElementById("emptyState");
-
             if (!tbody) return;
 
-            if (!pageRows.length) {
+            if (!currentRows.length) {
                 tbody.innerHTML = "";
                 if (empty) empty.style.display = "block";
             } else {
                 if (empty) empty.style.display = "none";
 
-                tbody.innerHTML = pageRows.map(r => `
-				<tr class="data-row" data-name="${escapeHtml(r.name)}" data-cif="${escapeHtml(r.cif)}" onclick="openRecordModal('${encodeURIComponent(r.cif)}')">
-					<td class="cb-cell" onclick="event.stopPropagation()">
-						<input type="checkbox" ${selectedRowNames.has(r.name) ? "checked" : ""} onchange="toggleRowSelection('${escapeHtml(r.name)}', this.checked)">
-					</td>
-					<td style="font-weight:500">${escapeHtml(r.sol_id || "-")}</td>
-					<td class="muted">${formatDate(r.cif_creation_date)}</td>
-					<td class="mono">${escapeHtml(r.cif || "-")}</td>
-					<td class="mono">${escapeHtml(r.account_number || "-")}</td>
-					<td class="mono">${escapeHtml(r.transaction_id || "-")}</td>
-					<td class="muted">${formatDateTime(r.fund_transfer_date)}</td>
-					<td>${pillHTML(r)}</td>
-				</tr>
-			`).join("");
+                tbody.innerHTML = currentRows.map(r => `
+                <tr class="data-row" data-name="${escapeHtml(r.name)}" data-cif="${escapeHtml(r.cif)}" onclick="openRecordModal('${encodeURIComponent(r.cif)}')">
+                    <td class="cb-cell" onclick="event.stopPropagation()">
+                        <input type="checkbox" ${selectedRowNames.has(r.name) ? "checked" : ""} onchange="toggleRowSelection('${escapeHtml(r.name)}', this.checked)">
+                    </td>
+                    <td style="font-weight:500">${escapeHtml(r.sol_id || "-")}</td>
+                    <td class="muted">${formatDate(r.cif_creation_date)}</td>
+                    <td class="mono">${escapeHtml(r.cif || "-")}</td>
+                    <td class="mono">${escapeHtml(r.account_number || "-")}</td>
+                    <td class="mono">${escapeHtml(r.transaction_id || "-")}</td>
+                    <td class="muted">${formatDateTime(r.fund_transfer_date)}</td>
+                    <td>${pillHTML(r)}</td>
+                </tr>
+            `).join("");
             }
 
-            const from = total === 0 ? 0 : start + 1;
-            const to = Math.min(start + PER_PAGE, total);
+            const totalPages = Math.max(1, Math.ceil(currentTotal / PER_PAGE));
+            const from = currentTotal === 0 ? 0 : ((currentPage - 1) * PER_PAGE) + 1;
+            const to = Math.min(currentPage * PER_PAGE, currentTotal);
 
             const pgInfo = document.getElementById("pgInfo");
-            // if (pgInfo) pgInfo.textContent = `Showing ${from}-${to} of ${total} records`;
-            if (pgInfo) pgInfo.textContent = `Showing ${formatNumber(from)}-${formatNumber(to)} of ${formatNumber(total)} records`;
+            if (pgInfo) pgInfo.textContent = `Showing ${formatNumber(from)}-${formatNumber(to)} of ${formatNumber(currentTotal)} records`;
 
             renderPagination(totalPages);
 
@@ -2058,22 +1735,11 @@
             updateSelectedCount();
             updateSortIndicators();
         }
-        function formatNumber(value) {
-            const num = Number(value || 0);
-            return num.toLocaleString("en-IN");
-        }
 
         function updateSortIndicators() {
             document.querySelectorAll("th.sortable").forEach(th => th.classList.remove("sorted"));
-
-            const map = {
-                sol_id: 1,
-                cif_creation_date: 2,
-                fund_transfer_date: 6
-            };
-
-            if (!sortCol) return;
-
+            const map = { sol_id: 1, cif_creation_date: 3, fund_transfer_date: 6, modified: null };
+            if (!sortCol || map[sortCol] === null) return;
             const ths = document.querySelectorAll("thead th");
             const index = map[sortCol];
             if (ths && ths[index]) ths[index].classList.add("sorted");
@@ -2084,28 +1750,24 @@
             if (!container) return;
 
             let html = `
-			<button class="pg-btn" onclick="goPage(${currentPage - 1})" ${currentPage === 1 ? "disabled" : ""}>
-				<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-				Prev
-			</button>
-		`;
+            <button class="pg-btn" onclick="goPage(${currentPage - 1})" ${currentPage === 1 ? "disabled" : ""}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                Prev
+            </button>
+        `;
 
             const pages = getPaginationPages(currentPage, totalPages);
-
             pages.forEach(p => {
-                if (p === "...") {
-                    html += `<span class="pg-dots">...</span>`;
-                } else {
-                    html += `<button class="pg-btn ${p === currentPage ? "active" : ""}" onclick="goPage(${p})">${p}</button>`;
-                }
+                if (p === "...") html += `<span class="pg-dots">...</span>`;
+                else html += `<button class="pg-btn ${p === currentPage ? "active" : ""}" onclick="goPage(${p})">${p}</button>`;
             });
 
             html += `
-			<button class="pg-btn" onclick="goPage(${currentPage + 1})" ${currentPage === totalPages ? "disabled" : ""}>
-				Next
-				<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-			</button>
-		`;
+            <button class="pg-btn" onclick="goPage(${currentPage + 1})" ${currentPage === totalPages ? "disabled" : ""}>
+                Next
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+        `;
 
             container.innerHTML = html;
         }
@@ -2117,18 +1779,18 @@
             return [1, "...", cur - 1, cur, cur + 1, "...", total];
         }
 
-        function goPage(p) {
-            const filtered = getFiltered();
-            const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+        async function goPage(p) {
+            const totalPages = Math.max(1, Math.ceil(currentTotal / PER_PAGE));
             if (p < 1 || p > totalPages) return;
             currentPage = p;
-            renderTable();
+            await loadRows();
         }
 
-        function switchTab(tab) {
+        async function switchTab(tab) {
             currentTab = tab;
             currentPage = 1;
-            sortCol = null;
+            sortCol = "modified";
+            sortDir = -1;
             searchQ = "";
             selectedSolIds.clear();
             pendingSolIds.clear();
@@ -2140,17 +1802,17 @@
             updateFilterUI();
             updateCardSelection();
             updateTabSelection();
-            renderTable();
+            await loadRows();
         }
 
-        function onSearch() {
+        async function onSearch() {
             const input = document.getElementById("searchInput");
             searchQ = input ? input.value.trim() : "";
             currentPage = 1;
-            renderTable();
+            await loadRows();
         }
 
-        function sortBy(col) {
+        async function sortBy(col) {
             const columnMap = {
                 solId: "sol_id",
                 cifDate: "cif_creation_date",
@@ -2158,16 +1820,14 @@
             };
 
             const actualCol = columnMap[col] || col;
-
-            if (sortCol === actualCol) {
-                sortDir *= -1;
-            } else {
+            if (sortCol === actualCol) sortDir *= -1;
+            else {
                 sortCol = actualCol;
                 sortDir = 1;
             }
 
             currentPage = 1;
-            renderTable();
+            await loadRows();
         }
 
         function toggleSelectAll(cb) {
@@ -2191,11 +1851,11 @@
         function updateSelectedCount() {
             const el = document.getElementById("selectedCount");
             if (!el) return;
-            el.textContent = selectedRowNames.size > 0 ? `${selectedRowNames.size} selected` : "";
+            el.textContent = selectedRowNames.size > 0 ? `${formatNumber(selectedRowNames.size)} selected` : "";
         }
 
         function getSolIdsForCurrentTab() {
-            return [...new Set(getCurrentTabRows().map(r => String(r.sol_id || "")).filter(Boolean))].sort();
+            return currentSolIds;
         }
 
         function toggleFilterPopup() {
@@ -2237,10 +1897,55 @@
             if (wrap && !wrap.contains(e.target)) closeFilterPopup();
         }
 
+        function parseSolIdTokens(value) {
+            return String(value || "").split(",").map(v => v.trim()).filter(Boolean);
+        }
+
+        function normalizeSolId(value) {
+            return String(value || "").trim().toLowerCase();
+        }
+
+        function getVisibleSolIdsFromInput() {
+            const fpSearch = document.getElementById("fpSearchInput");
+            const raw = fpSearch ? fpSearch.value : "";
+            const q = raw.toLowerCase().trim();
+
+            const solIds = getSolIdsForCurrentTab();
+
+            if (!q) return solIds;
+
+            if (raw.includes(",")) {
+                const tokenSet = new Set(parseSolIdTokens(raw).map(normalizeSolId));
+                return solIds.filter(id => tokenSet.has(normalizeSolId(id)));
+            }
+
+            return solIds.filter(id => normalizeSolId(id).includes(normalizeSolId(q)));
+        }
+
+        function handleFpSearchInput() {
+            autoSelectSolIdsFromInput();
+            renderFpList();
+        }
+
+        function autoSelectSolIdsFromInput() {
+            const fpSearch = document.getElementById("fpSearchInput");
+            if (!fpSearch) return;
+
+            const raw = fpSearch.value || "";
+            if (!raw.includes(",")) return;
+
+            const tokenSet = new Set(parseSolIdTokens(raw).map(normalizeSolId));
+            if (!tokenSet.size) return;
+
+            const availableSolIds = getSolIdsForCurrentTab();
+            availableSolIds.forEach(id => {
+                if (tokenSet.has(normalizeSolId(id))) pendingSolIds.add(id);
+            });
+        }
+
         function renderFpList() {
             const visible = getVisibleSolIdsFromInput();
             const list = document.getElementById("fpList");
-
             if (!list) return;
 
             if (!visible.length) {
@@ -2255,11 +1960,11 @@
             }
 
             list.innerHTML = visible.map(id => `
-        <label class="fp-item">
-            <input type="checkbox" value="${escapeHtml(id)}" ${pendingSolIds.has(id) ? "checked" : ""} onchange="fpToggleItem('${escapeHtml(id)}', this.checked)">
-            <span class="fp-item-label">${escapeHtml(id)}</span>
-        </label>
-    `).join("");
+            <label class="fp-item">
+                <input type="checkbox" value="${escapeHtml(id)}" ${pendingSolIds.has(id) ? "checked" : ""} onchange="fpToggleItem('${escapeHtml(id)}', this.checked)">
+                <span class="fp-item-label">${escapeHtml(id)}</span>
+            </label>
+        `).join("");
 
             updateFpMeta(visible);
         }
@@ -2271,18 +1976,6 @@
             updateFpMeta(getVisibleSolIdsFromInput());
         }
 
-        function fpToggleAll(cb) {
-            const visible = getVisibleSolIdsFromInput();
-
-            visible.forEach(id => {
-                if (cb.checked) pendingSolIds.add(id);
-                else pendingSolIds.delete(id);
-            });
-
-            renderFpList();
-        }
-
-
         function updateFpMeta(visible) {
             const checkedVisible = visible.filter(id => pendingSolIds.has(id)).length;
             const saEl = document.getElementById("fpSelectAll");
@@ -2293,10 +1986,17 @@
             }
 
             const fpCount = document.getElementById("fpCount");
-            if (fpCount) fpCount.textContent = pendingSolIds.size > 0 ? `${pendingSolIds.size} selected` : "0 selected";
+            if (fpCount) fpCount.textContent = pendingSolIds.size > 0 ? `${formatNumber(pendingSolIds.size)} selected` : "0 selected";
         }
 
-
+        function fpToggleAll(cb) {
+            const visible = getVisibleSolIdsFromInput();
+            visible.forEach(id => {
+                if (cb.checked) pendingSolIds.add(id);
+                else pendingSolIds.delete(id);
+            });
+            renderFpList();
+        }
 
         function fpReset() {
             pendingSolIds.clear();
@@ -2305,27 +2005,27 @@
             renderFpList();
         }
 
-        function applyFilter() {
+        async function applyFilter() {
             selectedSolIds = new Set(pendingSolIds);
             currentPage = 1;
             closeFilterPopup();
             updateFilterUI();
-            renderTable();
+            await loadRows(true);
         }
 
-        function clearSolFilter() {
+        async function clearSolFilter() {
             selectedSolIds.clear();
             pendingSolIds.clear();
             currentPage = 1;
             updateFilterUI();
-            renderTable();
+            await loadRows(true);
         }
 
-        function removeSolTag(id) {
+        async function removeSolTag(id) {
             selectedSolIds.delete(id);
             currentPage = 1;
             updateFilterUI();
-            renderTable();
+            await loadRows(true);
         }
 
         function updateFilterUI() {
@@ -2338,23 +2038,23 @@
             if (count > 0) {
                 if (badge) {
                     badge.style.display = "inline-flex";
-                    badge.textContent = count;
+                    badge.textContent = formatNumber(count);
                 }
                 if (btn) btn.classList.add("filter-active");
                 if (bar) bar.classList.add("show");
 
                 if (tagsEl) {
                     tagsEl.innerHTML = [...selectedSolIds].map(id => `
-					<span class="filter-tag">
-						${escapeHtml(id)}
-						<button class="filter-tag-remove" onclick="removeSolTag('${escapeHtml(id)}')" aria-label="Remove ${escapeHtml(id)}">
-							<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
-								<line x1="18" y1="6" x2="6" y2="18"></line>
-								<line x1="6" y1="6" x2="18" y2="18"></line>
-							</svg>
-						</button>
-					</span>
-				`).join("");
+                    <span class="filter-tag">
+                        ${escapeHtml(id)}
+                        <button class="filter-tag-remove" onclick="removeSolTag('${escapeHtml(id)}')" aria-label="Remove ${escapeHtml(id)}">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </span>
+                `).join("");
                 }
             } else {
                 if (badge) badge.style.display = "none";
@@ -2371,20 +2071,11 @@
         }
 
         function exportCSV() {
-            const rows = getFiltered();
+            const rows = currentRows;
             const headers = [
-                "SOL ID",
-                "CIF",
-                "Account Number",
-                "Transaction ID",
-                "Payment Status",
-                "Insufficient Balance",
-                "Account Closed",
-                "Fund Transfer Date",
-                "CIF Creation Date",
-                "Account Opening Date"
+                "SOL ID", "CIF", "Account Number", "Transaction ID", "Payment Status",
+                "Insufficient Balance", "Account Closed", "Fund Transfer Date", "CIF Creation Date", "Account Opening Date"
             ];
-
             const lines = [headers.join(",")];
 
             rows.forEach(r => {
@@ -2419,34 +2110,33 @@
             if (document.getElementById("recordDetailOverlay")) return;
 
             const modalHtml = `
-			<div id="recordDetailOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:500;align-items:center;justify-content:center;padding:24px;">
-				<div id="recordDetailModal" style="width:min(920px,100%);max-height:90vh;overflow:hidden;background:var(--bg-card);border:1px solid var(--border-md);border-radius:var(--radius-xl);box-shadow:0 20px 60px rgba(0,0,0,.55);display:flex;flex-direction:column;">
-					<div style="display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--border);background:var(--bg-surface);">
-						<div>
-							<div style="font-size:18px;font-weight:600;color:var(--text-primary);">Share Application Details</div>
-							<div id="recordDetailSub" style="font-size:12px;color:var(--text-secondary);margin-top:2px;">Loading...</div>
-						</div>
-						<button onclick="closeRecordModal()" aria-label="Close" style="width:34px;height:34px;border:none;border-radius:var(--radius-sm);background:transparent;color:var(--text-secondary);cursor:pointer;">
-							<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-								<line x1="18" y1="6" x2="6" y2="18"></line>
-								<line x1="6" y1="6" x2="18" y2="18"></line>
-							</svg>
-						</button>
-					</div>
-					<div id="recordDetailBody" style="padding:20px;overflow:auto;"></div>
-				</div>
-			</div>
-		`;
+            <div id="recordDetailOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:500;align-items:center;justify-content:center;padding:24px;">
+                <div id="recordDetailModal" style="width:min(920px,100%);max-height:90vh;overflow:hidden;background:var(--bg-card);border:1px solid var(--border-md);border-radius:var(--radius-xl);box-shadow:0 20px 60px rgba(0,0,0,.55);display:flex;flex-direction:column;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--border);background:var(--bg-surface);">
+                        <div>
+                            <div style="font-size:18px;font-weight:600;color:var(--text-primary);">Share Application Details</div>
+                            <div id="recordDetailSub" style="font-size:12px;color:var(--text-secondary);margin-top:2px;">Loading...</div>
+                        </div>
+                        <button onclick="closeRecordModal()" aria-label="Close" style="width:34px;height:34px;border:none;border-radius:var(--radius-sm);background:transparent;color:var(--text-secondary);cursor:pointer;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+                    <div id="recordDetailBody" style="padding:20px;overflow:auto;"></div>
+                </div>
+            </div>
+        `;
 
             document.body.insertAdjacentHTML("beforeend", modalHtml);
-
             const overlay = document.getElementById("recordDetailOverlay");
             overlay.addEventListener("click", function (e) {
                 if (e.target === overlay) closeRecordModal();
             });
         }
 
-        function openRecordModal(cif) {
+        async function openRecordModal(cif) {
             ensureModal();
 
             const overlay = document.getElementById("recordDetailOverlay");
@@ -2455,72 +2145,51 @@
 
             overlay.style.display = "flex";
             sub.textContent = "Fetching record details...";
-            body.innerHTML = `
-			<div style="padding:24px;text-align:center;color:var(--text-secondary);">
-				Loading details...
-			</div>
-		`;
+            body.innerHTML = `<div style="padding:24px;text-align:center;color:var(--text-secondary);">Loading details...</div>`;
 
-            fetch(`/api/method/frappe.client.get_value?doctype=Share%20Application&filters=${encodeURIComponent(JSON.stringify({ cif: decodeURIComponent(cif) }))}&fieldname=${encodeURIComponent(JSON.stringify([
-                "name",
-                "sol_id",
-                "cif",
-                "account_number",
-                "transaction_id",
-                "payment_status",
-                "insufficient_balance",
-                "account_closed",
-                "fund_transfer_date",
-                "cif_creation_date",
-                "account_opening_date",
-                "error_log"
-            ]))}`, {
-                credentials: "same-origin"
-            })
-                .then(r => r.json())
-                .then(r => {
-                    const doc = r && r.message ? r.message : null;
-
-                    if (!doc) {
-                        sub.textContent = "Record not found";
-                        body.innerHTML = `<div style="color:var(--text-secondary);">No details found for CIF ${escapeHtml(decodeURIComponent(cif))}</div>`;
-                        return;
-                    }
-
-                    sub.textContent = `CIF ${doc.cif || "-"} · ${doc.name || "-"}`;
-
-                    body.innerHTML = `
-					<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;">
-						${detailCard("SOL ID", doc.sol_id)}
-						${detailCard("CIF", doc.cif)}
-						${detailCard("Account Number", doc.account_number)}
-						${detailCard("Transaction ID", doc.transaction_id || "-")}
-						${detailCard("Payment Status", doc.payment_status || "-")}
-						${detailCard("Insufficient Balance", cintLike(doc.insufficient_balance) ? "Yes" : "No")}
-						${detailCard("Account Closed", cintLike(doc.account_closed) ? "Yes" : "No")}
-						${detailCard("Fund Transfer Date", formatDateTime(doc.fund_transfer_date))}
-						${detailCard("CIF Creation Date", formatDate(doc.cif_creation_date))}
-						${detailCard("Account Opening Date", formatDate(doc.account_opening_date))}
-					</div>
-					<div style="margin-top:16px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;">
-						<div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em;">API Response</div>
-						<pre style="margin:0;white-space:pre-wrap;word-break:break-word;font-size:12px;line-height:1.6;color:var(--text-primary);font-family:'SF Mono','Fira Code',monospace;">${escapeHtml(doc.error_log || "-")}</pre>
-					</div>
-				`;
-                })
-                .catch(() => {
-                    sub.textContent = "Error";
-                    body.innerHTML = `<div style="color:var(--red);">Unable to fetch record details.</div>`;
+            try {
+                const doc = await apiCall("banking_api.www.share_tracker.get_share_application_by_cif", {
+                    cif: decodeURIComponent(cif)
                 });
+
+                if (!doc) {
+                    sub.textContent = "Record not found";
+                    body.innerHTML = `<div style="color:var(--text-secondary);">No details found for CIF ${escapeHtml(decodeURIComponent(cif))}</div>`;
+                    return;
+                }
+
+                sub.textContent = `CIF ${doc.cif || "-"} · ${doc.name || "-"}`;
+                body.innerHTML = `
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;">
+                    ${detailCard("SOL ID", doc.sol_id)}
+                    ${detailCard("CIF", doc.cif)}
+                    ${detailCard("Account Number", doc.account_number)}
+                    ${detailCard("Transaction ID", doc.transaction_id || "-")}
+                    ${detailCard("Payment Status", doc.payment_status || "-")}
+                    ${detailCard("Insufficient Balance", cintLike(doc.insufficient_balance) ? "Yes" : "No")}
+                    ${detailCard("Account Closed", cintLike(doc.account_closed) ? "Yes" : "No")}
+                    ${detailCard("Fund Transfer Date", formatDateTime(doc.fund_transfer_date))}
+                    ${detailCard("CIF Creation Date", formatDate(doc.cif_creation_date))}
+                    ${detailCard("Account Opening Date", formatDate(doc.account_opening_date))}
+                </div>
+                <div style="margin-top:16px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;">
+                    <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em;">API Response</div>
+                    <pre style="margin:0;white-space:pre-wrap;word-break:break-word;font-size:12px;line-height:1.6;color:var(--text-primary);font-family:'SF Mono','Fira Code',monospace;">${escapeHtml(doc.error_log || "-")}</pre>
+                </div>
+            `;
+            } catch (e) {
+                sub.textContent = "Error";
+                body.innerHTML = `<div style="color:var(--red);">Unable to fetch record details.</div>`;
+            }
         }
 
         function detailCard(label, value) {
             return `
-			<div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;">
-				<div style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">${escapeHtml(label)}</div>
-				<div style="font-size:14px;color:var(--text-primary);font-weight:500;word-break:break-word;">${escapeHtml(value || "-")}</div>
-			</div>
-		`;
+            <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;">
+                <div style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">${escapeHtml(label)}</div>
+                <div style="font-size:14px;color:var(--text-primary);font-weight:500;word-break:break-word;">${escapeHtml(value || "-")}</div>
+            </div>
+        `;
         }
 
         function closeRecordModal() {
@@ -2531,9 +2200,7 @@
         function bindExistingTabButtons() {
             document.querySelectorAll(".tab").forEach(tabEl => {
                 const tab = tabEl.dataset.tab;
-                tabEl.onclick = function () {
-                    switchTab(tab);
-                };
+                tabEl.onclick = function () { switchTab(tab); };
             });
 
             const totalCard = document.querySelector(".metric.total");
@@ -2549,178 +2216,35 @@
             if (successCard) successCard.onclick = () => switchTab("success");
         }
 
-        function normalizeRecord(row) {
-            return {
-                name: row.name || "",
-                sol_id: row.sol_id || "",
-                cif: row.cif != null ? String(row.cif) : "",
-                account_number: row.account_number != null ? String(row.account_number) : "",
-                transaction_id: row.transaction_id || "",
-                payment_status: row.payment_status || "",
-                insufficient_balance: cintLike(row.insufficient_balance),
-                account_closed: cintLike(row.account_closed),
-                fund_transfer_date: row.fund_transfer_date || "",
-                cif_creation_date: row.cif_creation_date || "",
-                account_opening_date: row.account_opening_date || "",
-                error_log: row.error_log || ""
-            };
-        }
-
-        async function loadData() {
-            const fields = [
-                "name",
-                "sol_id",
-                "cif",
-                "account_number",
-                "transaction_id",
-                "payment_status",
-                "insufficient_balance",
-                "account_closed",
-                "fund_transfer_date",
-                "cif_creation_date",
-                "account_opening_date",
-                "error_log"
-            ];
-
-            const pageSize = 5000;
-            let start = 0;
-            let done = false;
-            let allRows = [];
-
-            const tbody = document.getElementById("tableBody");
-            const empty = document.getElementById("emptyState");
-
-            try {
-                if (empty) {
-                    empty.style.display = "block";
-                    empty.innerHTML = `
-                <div class="empty-icon">⏳</div>
-                <div class="empty-title">Loading Share Application records...</div>
-                <div class="empty-sub">Please wait while records are being fetched.</div>
-            `;
-                }
-                if (tbody) tbody.innerHTML = "";
-
-                while (!done) {
-                    const url = `/api/resource/Share Application?fields=${encodeURIComponent(JSON.stringify(fields))}&limit_start=${start}&limit_page_length=${pageSize}&order_by=modified desc`;
-
-                    const response = await fetch(url, {
-                        credentials: "same-origin"
-                    });
-
-                    const result = await response.json();
-                    const rows = (result.data || []).map(normalizeRecord);
-
-                    allRows = allRows.concat(rows);
-
-                    if (rows.length < pageSize) {
-                        done = true;
-                    } else {
-                        start += pageSize;
-                    }
-
-                    if (empty) {
-                        empty.style.display = "block";
-                        empty.innerHTML = `
-                    <div class="empty-icon">⏳</div>
-                    <div class="empty-title">Loading Share Application records...</div>
-                    <div class="empty-sub">${allRows.length.toLocaleString()} records loaded</div>
-                `;
-                    }
-                }
-
-                allRecords = allRows;
-
-                updateMetrics();
-                updateCardSelection();
-                updateTabSelection();
-                updateFilterUI();
-                renderTable();
-
-                if (empty) {
-                    empty.style.display = allRecords.length ? "none" : "block";
-                    if (!allRecords.length) {
-                        empty.innerHTML = `
-                    <div class="empty-icon">!</div>
-                    <div class="empty-title">No Share Application records found</div>
-                    <div class="empty-sub">There is no data available to display.</div>
-                `;
-                    }
-                }
-            } catch (error) {
-                console.error("Failed to load Share Application data:", error);
-
-                if (tbody) tbody.innerHTML = "";
-                if (empty) {
-                    empty.style.display = "block";
-                    empty.innerHTML = `
-                <div class="empty-icon">!</div>
-                <div class="empty-title">Unable to load Share Application records</div>
-                <div class="empty-sub">Check permission, login session, or API route.</div>
-            `;
-                }
+        function setupRealtime() {
+            if (window.frappe && frappe.realtime && frappe.realtime.on) {
+                frappe.realtime.on("share_tracker_updated", async function () {
+                    pageCache.clear();
+                    countCache = { data: null, ts: 0 };
+                    await loadCounts(true);
+                    await loadRows(true);
+                });
+            } else {
+                setInterval(async function () {
+                    if (document.visibilityState !== "visible") return;
+                    pageCache.clear();
+                    countCache = { data: null, ts: 0 };
+                    await loadCounts(true);
+                    await loadRows(true);
+                }, 30000);
             }
         }
 
-        document.addEventListener("DOMContentLoaded", function () {
+        document.addEventListener("DOMContentLoaded", async function () {
             bindExistingTabButtons();
             ensureModal();
-            loadData();
+            updateCardSelection();
+            updateTabSelection();
+            updateFilterUI();
+            await loadCounts();
+            await loadRows();
+            setupRealtime();
         });
-
-        function parseSolIdTokens(value) {
-            return String(value || "")
-                .split(",")
-                .map(v => v.trim())
-                .filter(Boolean);
-        }
-
-        function normalizeSolId(value) {
-            return String(value || "").trim().toLowerCase();
-        }
-
-        function getVisibleSolIdsFromInput() {
-            const fpSearch = document.getElementById("fpSearchInput");
-            const raw = fpSearch ? fpSearch.value : "";
-            const q = raw.toLowerCase().trim();
-
-            const solIds = getSolIdsForCurrentTab();
-
-            if (!q) {
-                return solIds;
-            }
-
-            if (raw.includes(",")) {
-                const tokenSet = new Set(parseSolIdTokens(raw).map(normalizeSolId));
-                return solIds.filter(id => tokenSet.has(normalizeSolId(id)));
-            }
-
-            return solIds.filter(id => normalizeSolId(id).includes(normalizeSolId(q)));
-        }
-
-        function handleFpSearchInput() {
-            autoSelectSolIdsFromInput();
-            renderFpList();
-        }
-
-        function autoSelectSolIdsFromInput() {
-            const fpSearch = document.getElementById("fpSearchInput");
-            if (!fpSearch) return;
-
-            const raw = fpSearch.value || "";
-            if (!raw.includes(",")) return;
-
-            const tokenSet = new Set(parseSolIdTokens(raw).map(normalizeSolId));
-            if (!tokenSet.size) return;
-
-            const availableSolIds = getSolIdsForCurrentTab();
-
-            availableSolIds.forEach(id => {
-                if (tokenSet.has(normalizeSolId(id))) {
-                    pendingSolIds.add(id);
-                }
-            });
-        }
     </script>
     <!-- end -->
 </body>

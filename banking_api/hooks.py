@@ -145,6 +145,14 @@ app_license = "mit"
 # 	}
 # }
 
+doc_events = {
+    "Share Application": {
+        "after_insert": "banking_api.www.share_tracker.publish_share_tracker_update",
+        "on_update": "banking_api.www.share_tracker.publish_share_tracker_update",
+        "on_trash": "banking_api.www.share_tracker.publish_share_tracker_update"
+    }
+}
+
 # Scheduled Tasks
 # ---------------
 
