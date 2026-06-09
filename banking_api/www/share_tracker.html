@@ -1530,6 +1530,7 @@
             return {
                 name: row.name || "",
                 sol_id: row.sol_id || "",
+                sol_desc: row.sol_desc || "",
                 cif: row.cif != null ? String(row.cif) : "",
                 account_number: row.account_number != null ? String(row.account_number) : "",
                 transaction_id: row.transaction_id || "",
@@ -1710,6 +1711,7 @@
                         <input type="checkbox" ${selectedRowNames.has(r.name) ? "checked" : ""} onchange="toggleRowSelection('${escapeHtml(r.name)}', this.checked)">
                     </td>
                     <td style="font-weight:500">${escapeHtml(r.sol_id || "-")}</td>
+                    <td class="muted">${escapeHtml(r.sol_desc || "-")}</td>
                     <td class="muted">${formatDate(r.cif_creation_date)}</td>
                     <td class="mono">${escapeHtml(r.cif || "-")}</td>
                     <td class="mono">${escapeHtml(r.account_number || "-")}</td>

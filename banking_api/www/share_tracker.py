@@ -14,6 +14,40 @@ def _make_cache_key(prefix, payload=None):
     return f"share_tracker::{prefix}::{frappe.as_json(payload, indent=None, separators=(',', ':'))}"
 
 
+SOL_DESC_TTL = 4 * 24 * 60 * 60  # 4 days
+
+
+def _sol_desc_cache_key(sol_id):
+    return f"share_tracker::sol_desc::{sol_id}"
+
+
+def get_sol_description(sol_id):
+    sol_id = (sol_id or "").strip()
+    if not sol_id:
+        return ""
+
+    cache_key = _sol_desc_cache_key(sol_id)
+    cached = _cache().get_value(cache_key)
+    if cached is not None:
+        return cached
+
+    branch_name = frappe.db.get_value(
+        "Sahayog Branch",
+        {"sol_id": sol_id},
+        "branch"
+    ) or ""
+
+    _cache().set_value(cache_key, branch_name, expires_in_sec=SOL_DESC_TTL)
+    return branch_name
+
+
+def attach_sol_descriptions(rows):
+    for row in rows:
+        sol_id = row.get("sol_id")
+        row["sol_desc"] = get_sol_description(sol_id)
+    return rows
+
+
 def get_context(context):
     return context
 
@@ -146,6 +180,8 @@ def get_share_tracker_rows(view="all", page=1, page_length=10, search=None, sol_
         )
         total = frappe.db.count("Share Application", filters=filters)
 
+    rows = attach_sol_descriptions(rows)
+
     result = {
         "rows": rows,
         "total": total,
@@ -188,6 +224,14 @@ def clear_share_tracker_cache():
     cache = _cache()
     cache.delete_keys("share_tracker::counts::*")
     cache.delete_keys("share_tracker::rows::*")
+
+
+def clear_sol_desc_cache(sol_id=None):
+    cache = _cache()
+    if sol_id:
+        cache.delete_value(_sol_desc_cache_key(sol_id))
+    else:
+        cache.delete_keys("share_tracker::sol_desc::*")
 
 
 def publish_share_tracker_update(doc=None, method=None):
