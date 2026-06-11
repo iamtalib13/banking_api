@@ -1826,6 +1826,24 @@
             });
         }
 
+        // async function fetchRowsForPage(pageNo) {
+        //     const message = await apiCall("banking_api.www.share_tracker.get_share_tracker_rows", {
+        //         view: currentTab,
+        //         page: pageNo,
+        //         page_length: PER_PAGE,
+        //         search: searchQ || null,
+        //         sol_ids: [...selectedSolIds],
+        //         sort_by: getSortBy(),
+        //         sort_order: getSortOrder()
+        //     });
+
+        //     const rows = (message.rows || []).map(normalizeRecord);
+        //     const total = cintLike(message.total);
+        //     const sol_ids = [...new Set(rows.map(r => String(r.sol_id || "")).filter(Boolean))].sort();
+
+        //     return { rows, total, sol_ids };
+        // }
+
         async function fetchRowsForPage(pageNo) {
             const message = await apiCall("banking_api.www.share_tracker.get_share_tracker_rows", {
                 view: currentTab,
@@ -1839,9 +1857,8 @@
 
             const rows = (message.rows || []).map(normalizeRecord);
             const total = cintLike(message.total);
-            const sol_ids = [...new Set(rows.map(r => String(r.sol_id || "")).filter(Boolean))].sort();
 
-            return { rows, total, sol_ids };
+            return { rows, total };
         }
 
         async function prefetchPage(pageNo) {
@@ -2015,6 +2032,47 @@
         //     renderTable();
         // }
 
+
+        // new working version
+        // async function loadRows(force = false) {
+        //     const cacheKey = getCacheKey();
+        //     const empty = document.getElementById("emptyState");
+        //     const tbody = document.getElementById("tableBody");
+
+        //     if (!force && pageCache.has(cacheKey)) {
+        //         const cached = pageCache.get(cacheKey);
+        //         currentRows = cached.rows;
+        //         currentTotal = cached.total;
+        //         currentSolIds = cached.sol_ids || [];
+        //         renderTable();
+        //         prefetchAdjacentPages();
+        //         return;
+        //     }
+
+        //     if (empty) {
+        //         empty.style.display = "block";
+        //         empty.innerHTML = `
+        //     <div class="empty-icon">⏳</div>
+        //     <div class="empty-title">Loading records...</div>
+        //     <div class="empty-sub">Please wait</div>
+        // `;
+        //     }
+
+        //     if (tbody) tbody.innerHTML = "";
+
+        //     const data = await fetchRowsForPage(currentPage);
+
+        //     currentRows = data.rows;
+        //     currentTotal = data.total;
+        //     currentSolIds = data.sol_ids || [];
+
+        //     pageCache.set(cacheKey, data);
+
+        //     renderTable();
+        //     prefetchAdjacentPages();
+        // }
+
+
         async function loadRows(force = false) {
             const cacheKey = getCacheKey();
             const empty = document.getElementById("emptyState");
@@ -2024,7 +2082,6 @@
                 const cached = pageCache.get(cacheKey);
                 currentRows = cached.rows;
                 currentTotal = cached.total;
-                currentSolIds = cached.sol_ids || [];
                 renderTable();
                 prefetchAdjacentPages();
                 return;
@@ -2045,7 +2102,6 @@
 
             currentRows = data.rows;
             currentTotal = data.total;
-            currentSolIds = data.sol_ids || [];
 
             pageCache.set(cacheKey, data);
 
@@ -2340,8 +2396,15 @@
             if (wrap && !wrap.contains(e.target)) closeFilterPopup();
         }
 
+        // function parseSolIdTokens(value) {
+        //     return String(value || "").split(",").map(v => v.trim()).filter(Boolean);
+        // }
+
         function parseSolIdTokens(value) {
-            return String(value || "").split(",").map(v => v.trim()).filter(Boolean);
+            return String(value || "")
+                .split(",")
+                .map(v => v.trim())
+                .filter(Boolean);
         }
 
         function normalizeSolId(value) {
