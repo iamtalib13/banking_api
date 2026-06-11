@@ -47,7 +47,7 @@ def _serialize_row(row):
 @frappe.whitelist()
 def get_loan_account_details():
     """
-    Fetch all loan account details using the original query
+    Fetch all loan account details using the updated query
     and return response in JSON format.
     """
     conn = None
@@ -84,7 +84,7 @@ def get_loan_account_details():
                 l3.flow_amt AS EMI,
                 l.ei_perd_start_date,
                 l.ei_perd_end_date,
-                l.prin_dmd_os AS Overdue,
+                l.prin_dmd_os AS Principal_Overdue,
                 l.int_dmd_os AS Interest_Overdue,
                 e.NEXT_INT_RUN_DATE_DR,
                 (
