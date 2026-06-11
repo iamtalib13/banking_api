@@ -1574,6 +1574,76 @@
             });
         }
 
+        function getCacheKeyForPage(pageNo) {
+            return JSON.stringify({
+                tab: currentTab,
+                page: pageNo,
+                q: searchQ,
+                sol_ids: [...selectedSolIds].sort(),
+                sort_by: getSortBy(),
+                sort_order: getSortOrder()
+            });
+        }
+
+        async function fetchRowsForPage(pageNo) {
+            const message = await apiCall("banking_api.www.share_tracker.get_share_tracker_rows", {
+                view: currentTab,
+                page: pageNo,
+                page_length: PER_PAGE,
+                search: searchQ || null,
+                sol_ids: [...selectedSolIds],
+                sort_by: getSortBy(),
+                sort_order: getSortOrder()
+            });
+
+            const rows = (message.rows || []).map(normalizeRecord);
+            const total = cintLike(message.total);
+            const sol_ids = [...new Set(rows.map(r => String(r.sol_id || "")).filter(Boolean))].sort();
+
+            return { rows, total, sol_ids };
+        }
+
+        async function prefetchPage(pageNo) {
+            const totalPages = Math.max(1, Math.ceil(currentTotal / PER_PAGE));
+            if (pageNo < 1 || pageNo > totalPages) return;
+
+            const cacheKey = getCacheKeyForPage(pageNo);
+            if (pageCache.has(cacheKey)) return;
+
+            try {
+                const data = await fetchRowsForPage(pageNo);
+                pageCache.set(cacheKey, data);
+            } catch (e) {
+                console.warn("Prefetch failed for page", pageNo, e);
+            }
+        }
+
+        function prefetchAdjacentPages() {
+            const totalPages = Math.max(1, Math.ceil(currentTotal / PER_PAGE));
+            if (currentPage < totalPages) {
+                prefetchPage(currentPage + 1);
+            }
+        }
+        function setupTableScrollPrefetch() {
+            const wrap = document.querySelector(".tbl-wrap");
+            if (!wrap) return;
+
+            let ticking = false;
+
+            wrap.addEventListener("scroll", function () {
+                if (ticking) return;
+                ticking = true;
+
+                requestAnimationFrame(() => {
+                    const nearEnd = wrap.scrollLeft + wrap.clientWidth >= wrap.scrollWidth - 80;
+                    if (nearEnd) {
+                        prefetchAdjacentPages();
+                    }
+                    ticking = false;
+                });
+            });
+        }
+
         async function apiCall(method, args = {}) {
             const qs = new URLSearchParams();
 
@@ -1651,6 +1721,49 @@
             pageCache.set(cacheKey, currentSolIds);
         }
 
+        // async function loadRows(force = false) {
+        //     const cacheKey = getCacheKey();
+        //     const empty = document.getElementById("emptyState");
+        //     const tbody = document.getElementById("tableBody");
+
+        //     if (!force && pageCache.has(cacheKey)) {
+        //         const cached = pageCache.get(cacheKey);
+        //         currentRows = cached.rows || [];
+        //         currentTotal = cached.total || 0;
+        //         renderTable();
+        //     }
+
+        //     if (empty && !pageCache.has(cacheKey)) {
+        //         empty.style.display = "block";
+        //         empty.innerHTML = `
+        //         <div class="empty-icon">⏳</div>
+        //         <div class="empty-title">Loading records...</div>
+        //         <div class="empty-sub">Please wait</div>
+        //     `;
+        //     }
+        //     if (tbody && !pageCache.has(cacheKey)) tbody.innerHTML = "";
+
+        //     const message = await apiCall("banking_api.www.share_tracker.get_share_tracker_rows", {
+        //         view: currentTab,
+        //         page: currentPage,
+        //         page_length: PER_PAGE,
+        //         search: searchQ || null,
+        //         sol_ids: [...selectedSolIds],
+        //         sort_by: getSortBy(),
+        //         sort_order: getSortOrder()
+        //     });
+
+        //     currentRows = (message.rows || []).map(normalizeRecord);
+        //     currentTotal = cintLike(message.total);
+
+        //     pageCache.set(cacheKey, {
+        //         rows: currentRows,
+        //         total: currentTotal
+        //     });
+
+        //     renderTable();
+        // }
+
         async function loadRows(force = false) {
             const cacheKey = getCacheKey();
             const empty = document.getElementById("emptyState");
@@ -1658,41 +1771,37 @@
 
             if (!force && pageCache.has(cacheKey)) {
                 const cached = pageCache.get(cacheKey);
-                currentRows = cached.rows || [];
-                currentTotal = cached.total || 0;
+                currentRows = cached.rows;
+                currentTotal = cached.total;
+                currentSolIds = cached.sol_ids || [];
                 renderTable();
+                prefetchAdjacentPages();
+                return;
             }
 
-            if (empty && !pageCache.has(cacheKey)) {
+            if (empty) {
                 empty.style.display = "block";
                 empty.innerHTML = `
-                <div class="empty-icon">⏳</div>
-                <div class="empty-title">Loading records...</div>
-                <div class="empty-sub">Please wait</div>
-            `;
+            <div class="empty-icon">⏳</div>
+            <div class="empty-title">Loading records...</div>
+            <div class="empty-sub">Please wait</div>
+        `;
             }
-            if (tbody && !pageCache.has(cacheKey)) tbody.innerHTML = "";
 
-            const message = await apiCall("banking_api.www.share_tracker.get_share_tracker_rows", {
-                view: currentTab,
-                page: currentPage,
-                page_length: PER_PAGE,
-                search: searchQ || null,
-                sol_ids: [...selectedSolIds],
-                sort_by: getSortBy(),
-                sort_order: getSortOrder()
-            });
+            if (tbody) tbody.innerHTML = "";
 
-            currentRows = (message.rows || []).map(normalizeRecord);
-            currentTotal = cintLike(message.total);
+            const data = await fetchRowsForPage(currentPage);
 
-            pageCache.set(cacheKey, {
-                rows: currentRows,
-                total: currentTotal
-            });
+            currentRows = data.rows;
+            currentTotal = data.total;
+            currentSolIds = data.sol_ids || [];
+
+            pageCache.set(cacheKey, data);
 
             renderTable();
+            prefetchAdjacentPages();
         }
+
 
         function updateCardSelection() {
             document.querySelectorAll(".metric").forEach(el => el.classList.remove("active-card"));
@@ -1769,29 +1878,86 @@
             if (ths && ths[index]) ths[index].classList.add("sorted");
         }
 
+        // function renderPagination(totalPages) {
+        //     const container = document.getElementById("pgBtns");
+        //     if (!container) return;
+
+        //     let html = `
+        //     <button class="pg-btn" onclick="goPage(${currentPage - 1})" ${currentPage === 1 ? "disabled" : ""}>
+        //         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        //         Prev
+        //     </button>
+        // `;
+
+        //     const pages = getPaginationPages(currentPage, totalPages);
+        //     pages.forEach(p => {
+        //         if (p === "...") html += `<span class="pg-dots">...</span>`;
+        //         else html += `<button class="pg-btn ${p === currentPage ? "active" : ""}" onclick="goPage(${p})">${p}</button>`;
+        //     });
+
+        //     html += `
+        //     <button class="pg-btn" onclick="goPage(${currentPage + 1})" ${currentPage === totalPages ? "disabled" : ""}>
+        //         Next
+        //         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        //     </button>
+        // `;
+
+        //     container.innerHTML = html;
+        // }
+
+
         function renderPagination(totalPages) {
             const container = document.getElementById("pgBtns");
             if (!container) return;
 
             let html = `
-            <button class="pg-btn" onclick="goPage(${currentPage - 1})" ${currentPage === 1 ? "disabled" : ""}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                Prev
-            </button>
-        `;
+        <button
+            class="pg-btn"
+            onclick="goPage(${currentPage - 1})"
+            onmouseenter="prefetchPage(${currentPage - 1})"
+            onfocus="prefetchPage(${currentPage - 1})"
+            ${currentPage === 1 ? "disabled" : ""}
+        >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+            Prev
+        </button>
+    `;
 
             const pages = getPaginationPages(currentPage, totalPages);
+
             pages.forEach(p => {
-                if (p === "...") html += `<span class="pg-dots">...</span>`;
-                else html += `<button class="pg-btn ${p === currentPage ? "active" : ""}" onclick="goPage(${p})">${p}</button>`;
+                if (p === "...") {
+                    html += `<span class="pg-dots">...</span>`;
+                } else {
+                    html += `
+                <button
+                    class="pg-btn ${p === currentPage ? "active" : ""}"
+                    onclick="goPage(${p})"
+                    onmouseenter="prefetchPage(${p})"
+                    onfocus="prefetchPage(${p})"
+                >
+                    ${p}
+                </button>
+            `;
+                }
             });
 
             html += `
-            <button class="pg-btn" onclick="goPage(${currentPage + 1})" ${currentPage === totalPages ? "disabled" : ""}>
-                Next
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
-            </button>
-        `;
+        <button
+            class="pg-btn"
+            onclick="goPage(${currentPage + 1})"
+            onmouseenter="prefetchPage(${currentPage + 1})"
+            onfocus="prefetchPage(${currentPage + 1})"
+            ${currentPage === totalPages ? "disabled" : ""}
+        >
+            Next
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+        </button>
+    `;
 
             container.innerHTML = html;
         }
@@ -2276,6 +2442,7 @@
             await loadSolIds(true);
             await loadRows(true);
             setupRealtime();
+            setupTableScrollPrefetch();
         });
     </script>
     <!-- end -->
