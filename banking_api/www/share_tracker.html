@@ -2281,35 +2281,124 @@
             }
         }
 
-        function exportCSV() {
-            const rows = currentRows;
-            const headers = [
-                "SOL ID", "CIF", "Account Number", "Transaction ID", "Payment Status",
-                "Insufficient Balance", "Account Closed", "Fund Transfer Date", "CIF Creation Date", "Account Opening Date"
-            ];
-            const lines = [headers.join(",")];
+        // function exportCSV() {
+        //     const rows = currentRows;
+        //     const headers = [
+        //         "SOL ID", "CIF", "Account Number", "Transaction ID", "Payment Status",
+        //         "Insufficient Balance", "Account Closed", "Fund Transfer Date", "CIF Creation Date", "Account Opening Date"
+        //     ];
+        //     const lines = [headers.join(",")];
 
-            rows.forEach(r => {
-                lines.push([
-                    csvSafe(r.sol_id),
-                    csvSafe(r.cif),
-                    csvSafe(r.account_number),
-                    csvSafe(r.transaction_id),
-                    csvSafe(r.payment_status),
-                    csvSafe(cintLike(r.insufficient_balance)),
-                    csvSafe(cintLike(r.account_closed)),
-                    csvSafe(r.fund_transfer_date),
-                    csvSafe(r.cif_creation_date),
-                    csvSafe(r.account_opening_date)
-                ].join(","));
-            });
+        //     rows.forEach(r => {
+        //         lines.push([
+        //             csvSafe(r.sol_id),
+        //             csvSafe(r.cif),
+        //             csvSafe(r.account_number),
+        //             csvSafe(r.transaction_id),
+        //             csvSafe(r.payment_status),
+        //             csvSafe(cintLike(r.insufficient_balance)),
+        //             csvSafe(cintLike(r.account_closed)),
+        //             csvSafe(r.fund_transfer_date),
+        //             csvSafe(r.cif_creation_date),
+        //             csvSafe(r.account_opening_date)
+        //         ].join(","));
+        //     });
 
-            const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
-            const a = document.createElement("a");
-            a.href = URL.createObjectURL(blob);
-            a.download = `share-application-${currentTab}.csv`;
-            a.click();
-            URL.revokeObjectURL(a.href);
+        //     const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+        //     const a = document.createElement("a");
+        //     a.href = URL.createObjectURL(blob);
+        //     a.download = `share-application-${currentTab}.csv`;
+        //     a.click();
+        //     URL.revokeObjectURL(a.href);
+        // }
+
+
+        async function exportCSV() {
+            try {
+                const rows = await apiCall("banking_api.www.share_tracker.get_share_tracker_export_rows", {
+                    search: searchQ ? searchQ : null,
+                    sol_ids: selectedSolIds.size ? [...selectedSolIds] : null,
+                    sort_by: getSortBy(),
+                    sort_order: getSortOrder()
+                });
+
+                const headers = [
+                    "Application ID",
+                    "SOL ID",
+                    "SOL Description",
+                    "CIF",
+                    "Account Number",
+                    "Transaction ID",
+                    "Payment Status",
+                    "Status Label",
+                    "Insufficient Balance",
+                    "Account Closed",
+                    "Fund Transfer Date",
+                    "CIF Creation Date",
+                    "Account Opening Date",
+                    "Modified",
+                    "Error Log"
+                ];
+
+                const lines = [headers.join(",")];
+
+                (rows || []).forEach(r => {
+                    const row = normalizeRecord(r);
+
+                    lines.push([
+                        csvSafe(row.name),
+                        csvSafe(row.sol_id),
+                        csvSafe(r.sol_desc || ""),
+                        csvSafe(row.cif),
+                        csvSafe(row.account_number),
+                        csvSafe(row.transaction_id),
+                        csvSafe(row.payment_status),
+                        csvSafe(getStatusLabel(row)),
+                        csvSafe(cintLike(row.insufficient_balance)),
+                        csvSafe(cintLike(row.account_closed)),
+                        csvSafe(row.fund_transfer_date),
+                        csvSafe(row.cif_creation_date),
+                        csvSafe(row.account_opening_date),
+                        csvSafe(row.modified),
+                        csvSafe(row.error_log)
+                    ].join(","));
+                });
+
+                const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+
+                const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+                const hasSearch = !!searchQ;
+                const hasSol = selectedSolIds.size > 0;
+                let fileLabel = "all-records";
+                if (hasSearch && hasSol) fileLabel = "search-sol-filtered";
+                else if (hasSearch) fileLabel = "search-filtered";
+                else if (hasSol) fileLabel = "sol-filtered";
+
+                a.download = `share-tracker-${fileLabel}-${ts}.csv`;
+                // a.download = `share-tracker-consolidated-${ts}.csv`;
+
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(a.href);
+
+                if (window.frappe && frappe.show_alert) {
+                    frappe.show_alert({
+                        message: __("Consolidated report downloaded"),
+                        indicator: "green"
+                    });
+                }
+            } catch (e) {
+                console.error(e);
+                if (window.frappe && frappe.show_alert) {
+                    frappe.show_alert({
+                        message: __("Unable to export report"),
+                        indicator: "red"
+                    });
+                }
+            }
         }
 
         function csvSafe(val) {

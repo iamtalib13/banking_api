@@ -347,3 +347,70 @@ def publish_share_tracker_update(doc=None, method=None):
         "sol_id": getattr(doc, "sol_id", None),
         "event": method
     })
+
+
+@frappe.whitelist()
+def get_share_tracker_export_rows(search=None, sol_ids=None, sort_by="modified", sort_order="desc"):
+    allowed_sort_by = {"modified", "sol_id", "cif_creation_date",
+                       "fund_transfer_date", "creation", "name"}
+    allowed_sort_order = {"asc", "desc"}
+
+    if sort_by not in allowed_sort_by:
+        sort_by = "modified"
+    if str(sort_order).lower() not in allowed_sort_order:
+        sort_order = "desc"
+
+    filters = {}
+
+    if sol_ids:
+        if isinstance(sol_ids, str):
+            sol_ids = json.loads(sol_ids)
+        if sol_ids:
+            filters["sol_id"] = ["in", sol_ids]
+
+    fields = [
+        "name",
+        "sol_id",
+        "cif",
+        "account_number",
+        "transaction_id",
+        "payment_status",
+        "insufficient_balance",
+        "account_closed",
+        "fund_transfer_date",
+        "cif_creation_date",
+        "account_opening_date",
+        "error_log",
+        "modified"
+    ]
+
+    if search:
+        search = str(search).strip()
+        like_txt = f"%{search}%"
+
+        rows = frappe.get_all(
+            "Share Application",
+            fields=fields,
+            filters=filters,
+            or_filters=[
+                ["Share Application", "name", "like", like_txt],
+                ["Share Application", "sol_id", "like", like_txt],
+                ["Share Application", "cif", "like", like_txt],
+                ["Share Application", "account_number", "like", like_txt],
+                ["Share Application", "transaction_id", "like", like_txt],
+                ["Share Application", "payment_status", "like", like_txt],
+            ],
+            order_by=f"`tabShare Application`.`{sort_by}` {sort_order}",
+            limit_page_length=0
+        )
+    else:
+        rows = frappe.get_all(
+            "Share Application",
+            fields=fields,
+            filters=filters,
+            order_by=f"`tabShare Application`.`{sort_by}` {sort_order}",
+            limit_page_length=0
+        )
+
+    rows = attach_sol_descriptions(rows)
+    return rows
