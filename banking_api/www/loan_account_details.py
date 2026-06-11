@@ -15,7 +15,6 @@ def db_connection():
     """Connect to external PostgreSQL (Finacle) using Finacle DB Credentials."""
     try:
         creds = frappe.get_single("Finacle DB Credentials")
-
         port = int(creds.db_port) if creds.db_port else 5432
 
         conn = psycopg2.connect(
@@ -47,7 +46,7 @@ def _serialize_row(row):
 @frappe.whitelist()
 def get_loan_account_details():
     """
-    Fetch all loan account details using the updated query
+    Fetch all loan account details using the latest query
     and return response in JSON format.
     """
     conn = None
@@ -118,7 +117,8 @@ def get_loan_account_details():
             JOIN tbaadm.lrs l3 ON g.acid = l3.acid
             JOIN tbaadm.htd h ON g.acid = h.acid
             JOIN tbaadm.gac c ON g.acid = c.acid
-            WHERE g.schm_type = 'LAA'
+            WHERE g.schm_code IN ('3001','3002','3003','3004','3024','3027','3028','3039','3040','3041','3042','3043','3044','3045')
+              AND g.acct_cls_flg = 'N'
               AND g.entity_cre_flg = 'Y'
               AND g.del_flg = 'N'
               AND h.part_tran_type = 'C'
