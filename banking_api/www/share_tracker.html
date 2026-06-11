@@ -1630,6 +1630,27 @@
             if (tcClosed) tcClosed.textContent = formatNumber(data.closed);
         }
 
+        async function loadSolIds(force = false) {
+            const cacheKey = JSON.stringify({
+                type: "sol_ids",
+                tab: currentTab,
+                q: searchQ
+            });
+
+            if (!force && pageCache.has(cacheKey)) {
+                currentSolIds = pageCache.get(cacheKey);
+                return;
+            }
+
+            const solIds = await apiCall("banking_api.www.share_tracker.get_share_tracker_sol_ids", {
+                view: currentTab,
+                search: searchQ || null
+            });
+
+            currentSolIds = Array.isArray(solIds) ? solIds : [];
+            pageCache.set(cacheKey, currentSolIds);
+        }
+
         async function loadRows(force = false) {
             const cacheKey = getCacheKey();
             const empty = document.getElementById("emptyState");
@@ -1637,9 +1658,8 @@
 
             if (!force && pageCache.has(cacheKey)) {
                 const cached = pageCache.get(cacheKey);
-                currentRows = cached.rows;
-                currentTotal = cached.total;
-                currentSolIds = cached.sol_ids || [];
+                currentRows = cached.rows || [];
+                currentTotal = cached.total || 0;
                 renderTable();
             }
 
@@ -1665,12 +1685,10 @@
 
             currentRows = (message.rows || []).map(normalizeRecord);
             currentTotal = cintLike(message.total);
-            currentSolIds = [...new Set(currentRows.map(r => String(r.sol_id || "")).filter(Boolean))].sort();
 
             pageCache.set(cacheKey, {
                 rows: currentRows,
-                total: currentTotal,
-                sol_ids: currentSolIds
+                total: currentTotal
             });
 
             renderTable();
@@ -1808,14 +1826,16 @@
             updateFilterUI();
             updateCardSelection();
             updateTabSelection();
-            await loadRows();
+            await loadSolIds(true);
+            await loadRows(true);
         }
 
         async function onSearch() {
             const input = document.getElementById("searchInput");
             searchQ = input ? input.value.trim() : "";
             currentPage = 1;
-            await loadRows();
+            await loadSolIds(true);
+            await loadRows(true);
         }
 
         async function sortBy(col) {
@@ -2016,6 +2036,7 @@
             currentPage = 1;
             closeFilterPopup();
             updateFilterUI();
+            await loadSolIds(true);
             await loadRows(true);
         }
 
@@ -2024,6 +2045,7 @@
             pendingSolIds.clear();
             currentPage = 1;
             updateFilterUI();
+            await loadSolIds(true);
             await loadRows(true);
         }
 
@@ -2031,6 +2053,7 @@
             selectedSolIds.delete(id);
             currentPage = 1;
             updateFilterUI();
+            await loadSolIds(true);
             await loadRows(true);
         }
 
@@ -2229,6 +2252,7 @@
                     pageCache.clear();
                     countCache = { data: null, ts: 0 };
                     await loadCounts(true);
+                    await loadSolIds(true);
                     await loadRows(true);
                 });
             } else {
@@ -2249,7 +2273,8 @@
             updateTabSelection();
             updateFilterUI();
             await loadCounts();
-            await loadRows();
+            await loadSolIds(true);
+            await loadRows(true);
             setupRealtime();
         });
     </script>
