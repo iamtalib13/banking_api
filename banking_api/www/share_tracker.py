@@ -48,7 +48,54 @@ def attach_sol_descriptions(rows):
     return rows
 
 
+# def get_context(context):
+#     return context
+
+def get_avatar_from_name(full_name):
+    full_name = (full_name or "").strip()
+    if not full_name:
+        return "U"
+
+    parts = [p for p in full_name.split() if p]
+    if not parts:
+        return "U"
+
+    if len(parts) == 1:
+        return parts[0][0].upper()
+
+    return (parts[0][0] + parts[-1][0]).upper()
+
+
 def get_context(context):
+    user = frappe.session.user
+
+    context.user_display_name = "Unknown User"
+    context.user_employee_id = user
+    context.user_avatar = "U"
+
+    if not user or user == "Guest":
+        return context
+
+    employee = frappe.db.get_value(
+        "Employee",
+        {"user_id": user},
+        ["employee_name", "name"],
+        as_dict=True
+    )
+
+    if employee:
+        display_name = (employee.get("employee_name") or "").strip() or user
+        employee_id = employee.get("name") or user
+
+        context.user_display_name = display_name
+        context.user_employee_id = employee_id
+        context.user_avatar = get_avatar_from_name(display_name)
+    else:
+        fallback_name = frappe.db.get_value("User", user, "full_name") or user
+        context.user_display_name = fallback_name
+        context.user_employee_id = user
+        context.user_avatar = get_avatar_from_name(fallback_name)
+
     return context
 
 
