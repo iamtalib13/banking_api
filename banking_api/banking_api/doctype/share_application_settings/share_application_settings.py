@@ -1,6 +1,7 @@
 # Copyright (c) 2026, Talib Sheikh and contributors
 # For license information, please see license.txt
 
+from datetime import timedelta
 import frappe
 import psycopg2
 import psycopg2.extras
@@ -11,6 +12,7 @@ import random
 from datetime import datetime
 import time
 
+from tqdm import tqdm
 import requests
 import xmltodict
 from requests.exceptions import ConnectionError, HTTPError, ReadTimeout, Timeout
@@ -50,45 +52,111 @@ def cint_safe(value, default=0):
 
 def get_share_application_query(sync_days=None):
     return """
-        SELECT cif_id,
-       foracid,
-       sol_id,
-       cif_opening_date
-FROM (
-    SELECT  g.cif_id,
-            g.foracid,
-            g.sol_id,
-            a.orgkey,
-            a.relationshipopeningdate AS cif_opening_date,
-            ROW_NUMBER() OVER (
-                PARTITION BY g.cif_id
-                ORDER BY g.foracid
-            ) AS rn
-    FROM tbaadm.gam g
-    JOIN crmuser.accounts a
-      ON g.cif_id = a.orgkey
-    WHERE --g.schm_type IN ('SBA', 'CAA')
-       g.schm_code IN (
-             '1001','1002','1003','1004','1005','1006','1008',
-             '1009','1011','1012','1013','1101','1102','1103','1104','1117'
-         )
-      AND g.schm_code NOT IN ('1010')
-      AND a.relationshipopeningdate IS NOT NULL
-      AND a.relationshipopeningdate <= DATE '2026-06-03'
-      AND g.entity_cre_flg = 'Y' and g.del_flg = 'N'
-      AND g.acct_cls_flg = 'N'
-      AND g.clr_bal_amt >= 20
-      AND NOT EXISTS (
-          SELECT 1
-          FROM tbaadm.htd h
-          WHERE h.acid = g.acid
-            AND (
-                  h.tran_particular = 'SHARE FUND DEBITED'
-                  OR h.part_tran_type = 'D'
-                )
-      )
-) x
-WHERE x.rn = 1;
+        SELECT *
+        FROM (
+            SELECT 
+                g.cif_id AS cif_id,
+                a.relationshipopeningdate AS cif_opening_date,
+                g.foracid AS account_no,
+                g.acct_opn_date AS acct_opn_date,
+                g.sol_id AS sol_id,
+                s.sol_desc AS sol_desc,
+                g.acct_name AS acct_name,
+                g.clr_bal_amt AS clr_bal_amt,
+                g.schm_code AS schm_code,
+                g2.schm_desc AS schm_desc,
+                g.frez_code AS frez_code,
+                g.schm_type AS schm_type,
+                g.acct_cls_date AS acct_cls_date,
+                g.acct_cls_flg AS acct_cls_flg,
+                CASE
+                    WHEN cif_htd.cif_id IS NOT NULL THEN 'DEDUCTED'
+                    ELSE 'NOT DEDUCTED'
+                END AS remark,
+                CASE
+                    WHEN g.clr_bal_amt >= 20 THEN 'SUFFICIENT BALANCE'
+                    ELSE 'INSUFFICIENT BALANCE'
+                END AS balance_status,
+                CASE
+                    WHEN acc_htd.acid IS NOT NULL THEN 'YES'
+                    ELSE NULL
+                END AS share_fund_status,
+                ROW_NUMBER() OVER (
+                    PARTITION BY g.cif_id
+                    ORDER BY CASE g.schm_code
+                        WHEN '1001' THEN 1
+                        WHEN '1002' THEN 2
+                        WHEN '1003' THEN 3
+                        WHEN '1004' THEN 4
+                        WHEN '1005' THEN 5
+                        WHEN '1006' THEN 6
+                        WHEN '1008' THEN 7
+                        WHEN '1010' THEN 8
+                        WHEN '1009' THEN 9
+                        WHEN '1011' THEN 10
+                        WHEN '1012' THEN 11
+                        WHEN '1013' THEN 12
+                        WHEN '1101' THEN 13
+                        WHEN '1102' THEN 14
+                        WHEN '1103' THEN 15
+                        WHEN '1104' THEN 16
+                        WHEN '1117' THEN 17
+                        ELSE 999
+                    END,
+                    g.foracid
+                ) AS rn
+            FROM tbaadm.gam g
+            JOIN tbaadm.sol s ON g.sol_id = s.sol_id
+            JOIN tbaadm.gsp g2 ON g.schm_code = g2.schm_code
+
+            LEFT JOIN LATERAL (
+                SELECT orgkey, relationshipopeningdate
+                FROM crmuser.accounts a
+                WHERE a.orgkey = g.cif_id
+                  AND a.relationshipopeningdate IS NOT NULL
+                  AND a.relationshipopeningdate <= DATE '2026-06-04'
+                ORDER BY a.relationshipopeningdate DESC
+                LIMIT 1
+            ) a ON TRUE
+
+            LEFT JOIN (
+                SELECT DISTINCT g.cif_id
+                FROM tbaadm.htd h
+                JOIN tbaadm.gam g ON h.acid = g.acid
+                WHERE h.tran_particular = 'SHARE FUND DEBITED'
+                  AND h.part_tran_type = 'D'
+                  AND g.cif_id IN (
+                      SELECT DISTINCT g2.cif_id
+                      FROM tbaadm.gam g2
+                      WHERE g2.schm_code IN (
+                          '1001','1002','1003','1004','1005','1006','1008','1010',
+                          '1009','1011','1012','1013','1101','1102','1103','1104','1117'
+                      )
+                        AND g2.entity_cre_flg = 'Y'
+                        AND g2.del_flg = 'N'
+                        AND g2.acct_cls_flg = 'N'
+                  )
+            ) cif_htd ON g.cif_id = cif_htd.cif_id
+
+            LEFT JOIN (
+                SELECT DISTINCT h.acid
+                FROM tbaadm.htd h
+                WHERE h.tran_particular = 'SHARE FUND DEBITED'
+                  AND h.part_tran_type = 'D'
+            ) acc_htd ON g.acid = acc_htd.acid
+
+            WHERE g.schm_code IN (
+                    '1001','1002','1003','1004','1005','1006','1008','1010',
+                    '1009','1011','1012','1013','1101','1102','1103','1104','1117'
+                  )
+              AND g.entity_cre_flg = 'Y'
+              AND g.del_flg = 'N'
+              AND g.acct_cls_flg = 'N'
+              AND g.clr_bal_amt >= 20
+              AND cif_htd.cif_id IS NULL
+              AND a.relationshipopeningdate IS NOT NULL
+        ) AS final_data
+        WHERE rn = 1
     """
 
 
@@ -192,11 +260,175 @@ WHERE x.rn = 1;
 
 ###########################################
 
+# def run_share_application_sync():
+#     settings = frappe.get_single("Share Application Settings")
+
+#     if not settings.enable_sync:
+#         print("Share Application Sync is disabled.", flush=True)
+#         return {
+#             "status": "skipped",
+#             "message": "Share Application Sync is disabled."
+#         }
+
+#     conn = None
+#     cursor = None
+#     created_count = 0
+#     skipped_count = 0
+#     total_rows = 0
+#     batch_size = 10
+#     batch_no = 0
+
+#     try:
+#         print("Connecting to external PostgreSQL database...", flush=True)
+#         conn = db_connection()
+#         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+#         query = get_share_application_query()
+#         print("Executing Share Application sync query...", flush=True)
+#         cursor.execute(query)
+
+#         existing_cifs = set(
+#             str(cif).strip()
+#             for cif in frappe.get_all("Share Application", pluck="cif")
+#             if cif is not None
+#         )
+#         print(
+#             f"Loaded {len(existing_cifs)} existing CIFs from Share Application.", flush=True)
+
+#         while True:
+#             rows = cursor.fetchmany(batch_size)
+#             if not rows:
+#                 print("No more rows to fetch from PostgreSQL.", flush=True)
+#                 break
+
+#             batch_no += 1
+#             print(
+#                 f"Fetched batch #{batch_no} with {len(rows)} rows.", flush=True)
+
+#             batch_created = 0
+#             batch_skipped = 0
+
+#             for row in rows:
+#                 total_rows += 1
+
+#                 # cif_id = row.get("cif_id")
+#                 # foracid = row.get("foracid")
+#                 # sol_id = row.get("sol_id")
+#                 # cif_opening_date = row.get("cif_opening_date")
+#                 cif_id = row.get("cif_id")
+#                 foracid = row.get("account_no")
+#                 sol_id = row.get("sol_id")
+#                 cif_opening_date = row.get("cif_opening_date")
+
+#                 print(
+#                     f"Processing row #{total_rows}: CIF={cif_id}, Account={foracid}, SOL={sol_id}",
+#                     flush=True
+#                 )
+
+#                 if cif_id is None:
+#                     skipped_count += 1
+#                     batch_skipped += 1
+#                     print(
+#                         f"Skipped row #{total_rows}: CIF is missing.", flush=True)
+#                     continue
+
+#                 cif_id_str = str(cif_id).strip()
+#                 if cif_id_str in existing_cifs:
+#                     skipped_count += 1
+#                     batch_skipped += 1
+#                     print(
+#                         f"Skipped row #{total_rows}: CIF {cif_id_str} already exists.", flush=True)
+#                     continue
+
+#                 try:
+#                     # doc = frappe.new_doc("Share Application")
+#                     # doc.cif = cif_id
+#                     # doc.account_number = foracid
+#                     # doc.sol_id = sol_id
+#                     # doc.cif_creation_date = cif_opening_date
+#                     # doc.status = "Pending"
+#                     # doc.insert(ignore_permissions=True)
+#                     doc = frappe.new_doc("Share Application")
+#                     doc.cif = cif_id
+#                     doc.account_number = foracid
+#                     doc.sol_id = sol_id
+#                     doc.cif_creation_date = cif_opening_date
+#                     doc.status = "Pending"
+#                     doc.insert(ignore_permissions=True)
+
+#                     existing_cifs.add(cif_id_str)
+#                     created_count += 1
+#                     batch_created += 1
+
+#                     print(
+#                         f"Created Share Application: name={doc.name}, CIF={cif_id_str}, Account={foracid}",
+#                         flush=True
+#                     )
+
+#                 except Exception as row_error:
+#                     skipped_count += 1
+#                     batch_skipped += 1
+#                     frappe.log_error(
+#                         frappe.get_traceback(),
+#                         f"Share Application Sync Row Failed - CIF {cif_id}"
+#                     )
+#                     print(
+#                         f"Error while creating row #{total_rows} for CIF={cif_id}: {str(row_error)}",
+#                         flush=True
+#                     )
+
+#             frappe.db.commit()
+#             print(
+#                 f"Committed batch #{batch_no}: created={batch_created}, skipped={batch_skipped}, total_created={created_count}, total_skipped={skipped_count}",
+#                 flush=True
+#             )
+
+#         frappe.db.set_single_value(
+#             "Share Application Settings",
+#             "last_sync_run",
+#             now()
+#         )
+#         frappe.db.commit()
+#         print("Updated last_sync_run and committed final changes.", flush=True)
+
+#         print(
+#             f"Sync completed successfully. Total fetched={total_rows}, created={created_count}, skipped={skipped_count}",
+#             flush=True
+#         )
+
+#         return {
+#             "status": "success",
+#             "total_rows": total_rows,
+#             "created_count": created_count,
+#             "skipped_count": skipped_count,
+#             "message": (
+#                 f"Sync completed. Total fetched: {total_rows}, "
+#                 f"created: {created_count}, skipped existing/errors: {skipped_count}."
+#             )
+#         }
+
+#     except Exception as e:
+#         frappe.db.rollback()
+#         frappe.log_error(frappe.get_traceback(),
+#                          "Share Application Sync Failed")
+#         print(f"Sync failed: {str(e)}", flush=True)
+#         raise
+
+#     finally:
+#         if cursor:
+#             cursor.close()
+#             print("PostgreSQL cursor closed.", flush=True)
+#         if conn:
+#             conn.close()
+#             print("PostgreSQL connection closed.", flush=True)
+
+###########################################
+
+
 def run_share_application_sync():
     settings = frappe.get_single("Share Application Settings")
 
     if not settings.enable_sync:
-        print("Share Application Sync is disabled.", flush=True)
         return {
             "status": "skipped",
             "message": "Share Application Sync is disabled."
@@ -207,16 +439,12 @@ def run_share_application_sync():
     created_count = 0
     skipped_count = 0
     total_rows = 0
-    batch_size = 10
-    batch_no = 0
 
     try:
-        print("Connecting to external PostgreSQL database...", flush=True)
         conn = db_connection()
         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
         query = get_share_application_query()
-        print("Executing Share Application sync query...", flush=True)
         cursor.execute(query)
 
         existing_cifs = set(
@@ -224,48 +452,43 @@ def run_share_application_sync():
             for cif in frappe.get_all("Share Application", pluck="cif")
             if cif is not None
         )
-        print(
-            f"Loaded {len(existing_cifs)} existing CIFs from Share Application.", flush=True)
 
-        while True:
-            rows = cursor.fetchmany(batch_size)
-            if not rows:
-                print("No more rows to fetch from PostgreSQL.", flush=True)
-                break
+        with tqdm(
+            total=None,
+            desc="Share Application Sync",
+            unit="row",
+            ncols=120
+        ) as pbar:
 
-            batch_no += 1
-            print(
-                f"Fetched batch #{batch_no} with {len(rows)} rows.", flush=True)
+            while True:
+                row = cursor.fetchone()
+                if not row:
+                    break
 
-            batch_created = 0
-            batch_skipped = 0
-
-            for row in rows:
                 total_rows += 1
 
                 cif_id = row.get("cif_id")
-                foracid = row.get("foracid")
+                foracid = row.get("account_no")
                 sol_id = row.get("sol_id")
                 cif_opening_date = row.get("cif_opening_date")
 
-                print(
-                    f"Processing row #{total_rows}: CIF={cif_id}, Account={foracid}, SOL={sol_id}",
-                    flush=True
-                )
-
                 if cif_id is None:
                     skipped_count += 1
-                    batch_skipped += 1
-                    print(
-                        f"Skipped row #{total_rows}: CIF is missing.", flush=True)
+                    pbar.update(1)
+                    pbar.set_postfix(
+                        created=created_count,
+                        skipped=skipped_count
+                    )
                     continue
 
                 cif_id_str = str(cif_id).strip()
                 if cif_id_str in existing_cifs:
                     skipped_count += 1
-                    batch_skipped += 1
-                    print(
-                        f"Skipped row #{total_rows}: CIF {cif_id_str} already exists.", flush=True)
+                    pbar.update(1)
+                    pbar.set_postfix(
+                        created=created_count,
+                        skipped=skipped_count
+                    )
                     continue
 
                 try:
@@ -277,32 +500,24 @@ def run_share_application_sync():
                     doc.status = "Pending"
                     doc.insert(ignore_permissions=True)
 
+                    frappe.db.commit()
+
                     existing_cifs.add(cif_id_str)
                     created_count += 1
-                    batch_created += 1
 
-                    print(
-                        f"Created Share Application: name={doc.name}, CIF={cif_id_str}, Account={foracid}",
-                        flush=True
-                    )
-
-                except Exception as row_error:
+                except Exception:
+                    frappe.db.rollback()
                     skipped_count += 1
-                    batch_skipped += 1
                     frappe.log_error(
                         frappe.get_traceback(),
                         f"Share Application Sync Row Failed - CIF {cif_id}"
                     )
-                    print(
-                        f"Error while creating row #{total_rows} for CIF={cif_id}: {str(row_error)}",
-                        flush=True
-                    )
 
-            frappe.db.commit()
-            print(
-                f"Committed batch #{batch_no}: created={batch_created}, skipped={batch_skipped}, total_created={created_count}, total_skipped={skipped_count}",
-                flush=True
-            )
+                pbar.update(1)
+                pbar.set_postfix(
+                    created=created_count,
+                    skipped=skipped_count
+                )
 
         frappe.db.set_single_value(
             "Share Application Settings",
@@ -310,12 +525,6 @@ def run_share_application_sync():
             now()
         )
         frappe.db.commit()
-        print("Updated last_sync_run and committed final changes.", flush=True)
-
-        print(
-            f"Sync completed successfully. Total fetched={total_rows}, created={created_count}, skipped={skipped_count}",
-            flush=True
-        )
 
         return {
             "status": "success",
@@ -328,22 +537,17 @@ def run_share_application_sync():
             )
         }
 
-    except Exception as e:
+    except Exception:
         frappe.db.rollback()
         frappe.log_error(frappe.get_traceback(),
                          "Share Application Sync Failed")
-        print(f"Sync failed: {str(e)}", flush=True)
         raise
 
     finally:
         if cursor:
             cursor.close()
-            print("PostgreSQL cursor closed.", flush=True)
         if conn:
             conn.close()
-            print("PostgreSQL connection closed.", flush=True)
-
-###########################################
 
 
 @frappe.whitelist()
@@ -856,26 +1060,26 @@ def _set_share_application_error(
 
 @frappe.whitelist()
 def pay_now_share_application(entry_name):
-    print(
-        f"[START] pay_now_share_application called for: {entry_name}", flush=True)
+    # print(
+    #     f"[START] pay_now_share_application called for: {entry_name}", flush=True)
 
     settings = frappe.get_single("Share Application Settings")
     lock_name = f"share_application_pay_now::{entry_name}"
 
     if not entry_name:
-        print("[ERROR] Share Application document name is missing.", flush=True)
+        # print("[ERROR] Share Application document name is missing.", flush=True)
         frappe.throw(_("Share Application document name is required."))
 
     if not settings.enable_fund_transfer:
-        print(
-            "[SKIP] Fund transfer is disabled in Share Application Settings.", flush=True)
+        # print(
+        #     "[SKIP] Fund transfer is disabled in Share Application Settings.", flush=True)
         return {
             "status": "skipped",
             "message": "Fund transfer is disabled in Share Application Settings."
         }
 
     if not settings.finacle_api_url:
-        print("[ERROR] Finacle API URL is missing in settings.", flush=True)
+        # print("[ERROR] Finacle API URL is missing in settings.", flush=True)
         frappe.throw(
             _("Finacle API URL is mandatory in Share Application Settings."))
 
@@ -883,60 +1087,60 @@ def pay_now_share_application(entry_name):
     member_fee_amount = cint_safe(settings.member_fee_credit_amount, 0)
     total_debit_amount = share_amount + member_fee_amount
 
-    print(
-        f"[INFO] share_amount={share_amount}, member_fee_amount={member_fee_amount}, total_debit_amount={total_debit_amount}",
-        flush=True
-    )
+    # print(
+    #     # f"[INFO] share_amount={share_amount}, member_fee_amount={member_fee_amount}, total_debit_amount={total_debit_amount}",
+    #     flush=True
+    # )
 
     if not settings.share_account_gl:
-        print("[ERROR] Share Account GL is missing.", flush=True)
+        # print("[ERROR] Share Account GL is missing.", flush=True)
         frappe.throw(
             _("Share Account GL is mandatory in Share Application Settings."))
 
     if not settings.share_member_fee_gl:
-        print("[ERROR] Share Member Fee GL is missing.", flush=True)
+        # print("[ERROR] Share Member Fee GL is missing.", flush=True)
         frappe.throw(
             _("Share Member Fee GL is mandatory in Share Application Settings."))
 
     if share_amount <= 0 and member_fee_amount <= 0:
-        print("[ERROR] Both credit amounts are zero or invalid.", flush=True)
+        # print("[ERROR] Both credit amounts are zero or invalid.", flush=True)
         frappe.throw(
             _("At least one credit amount must be greater than zero."))
 
     if total_debit_amount <= 0:
-        print("[ERROR] Total debit amount is invalid.", flush=True)
+        # print("[ERROR] Total debit amount is invalid.", flush=True)
         frappe.throw(_("Total debit amount must be greater than zero."))
 
     try:
         if frappe.cache().get_value(lock_name):
-            print(
-                f"[LOCKED] Transaction already in progress for {entry_name}", flush=True)
+            # print(
+            # f"[LOCKED] Transaction already in progress for {entry_name}", flush=True)
             frappe.throw(
                 _("A fund transfer is already in progress for this Share Application."))
         frappe.cache().set_value(lock_name, frappe.session.user, expires_in_sec=120)
-        print(f"[LOCK] Lock acquired for {entry_name}", flush=True)
+        # print(f"[LOCK] Lock acquired for {entry_name}", flush=True)
     except frappe.ValidationError:
         raise
     except Exception as lock_error:
-        print(
-            f"[WARN] Lock check failed, continuing: {str(lock_error)}", flush=True)
+        # print(
+        #     f"[WARN] Lock check failed, continuing: {str(lock_error)}", flush=True)
         pass
 
     try:
         doc = frappe.get_doc("Share Application", entry_name)
-        print(f"[DOC] Loaded Share Application: {doc.name}", flush=True)
+        # print(f"[DOC] Loaded Share Application: {doc.name}", flush=True)
 
         if doc.docstatus != 0:
-            print(
-                f"[SKIP] Document {doc.name} is not draft. docstatus={doc.docstatus}", flush=True)
+            # print(
+            # f"[SKIP] Document {doc.name} is not draft. docstatus={doc.docstatus}", flush=True)
             return {
                 "status": "warning",
                 "message": "Only draft Share Application documents can be processed."
             }
 
         if doc.payment_status == "Success":
-            print(
-                f"[SKIP] Document {doc.name} already has payment_status=Success", flush=True)
+            # print(
+            # f"[SKIP] Document {doc.name} already has payment_status=Success", flush=True)
             return {
                 "status": "warning",
                 "message": "This Share Application is already processed successfully."
@@ -944,11 +1148,11 @@ def pay_now_share_application(entry_name):
 
         debit_account = str(doc.account_number).strip(
         ) if doc.account_number else ""
-        print(f"[INFO] Debit account resolved: {debit_account}", flush=True)
+        # print(f"[INFO] Debit account resolved: {debit_account}", flush=True)
 
         if not debit_account:
             error_message = "Account Number is missing on Share Application."
-            print(f"[ERROR] {error_message}", flush=True)
+            # print(f"[ERROR] {error_message}", flush=True)
             _set_share_application_error(
                 doc.name,
                 error_message,
@@ -964,8 +1168,8 @@ def pay_now_share_application(entry_name):
         conn = None
         cursor = None
         try:
-            print(
-                f"[DB] Checking debit account status for {debit_account}", flush=True)
+            # print(
+            # f"[DB] Checking debit account status for {debit_account}", flush=True)
             conn = db_connection()
             cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
@@ -991,7 +1195,7 @@ def pay_now_share_application(entry_name):
 
             if closed_account_row:
                 error_message = f"Debit account number is closed: {debit_account}"
-                print(f"[ERROR] {error_message}", flush=True)
+                # print(f"[ERROR] {error_message}", flush=True)
                 _set_share_application_error(
                     doc.name,
                     error_message,
@@ -1004,8 +1208,8 @@ def pay_now_share_application(entry_name):
                     "message": error_message
                 }
 
-            print(
-                f"[DB] Checking balance for debit account {debit_account}", flush=True)
+            # print(
+                # f"[DB] Checking balance for debit account {debit_account}", flush=True)
             balance_query = """
                 SELECT
                     g.foracid,
@@ -1021,7 +1225,7 @@ def pay_now_share_application(entry_name):
 
             if not balance_row:
                 error_message = f"Debit account not found or inactive: {debit_account}"
-                print(f"[ERROR] {error_message}", flush=True)
+                # print(f"[ERROR] {error_message}", flush=True)
                 _set_share_application_error(
                     doc.name,
                     error_message,
@@ -1035,17 +1239,17 @@ def pay_now_share_application(entry_name):
                 }
 
             available_balance = float(balance_row.get("clr_bal_amt") or 0)
-            print(
-                f"[BALANCE] Account={debit_account}, available_balance={available_balance}, required={total_debit_amount}",
-                flush=True
-            )
+            # print(
+            #     # f"[BALANCE] Account={debit_account}, available_balance={available_balance}, required={total_debit_amount}",
+            #     flush=True
+            # )
 
             if available_balance < float(total_debit_amount):
                 error_message = (
                     f"Insufficient balance in debit account {debit_account}. "
                     f"Available balance is {available_balance}, required amount is {total_debit_amount}."
                 )
-                print(f"[ERROR] {error_message}", flush=True)
+                # print(f"[ERROR] {error_message}", flush=True)
                 _set_share_application_error(
                     doc.name,
                     error_message,
@@ -1060,7 +1264,7 @@ def pay_now_share_application(entry_name):
 
         except Exception as db_check_error:
             error_message = f"Debit account validation failed: {str(db_check_error)}"
-            print(f"[ERROR] {error_message}", flush=True)
+            # print(f"[ERROR] {error_message}", flush=True)
             _set_share_application_error(
                 doc.name,
                 error_message,
@@ -1075,17 +1279,17 @@ def pay_now_share_application(entry_name):
         finally:
             if cursor:
                 cursor.close()
-                print("[DB] Validation cursor closed.", flush=True)
+                # print("[DB] Validation cursor closed.", flush=True)
             if conn:
                 conn.close()
-                print("[DB] Validation connection closed.", flush=True)
+                # print("[DB] Validation connection closed.", flush=True)
 
         current_date = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]
         guid = random.randint(1000000000, 9999999999)
         url = settings.finacle_api_url
 
-        print(
-            f"[API] Preparing XML for {doc.name}, RequestUUID={guid}", flush=True)
+        # print(
+        # f"[API] Preparing XML for {doc.name}, RequestUUID={guid}", flush=True)
 
         xml_parts = []
         xml_parts.append(
@@ -1142,8 +1346,8 @@ def pay_now_share_application(entry_name):
 </FIXML>"""
 
         try:
-            print(
-                f"[API] Initiating request for {doc.name} to {url}", flush=True)
+            # print(
+            # f"[API] Initiating request for {doc.name} to {url}", flush=True)
             response = requests.post(
                 url,
                 data=xml_data.encode("utf-8"),
@@ -1151,12 +1355,12 @@ def pay_now_share_application(entry_name):
                 verify=False,
                 timeout=(10, 30)
             )
-            print(
-                f"[API] HTTP status code: {response.status_code}", flush=True)
+            # print(
+            #     f"[API] HTTP status code: {response.status_code}", flush=True)
             response.raise_for_status()
         except (Timeout, ReadTimeout):
             error_message = "Finacle API timeout occurred while processing the transaction. Transaction status is unknown; verify before retrying."
-            print(f"[ERROR] {error_message}", flush=True)
+            # print(f"[ERROR] {error_message}", flush=True)
             _set_share_application_error(
                 doc.name,
                 error_message,
@@ -1170,7 +1374,7 @@ def pay_now_share_application(entry_name):
             }
         except ConnectionError:
             error_message = "Unable to connect to Finacle API. Please verify network or server availability before retrying."
-            print(f"[ERROR] {error_message}", flush=True)
+            # print(f"[ERROR] {error_message}", flush=True)
             _set_share_application_error(
                 doc.name,
                 error_message,
@@ -1184,7 +1388,7 @@ def pay_now_share_application(entry_name):
             }
         except HTTPError:
             error_message = f"Finacle API returned HTTP {getattr(response, 'status_code', 'error')}. Response: {getattr(response, 'text', '')}"
-            print(f"[ERROR] {error_message}", flush=True)
+            # print(f"[ERROR] {error_message}", flush=True)
             _set_share_application_error(
                 doc.name,
                 error_message,
@@ -1198,13 +1402,13 @@ def pay_now_share_application(entry_name):
             }
 
         response_text = response.text or ""
-        print(f"[API] Response received for {doc.name}", flush=True)
+        # print(f"[API] Response received for {doc.name}", flush=True)
 
         try:
             res_dict = xmltodict.parse(response_text)
         except Exception:
             error_message = f"Unable to parse Finacle API response. Raw response: {response_text}"
-            print(f"[ERROR] {error_message}", flush=True)
+            # print(f"[ERROR] {error_message}", flush=True)
             _set_share_application_error(
                 doc.name,
                 error_message,
@@ -1230,10 +1434,10 @@ def pay_now_share_application(entry_name):
         status = (host_transaction.get("Status") or "").strip().upper()
         transaction_id = (trn_identifier.get("TrnId") or "").strip()
 
-        print(
-            f"[RESULT] Parsed response for {doc.name}: status={status}, transaction_id={transaction_id}",
-            flush=True
-        )
+        # print(
+        #     # f"[RESULT] Parsed response for {doc.name}: status={status}, transaction_id={transaction_id}",
+        #     flush=True
+        # )
 
         if status == "SUCCESS" and transaction_id:
             frappe.db.set_value(
@@ -1259,13 +1463,13 @@ def pay_now_share_application(entry_name):
 
             submitted_doc = frappe.get_doc("Share Application", doc.name)
             if submitted_doc.docstatus == 0:
-                print(
-                    f"[SUBMIT] Submitting Share Application {doc.name}", flush=True)
+                # print(
+                # f"[SUBMIT] Submitting Share Application {doc.name}", flush=True)
                 submitted_doc.submit()
 
             frappe.db.commit()
-            print(
-                f"[SUCCESS] Transaction completed for {doc.name}", flush=True)
+            # print(
+            #     f"[SUCCESS] Transaction completed for {doc.name}", flush=True)
 
             return {
                 "status": "success",
@@ -1274,7 +1478,7 @@ def pay_now_share_application(entry_name):
             }
 
         error_message = response_text or "Finacle API did not return a success status."
-        print(f"[ERROR] API business failure for {doc.name}", flush=True)
+        # print(f"[ERROR] API business failure for {doc.name}", flush=True)
         _set_share_application_error(
             doc.name,
             error_message,
@@ -1294,8 +1498,8 @@ def pay_now_share_application(entry_name):
         frappe.db.rollback()
         frappe.log_error(frappe.get_traceback(),
                          "Share Application Pay Now Failed")
-        print(
-            f"[FATAL] pay_now_share_application failed for {entry_name}: {str(e)}", flush=True)
+        # print(
+        #     f"[FATAL] pay_now_share_application failed for {entry_name}: {str(e)}", flush=True)
         try:
             _set_share_application_error(
                 entry_name,
@@ -1313,20 +1517,244 @@ def pay_now_share_application(entry_name):
     finally:
         try:
             frappe.cache().delete_value(lock_name)
-            print(f"[LOCK] Released lock for {entry_name}", flush=True)
+            # print(f"[LOCK] Released lock for {entry_name}", flush=True)
         except Exception:
             pass
 
 
+# working ///////////////////////////////////////////////////////////////////////////////////////////////
+
+# @frappe.whitelist()
+# def run_bulk_share_application_payment():
+#     print("[START] Bulk Share Application payment started.", flush=True)
+
+#     settings = frappe.get_single("Share Application Settings")
+
+#     if not settings.enable_fund_transfer:
+#         print(
+#             "[SKIP] Fund transfer is disabled in Share Application Settings.", flush=True)
+#         return {
+#             "status": "skipped",
+#             "message": "Fund transfer is disabled in Share Application Settings."
+#         }
+
+#     share_applications = frappe.get_all(
+#         "Share Application",
+#         filters={
+#             "payment_status": ["!=", "Success"],
+#             "docstatus": 0
+#         },
+#         fields=["name", "payment_status"]
+#     )
+
+#     print(
+#         f"[INFO] Found {len(share_applications)} Share Application records for bulk payment.", flush=True)
+
+#     if not share_applications:
+#         return {
+#             "status": "success",
+#             "message": "No pending Share Application records found for bulk payment.",
+#             "processed_count": 0,
+#             "success_count": 0,
+#             "failed_count": 0,
+#             "skipped_count": 0
+#         }
+
+#     processed_count = 0
+#     success_count = 0
+#     failed_count = 0
+#     skipped_count = 0
+#     result_lines = []
+
+#     for row in share_applications:
+#         docname = row.get("name")
+#         if not docname:
+#             skipped_count += 1
+#             continue
+
+#         processed_count += 1
+#         print(
+#             f"[PROCESS] ({processed_count}/{len(share_applications)}) Processing {docname}", flush=True)
+
+#         try:
+#             result = pay_now_share_application(docname)
+
+#             if isinstance(result, dict):
+#                 result_status = (result.get("status") or "").lower()
+#                 result_message = result.get("message") or ""
+
+#                 if result_status == "success":
+#                     success_count += 1
+#                 elif result_status in ("skipped", "warning"):
+#                     skipped_count += 1
+#                 else:
+#                     failed_count += 1
+
+#                 result_lines.append(f"{docname}: {result_message}")
+#                 print(
+#                     f"[RESULT] {docname}: status={result_status}, message={result_message}",
+#                     flush=True
+#                 )
+#             else:
+#                 failed_count += 1
+#                 result_lines.append(
+#                     f"{docname}: Unexpected response returned.")
+#                 print(
+#                     f"[ERROR] {docname}: Unexpected response returned.", flush=True)
+
+#         except Exception as e:
+#             failed_count += 1
+#             frappe.log_error(
+#                 frappe.get_traceback(),
+#                 f"Bulk Share Payment Failed for {docname}"
+#             )
+#             result_lines.append(f"{docname}: {str(e)}")
+#             print(f"[ERROR] {docname}: {str(e)}", flush=True)
+
+#         if processed_count % 500 == 0:
+#             print(
+#                 f"[WAIT] Processed {processed_count} records. Waiting 5 seconds before continuing...",
+#                 flush=True
+#             )
+#             time.sleep(5)
+#             print("[WAIT] Resuming bulk processing.", flush=True)
+
+#     print(
+#         f"[DONE] Bulk payment completed. Processed={processed_count}, Success={success_count}, Failed={failed_count}, Skipped={skipped_count}",
+#         flush=True
+#     )
+
+#     return {
+#         "status": "success" if failed_count == 0 else "warning",
+#         "message": (
+#             f"Bulk payment completed. Processed: {processed_count}, "
+#             f"Success: {success_count}, Failed: {failed_count}, Skipped: {skipped_count}."
+#             + ("<br><br>" + "<br>".join(result_lines) if result_lines else "")
+#         ),
+#         "processed_count": processed_count,
+#         "success_count": success_count,
+#         "failed_count": failed_count,
+#         "skipped_count": skipped_count
+#     }
+
+# #############################################################################################
+
+
+# @frappe.whitelist()
+# def run_bulk_share_application_payment():
+#     settings = frappe.get_single("Share Application Settings")
+
+#     if not settings.enable_fund_transfer:
+#         return {
+#             "status": "skipped",
+#             "message": "Fund transfer is disabled in Share Application Settings."
+#         }
+
+#     share_applications = frappe.get_all(
+#         "Share Application",
+#         filters={
+#             "payment_status": ["!=", "Success"],
+#             "docstatus": 0
+#         },
+#         fields=["name", "payment_status"]
+#     )
+
+#     if not share_applications:
+#         return {
+#             "status": "success",
+#             "message": "No pending Share Application records found for bulk payment.",
+#             "processed_count": 0,
+#             "success_count": 0,
+#             "failed_count": 0,
+#             "skipped_count": 0
+#         }
+
+#     processed_count = 0
+#     success_count = 0
+#     failed_count = 0
+#     skipped_count = 0
+#     result_lines = []
+
+#     with tqdm(
+#         share_applications,
+#         total=len(share_applications),
+#         desc="Share Application Payment",
+#         unit="doc",
+#         ncols=120,
+#         position=0,
+#         leave=True
+#     ) as pbar:
+#         for row in pbar:
+#             docname = row.get("name")
+#             if not docname:
+#                 skipped_count += 1
+#                 processed_count += 1
+#                 pbar.set_postfix(
+#                     success=success_count,
+#                     failed=failed_count,
+#                     skipped=skipped_count
+#                 )
+#                 continue
+
+#             processed_count += 1
+
+#             try:
+#                 result = pay_now_share_application(docname)
+
+#                 if isinstance(result, dict):
+#                     result_status = (result.get("status") or "").lower()
+#                     result_message = result.get("message") or ""
+
+#                     if result_status == "success":
+#                         success_count += 1
+#                     elif result_status in ("skipped", "warning"):
+#                         skipped_count += 1
+#                     else:
+#                         failed_count += 1
+
+#                     result_lines.append(f"{docname}: {result_message}")
+#                 else:
+#                     failed_count += 1
+#                     result_lines.append(
+#                         f"{docname}: Unexpected response returned.")
+
+#             except Exception as e:
+#                 failed_count += 1
+#                 frappe.log_error(
+#                     frappe.get_traceback(),
+#                     f"Bulk Share Payment Failed for {docname}"
+#                 )
+#                 result_lines.append(f"{docname}: {str(e)}")
+
+#             pbar.set_postfix(
+#                 success=success_count,
+#                 failed=failed_count,
+#                 skipped=skipped_count
+#             )
+
+#             if processed_count % 5 == 0:
+#                 time.sleep(5)
+
+#     return {
+#         "status": "success" if failed_count == 0 else "warning",
+#         "message": (
+#             f"Bulk payment completed. Processed: {processed_count}, "
+#             f"Success: {success_count}, Failed: {failed_count}, Skipped: {skipped_count}."
+#             + ("<br><br>" + "<br>".join(result_lines) if result_lines else "")
+#         ),
+#         "processed_count": processed_count,
+#         "success_count": success_count,
+#         "failed_count": failed_count,
+#         "skipped_count": skipped_count
+#     }
+# working
+
+
 @frappe.whitelist()
 def run_bulk_share_application_payment():
-    print("[START] Bulk Share Application payment started.", flush=True)
-
     settings = frappe.get_single("Share Application Settings")
 
     if not settings.enable_fund_transfer:
-        print(
-            "[SKIP] Fund transfer is disabled in Share Application Settings.", flush=True)
         return {
             "status": "skipped",
             "message": "Fund transfer is disabled in Share Application Settings."
@@ -1340,9 +1768,6 @@ def run_bulk_share_application_payment():
         },
         fields=["name", "payment_status"]
     )
-
-    print(
-        f"[INFO] Found {len(share_applications)} Share Application records for bulk payment.", flush=True)
 
     if not share_applications:
         return {
@@ -1360,63 +1785,83 @@ def run_bulk_share_application_payment():
     skipped_count = 0
     result_lines = []
 
-    for row in share_applications:
-        docname = row.get("name")
-        if not docname:
-            skipped_count += 1
-            continue
+    pause_after_records = 500
+    pause_seconds = 10
 
-        processed_count += 1
-        print(
-            f"[PROCESS] ({processed_count}/{len(share_applications)}) Processing {docname}", flush=True)
+    with tqdm(
+        total=len(share_applications),
+        desc="Share Application Payment",
+        unit="doc",
+        ncols=120,
+        position=0,
+        leave=True
+    ) as pbar:
 
-        try:
-            result = pay_now_share_application(docname)
+        for row in share_applications:
+            docname = row.get("name")
 
-            if isinstance(result, dict):
-                result_status = (result.get("status") or "").lower()
-                result_message = result.get("message") or ""
+            if not docname:
+                skipped_count += 1
+                processed_count += 1
 
-                if result_status == "success":
-                    success_count += 1
-                elif result_status in ("skipped", "warning"):
-                    skipped_count += 1
+                pbar.update(1)
+                pbar.set_postfix(
+                    success=success_count,
+                    failed=failed_count,
+                    skipped=skipped_count
+                )
+                continue
+
+            processed_count += 1
+
+            try:
+                result = pay_now_share_application(docname)
+
+                if isinstance(result, dict):
+                    result_status = (result.get("status") or "").lower()
+                    result_message = result.get("message") or ""
+
+                    if result_status == "success":
+                        success_count += 1
+                    elif result_status in ("skipped", "warning"):
+                        skipped_count += 1
+                    else:
+                        failed_count += 1
+
+                    result_lines.append(f"{docname}: {result_message}")
                 else:
                     failed_count += 1
+                    result_lines.append(
+                        f"{docname}: Unexpected response returned.")
 
-                result_lines.append(f"{docname}: {result_message}")
-                print(
-                    f"[RESULT] {docname}: status={result_status}, message={result_message}",
-                    flush=True
-                )
-            else:
+            except Exception as e:
                 failed_count += 1
-                result_lines.append(
-                    f"{docname}: Unexpected response returned.")
-                print(
-                    f"[ERROR] {docname}: Unexpected response returned.", flush=True)
+                frappe.log_error(
+                    frappe.get_traceback(),
+                    f"Bulk Share Payment Failed for {docname}"
+                )
+                result_lines.append(f"{docname}: {str(e)}")
 
-        except Exception as e:
-            failed_count += 1
-            frappe.log_error(
-                frappe.get_traceback(),
-                f"Bulk Share Payment Failed for {docname}"
+            pbar.update(1)
+            pbar.set_postfix(
+                success=success_count,
+                failed=failed_count,
+                skipped=skipped_count
             )
-            result_lines.append(f"{docname}: {str(e)}")
-            print(f"[ERROR] {docname}: {str(e)}", flush=True)
 
-        if processed_count % 500 == 0:
-            print(
-                f"[WAIT] Processed {processed_count} records. Waiting 5 seconds before continuing...",
-                flush=True
-            )
-            time.sleep(5)
-            print("[WAIT] Resuming bulk processing.", flush=True)
-
-    print(
-        f"[DONE] Bulk payment completed. Processed={processed_count}, Success={success_count}, Failed={failed_count}, Skipped={skipped_count}",
-        flush=True
-    )
+            if processed_count % pause_after_records == 0:
+                with tqdm(
+                    total=pause_seconds,
+                    desc=f"Paused after {processed_count} records | Press Ctrl+Z to stop",
+                    unit="sec",
+                    ncols=120,
+                    position=1,
+                    leave=False
+                ) as pause_bar:
+                    for remaining in range(pause_seconds, 0, -1):
+                        pause_bar.set_postfix(remaining=f"{remaining}s")
+                        time.sleep(1)
+                        pause_bar.update(1)
 
     return {
         "status": "success" if failed_count == 0 else "warning",
@@ -1430,3 +1875,191 @@ def run_bulk_share_application_payment():
         "failed_count": failed_count,
         "skipped_count": skipped_count
     }
+
+
+###########################################################################
+# @frappe.whitelist()
+# def run_bulk_share_application_payment():
+#     settings = frappe.get_single("Share Application Settings")
+
+#     if not settings.enable_fund_transfer:
+#         return {
+#             "status": "skipped",
+#             "message": "Fund transfer is disabled in Share Application Settings."
+#         }
+
+#     share_applications = frappe.get_all(
+#         "Share Application",
+#         filters={
+#             "payment_status": ["!=", "Success"],
+#             "docstatus": 0
+#         },
+#         fields=["name", "payment_status"]
+#     )
+
+#     if not share_applications:
+#         return {
+#             "status": "success",
+#             "message": "No pending Share Application records found for bulk payment.",
+#             "processed_count": 0,
+#             "success_count": 0,
+#             "failed_count": 0,
+#             "skipped_count": 0
+#         }
+
+#     processed_count = 0
+#     success_count = 0
+#     failed_count = 0
+#     skipped_count = 0
+#     result_lines = []
+
+#     with tqdm(
+#         share_applications,
+#         total=len(share_applications),
+#         desc="Share Application Payment",
+#         unit="doc",
+#         ncols=120
+#     ) as pbar:
+#         for row in pbar:
+#             docname = row.get("name")
+#             if not docname:
+#                 skipped_count += 1
+#                 processed_count += 1
+#                 pbar.set_postfix(
+#                     success=success_count,
+#                     failed=failed_count,
+#                     skipped=skipped_count
+#                 )
+#                 continue
+
+#             processed_count += 1
+#             pbar.set_postfix(
+#                 current=docname,
+#                 success=success_count,
+#                 failed=failed_count,
+#                 skipped=skipped_count
+#             )
+
+#             try:
+#                 result = pay_now_share_application(docname)
+
+#                 if isinstance(result, dict):
+#                     result_status = (result.get("status") or "").lower()
+#                     result_message = result.get("message") or ""
+
+#                     if result_status == "success":
+#                         success_count += 1
+#                     elif result_status in ("skipped", "warning"):
+#                         skipped_count += 1
+#                     else:
+#                         failed_count += 1
+
+#                     result_lines.append(f"{docname}: {result_message}")
+#                 else:
+#                     failed_count += 1
+#                     result_lines.append(
+#                         f"{docname}: Unexpected response returned.")
+
+#             except Exception as e:
+#                 failed_count += 1
+#                 frappe.log_error(
+#                     frappe.get_traceback(),
+#                     f"Bulk Share Payment Failed for {docname}"
+#                 )
+#                 result_lines.append(f"{docname}: {str(e)}")
+
+#             pbar.set_postfix(
+#                 current=docname,
+#                 success=success_count,
+#                 failed=failed_count,
+#                 skipped=skipped_count
+#             )
+
+#             if processed_count % 1 == 0:
+#                 tqdm.write(
+#                     f"Processed {processed_count} records. Waiting 5 seconds before continuing..."
+#                 )
+#                 time.sleep(10)
+#                 tqdm.write("Resuming bulk processing.")
+
+#     return {
+#         "status": "success" if failed_count == 0 else "warning",
+#         "message": (
+#             f"Bulk payment completed. Processed: {processed_count}, "
+#             f"Success: {success_count}, Failed: {failed_count}, Skipped: {skipped_count}."
+#             + ("<br><br>" + "<br>".join(result_lines) if result_lines else "")
+#         ),
+#         "processed_count": processed_count,
+#         "success_count": success_count,
+#         "failed_count": failed_count,
+#         "skipped_count": skipped_count
+#     }
+
+
+def test_progress():
+    total_records = 1000
+    batch_size = 5
+
+    with tqdm(
+        total=total_records,
+        desc="Processing Share Applications",
+        unit="record",
+        ncols=100
+    ) as pbar:
+
+        for batch_start in range(1, total_records + 1, batch_size):
+
+            # Process 5 records
+            for _ in range(batch_size):
+                if pbar.n >= total_records:
+                    break
+
+                time.sleep(0.01)  # Your processing logic
+                pbar.update(1)
+
+            # Pause after every batch except the last one
+            if pbar.n < total_records:
+                tqdm.write(
+                    f"Processed {pbar.n}/{total_records} records. "
+                    "Pausing for 5 seconds... (Press Ctrl+C to stop)"
+                )
+                time.sleep(5)
+
+    print("\nDone!")
+
+
+# test_progress()
+
+
+def process_bulk_record():
+    total_records = 35000
+
+    start_time = time.time()
+    batch_start = time.time()
+
+    with tqdm(total=total_records, ncols=120) as pbar:
+
+        for i in range(1, total_records + 1):
+
+            # process record
+            time.sleep(0.001)
+
+            pbar.update(1)
+
+            if i % 500 == 0:
+
+                batch_time = time.time() - batch_start
+                total_time = time.time() - start_time
+
+                rate = i / total_time
+                eta = (total_records - i) / rate
+
+                pbar.set_description(
+                    f"{i:,}/{total_records:,} ({i/total_records*100:.2f}%) "
+                    f"| Batch:{str(timedelta(seconds=int(batch_time)))} "
+                    f"| Rate:{rate:.0f}/s "
+                    f"| ETA:{str(timedelta(seconds=int(eta)))}"
+                )
+
+                time.sleep(5)
+                batch_start = time.time()
