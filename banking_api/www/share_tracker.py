@@ -72,6 +72,57 @@ def get_share_tracker_counts():
 
 
 @frappe.whitelist()
+def get_share_tracker_sol_ids(view="all", search=None):
+    filters = {}
+
+    if view == "pending":
+        filters["payment_status"] = "Pending"
+    elif view == "success":
+        filters["payment_status"] = "Success"
+    elif view == "insuf":
+        filters["insufficient_balance"] = 1
+    elif view == "closed":
+        filters["account_closed"] = 1
+
+    cache_payload = {
+        "view": view,
+        "search": search
+    }
+    cache_key = _make_cache_key("sol_ids", cache_payload)
+    cached = _cache().get_value(cache_key)
+    if cached:
+        return cached
+
+    if search:
+        search = str(search).strip()
+        like_txt = f"%{search}%"
+        rows = frappe.get_all(
+            "Share Application",
+            fields=["sol_id"],
+            filters=filters,
+            or_filters=[
+                ["Share Application", "name", "like", like_txt],
+                ["Share Application", "sol_id", "like", like_txt],
+                ["Share Application", "cif", "like", like_txt],
+                ["Share Application", "account_number", "like", like_txt],
+                ["Share Application", "transaction_id", "like", like_txt],
+                ["Share Application", "payment_status", "like", like_txt],
+            ]
+        )
+    else:
+        rows = frappe.get_all(
+            "Share Application",
+            fields=["sol_id"],
+            filters=filters
+        )
+
+    sol_ids = sorted({(row.get("sol_id") or "").strip()
+                     for row in rows if row.get("sol_id")})
+    _cache().set_value(cache_key, sol_ids, expires_in_sec=CACHE_TTL)
+    return sol_ids
+
+
+@frappe.whitelist()
 def get_share_tracker_rows(view="all", page=1, page_length=10, search=None, sol_ids=None, sort_by="modified", sort_order="desc"):
     page = cint(page) or 1
     page_length = cint(page_length) or 10
@@ -229,6 +280,7 @@ def clear_share_tracker_cache():
     cache = _cache()
     cache.delete_keys("share_tracker::counts::*")
     cache.delete_keys("share_tracker::rows::*")
+    cache.delete_keys("share_tracker::sol_ids::*")
 
 
 def clear_sol_desc_cache(sol_id=None):
