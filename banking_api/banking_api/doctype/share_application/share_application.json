@@ -7,6 +7,7 @@
  "engine": "InnoDB",
  "field_order": [
   "section_break_f1dc",
+  "sol_id",
   "cif",
   "account_number",
   "transaction_id",
@@ -16,7 +17,9 @@
   "fund_transfer_date",
   "cif_creation_date",
   "account_opening_date",
-  "status"
+  "payment_status",
+  "insufficient_balance",
+  "account_closed"
  ],
  "fields": [
   {
@@ -27,9 +30,9 @@
    "fieldname": "cif",
    "fieldtype": "Int",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "CIF",
    "length": 16,
-   "read_only": 1,
    "reqd": 1,
    "unique": 1
   },
@@ -39,7 +42,6 @@
    "in_list_view": 1,
    "label": "Account Number",
    "length": 16,
-   "read_only": 1,
    "reqd": 1,
    "search_index": 1
   },
@@ -51,19 +53,9 @@
    "search_index": 1
   },
   {
-   "default": "Pending",
-   "fieldname": "status",
-   "fieldtype": "Select",
-   "label": "Status",
-   "options": "Pending\nSuccess\nFailed",
-   "read_only": 1,
-   "reqd": 1,
-   "search_index": 1
-  },
-  {
    "fieldname": "error_log",
    "fieldtype": "Code",
-   "label": "Error Log",
+   "label": "API Response",
    "read_only": 1
   },
   {
@@ -97,13 +89,43 @@
    "fieldtype": "Date",
    "label": "Account Opening Date",
    "read_only": 1
+  },
+  {
+   "default": "Pending",
+   "fieldname": "payment_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Payment Status",
+   "options": "Pending\nSuccess\nFailed",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "sol_id",
+   "fieldtype": "Data",
+   "label": "SOL ID"
+  },
+  {
+   "default": "0",
+   "fieldname": "insufficient_balance",
+   "fieldtype": "Check",
+   "label": "Insufficient Balance",
+   "search_index": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "account_closed",
+   "fieldtype": "Check",
+   "label": "Account Closed",
+   "search_index": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-05-25 16:41:05.331529",
+ "modified": "2026-06-06 10:09:34.969303",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Share Application",
