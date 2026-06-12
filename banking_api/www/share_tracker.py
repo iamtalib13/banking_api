@@ -169,8 +169,8 @@ def get_share_tracker_sol_ids(view="all", search=None):
     return sol_ids
 
 
-@frappe.whitelist()
-def get_share_tracker_rows(view="all", page=1, page_length=10, search=None, sol_ids=None, sort_by="modified", sort_order="desc"):
+# @frappe.whitelist()
+# def get_share_tracker_rows(view="all", page=1, page_length=10, search=None, sol_ids=None, sort_by="modified", sort_order="desc"):
     page = cint(page) or 1
     page_length = cint(page_length) or 10
     page = max(page, 1)
@@ -223,6 +223,159 @@ def get_share_tracker_rows(view="all", page=1, page_length=10, search=None, sol_
         "page_length": page_length,
         "search": search,
         "sol_ids": sol_ids,
+        "sort_by": sort_by,
+        "sort_order": sort_order,
+    }
+    cache_key = _make_cache_key("rows", cache_payload)
+    cached = _cache().get_value(cache_key)
+    if cached:
+        return cached
+
+    start = (page - 1) * page_length
+
+    if search:
+        search = str(search).strip()
+        like_txt = f"%{search}%"
+
+        rows = frappe.get_all(
+            "Share Application",
+            fields=fields,
+            filters=filters,
+            or_filters=[
+                ["Share Application", "name", "like", like_txt],
+                ["Share Application", "sol_id", "like", like_txt],
+                ["Share Application", "cif", "like", like_txt],
+                ["Share Application", "account_number", "like", like_txt],
+                ["Share Application", "transaction_id", "like", like_txt],
+                ["Share Application", "payment_status", "like", like_txt],
+            ],
+            start=start,
+            page_length=page_length,
+            order_by=f"`tabShare Application`.`{sort_by}` {sort_order}"
+        )
+
+        total = len(frappe.get_all(
+            "Share Application",
+            pluck="name",
+            filters=filters,
+            or_filters=[
+                ["Share Application", "name", "like", like_txt],
+                ["Share Application", "sol_id", "like", like_txt],
+                ["Share Application", "cif", "like", like_txt],
+                ["Share Application", "account_number", "like", like_txt],
+                ["Share Application", "transaction_id", "like", like_txt],
+                ["Share Application", "payment_status", "like", like_txt],
+            ]
+        ))
+    else:
+        rows = frappe.get_all(
+            "Share Application",
+            fields=fields,
+            filters=filters,
+            start=start,
+            page_length=page_length,
+            order_by=f"`tabShare Application`.`{sort_by}` {sort_order}"
+        )
+        total = frappe.db.count("Share Application", filters=filters)
+
+    rows = attach_sol_descriptions(rows)
+
+    result = {
+        "rows": rows,
+        "total": total,
+        "page": page,
+        "page_length": page_length
+    }
+
+    _cache().set_value(cache_key, result, expires_in_sec=CACHE_TTL)
+    return result
+
+
+@frappe.whitelist()
+# def get_share_tracker_rows(view="all", page=1, page_length=10, search=None, sol_ids=None, sort_by="modified", sort_order="desc"):
+@frappe.whitelist()
+def get_share_tracker_rows(
+    view="all",
+    page=1,
+    page_length=10,
+    search=None,
+    sol_ids=None,
+    from_date=None,
+    to_date=None,
+    sort_by="modified",
+    sort_order="desc"
+):
+    page = cint(page) or 1
+    page_length = cint(page_length) or 10
+    page = max(page, 1)
+
+    allowed_sort_by = {"modified", "sol_id", "cif_creation_date",
+                       "fund_transfer_date", "creation", "name"}
+    allowed_sort_order = {"asc", "desc"}
+
+    if sort_by not in allowed_sort_by:
+        sort_by = "modified"
+    if str(sort_order).lower() not in allowed_sort_order:
+        sort_order = "desc"
+
+    filters = {}
+
+    if view == "pending":
+        filters["payment_status"] = "Pending"
+    elif view == "success":
+        filters["payment_status"] = "Success"
+    elif view == "insuf":
+        filters["insufficient_balance"] = 1
+    elif view == "closed":
+        filters["account_closed"] = 1
+
+    if sol_ids:
+        if isinstance(sol_ids, str):
+            sol_ids = json.loads(sol_ids)
+        if sol_ids:
+            filters["sol_id"] = ["in", sol_ids]
+
+    if from_date and to_date:
+        filters["fund_transfer_date"] = ["between", [from_date, to_date]]
+    elif from_date:
+        filters["fund_transfer_date"] = [">=", from_date]
+    elif to_date:
+        filters["fund_transfer_date"] = ["<=", to_date]
+
+    fields = [
+        "name",
+        "sol_id",
+        "cif",
+        "account_number",
+        "transaction_id",
+        "payment_status",
+        "insufficient_balance",
+        "account_closed",
+        "fund_transfer_date",
+        "cif_creation_date",
+        "account_opening_date",
+        "error_log",
+        "modified"
+    ]
+
+    # cache_payload = {
+    #     "view": view,
+    #     "page": page,
+    #     "page_length": page_length,
+    #     "search": search,
+    #     "sol_ids": sol_ids,
+    #     "sort_by": sort_by,
+    #     "sort_order": sort_order,
+    # }
+
+    cache_payload = {
+        "view": view,
+        "page": page,
+        "page_length": page_length,
+        "search": search,
+        "sol_ids": sol_ids,
+        "from_date": from_date,
+        "to_date": to_date,
         "sort_by": sort_by,
         "sort_order": sort_order,
     }
@@ -349,8 +502,10 @@ def publish_share_tracker_update(doc=None, method=None):
     })
 
 
+# @frappe.whitelist()
+# def get_share_tracker_export_rows(search=None, sol_ids=None, sort_by="modified", sort_order="desc"):
 @frappe.whitelist()
-def get_share_tracker_export_rows(search=None, sol_ids=None, sort_by="modified", sort_order="desc"):
+def get_share_tracker_export_rows(search=None, sol_ids=None, from_date=None, to_date=None, sort_by="modified", sort_order="desc"):
     allowed_sort_by = {"modified", "sol_id", "cif_creation_date",
                        "fund_transfer_date", "creation", "name"}
     allowed_sort_order = {"asc", "desc"}
@@ -368,6 +523,13 @@ def get_share_tracker_export_rows(search=None, sol_ids=None, sort_by="modified",
         if sol_ids:
             filters["sol_id"] = ["in", sol_ids]
 
+    if from_date and to_date:
+        filters["fund_transfer_date"] = ["between", [
+            f"{from_date} 00:00:00", f"{to_date} 23:59:59"]]
+    elif from_date:
+        filters["fund_transfer_date"] = [">=", f"{from_date} 00:00:00"]
+    elif to_date:
+        filters["fund_transfer_date"] = ["<=", f"{to_date} 23:59:59"]
     fields = [
         "name",
         "sol_id",

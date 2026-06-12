@@ -1578,7 +1578,7 @@
                         </div>
                     </div>
 
-                    <button class="toolbar-btn" onclick="toggleDateFilter()">
+                    <!-- <button class="toolbar-btn" onclick="toggleDateFilter()">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -1587,7 +1587,59 @@
                             <line x1="3" y1="10" x2="21" y2="10" />
                         </svg>
                         Date range
-                    </button>
+                    </button> -->
+                    <div class="filter-wrap" id="dateFilterWrap">
+                        <button class="toolbar-btn" id="dateFilterBtn" onclick="toggleDateFilter()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="4" width="18" height="18" rx="2"></rect>
+                                <line x1="16" y1="2" x2="16" y2="6"></line>
+                                <line x1="8" y1="2" x2="8" y2="6"></line>
+                                <line x1="3" y1="10" x2="21" y2="10"></line>
+                            </svg>
+                            Date range
+                            <span class="filter-badge" id="dateFilterBadge" style="display:none">1</span>
+                        </button>
+
+                        <div class="filter-popup" id="dateFilterPopup" role="dialog"
+                            aria-label="Filter by transaction date">
+                            <div class="fp-header">
+                                <span class="fp-title">Transaction date range</span>
+                                <button class="fp-close" onclick="closeDateFilter()" aria-label="Close date filter">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2.5" stroke-linecap="round">
+                                        <line x1="18" y1="6" x2="6" y2="18" />
+                                        <line x1="6" y1="6" x2="18" y2="18" />
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <div style="padding:14px 16px;display:grid;gap:12px;border-bottom:1px solid var(--border);">
+                                <div>
+                                    <label
+                                        style="display:block;font-size:12px;color:var(--text-secondary);margin-bottom:6px;">From
+                                        date</label>
+                                    <input type="date" id="fromDateInput" class="search-input"
+                                        style="height:34px;padding:0 10px;">
+                                </div>
+                                <div>
+                                    <label
+                                        style="display:block;font-size:12px;color:var(--text-secondary);margin-bottom:6px;">To
+                                        date</label>
+                                    <input type="date" id="toDateInput" class="search-input"
+                                        style="height:34px;padding:0 10px;">
+                                </div>
+                            </div>
+
+                            <div class="fp-footer">
+                                <span class="fp-count" id="dateFilterText">No date selected</span>
+                                <div class="fp-footer-btns">
+                                    <button class="fp-btn-reset" onclick="resetDateFilter()">Reset</button>
+                                    <button class="fp-btn-apply" onclick="applyDateFilter()">Apply filter</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="toolbar-right">
                         <span style="font-size:12px;color:var(--text-tertiary)" id="selectedCount"></span>
@@ -1693,6 +1745,12 @@
         let currentSolIds = [];
         let pageCache = new Map();
         let countCache = { data: null, ts: 0 };
+
+        // Date filters
+        let fromDate = "";
+        let toDate = "";
+        let pendingFromDate = "";
+        let pendingToDate = "";
 
         function escapeHtml(value) {
             if (value === null || value === undefined) return "";
@@ -1804,12 +1862,36 @@
             return sortDir === -1 ? "desc" : "asc";
         }
 
+        // function getCacheKey() {
+        //     return JSON.stringify({
+        //         tab: currentTab,
+        //         page: currentPage,
+        //         q: searchQ,
+        //         sol_ids: [...selectedSolIds].sort(),
+        //         sort_by: getSortBy(),
+        //         sort_order: getSortOrder()
+        //     });
+        // }
+
+        // function getCacheKeyForPage(pageNo) {
+        //     return JSON.stringify({
+        //         tab: currentTab,
+        //         page: pageNo,
+        //         q: searchQ,
+        //         sol_ids: [...selectedSolIds].sort(),
+        //         sort_by: getSortBy(),
+        //         sort_order: getSortOrder()
+        //     });
+        // }
+
         function getCacheKey() {
             return JSON.stringify({
                 tab: currentTab,
                 page: currentPage,
                 q: searchQ,
                 sol_ids: [...selectedSolIds].sort(),
+                from_date: fromDate,
+                to_date: toDate,
                 sort_by: getSortBy(),
                 sort_order: getSortOrder()
             });
@@ -1821,10 +1903,16 @@
                 page: pageNo,
                 q: searchQ,
                 sol_ids: [...selectedSolIds].sort(),
+                from_date: fromDate,
+                to_date: toDate,
                 sort_by: getSortBy(),
                 sort_order: getSortOrder()
             });
         }
+
+
+
+
 
         // async function fetchRowsForPage(pageNo) {
         //     const message = await apiCall("banking_api.www.share_tracker.get_share_tracker_rows", {
@@ -1839,9 +1927,8 @@
 
         //     const rows = (message.rows || []).map(normalizeRecord);
         //     const total = cintLike(message.total);
-        //     const sol_ids = [...new Set(rows.map(r => String(r.sol_id || "")).filter(Boolean))].sort();
 
-        //     return { rows, total, sol_ids };
+        //     return { rows, total };
         // }
 
         async function fetchRowsForPage(pageNo) {
@@ -1851,6 +1938,8 @@
                 page_length: PER_PAGE,
                 search: searchQ || null,
                 sol_ids: [...selectedSolIds],
+                from_date: fromDate || null,
+                to_date: toDate || null,
                 sort_by: getSortBy(),
                 sort_order: getSortOrder()
             });
@@ -2573,10 +2662,119 @@
             }
         }
 
-        function toggleDateFilter() {
-            if (window.frappe && frappe.show_alert) {
-                frappe.show_alert({ message: __("Date range filter not enabled yet"), indicator: "orange" });
+        // function toggleDateFilter() {
+        //     if (window.frappe && frappe.show_alert) {
+        //         frappe.show_alert({ message: __("Date range filter not enabled yet"), indicator: "orange" });
+        //     }
+        // }
+
+        function updateDateFilterUI() {
+            const btn = document.getElementById("dateFilterBtn");
+            const badge = document.getElementById("dateFilterBadge");
+            const text = document.getElementById("dateFilterText");
+
+            const hasDate = !!(fromDate || toDate);
+
+            if (btn) btn.classList.toggle("filter-active", hasDate);
+
+            if (badge) {
+                badge.style.display = hasDate ? "inline-flex" : "none";
+                badge.textContent = "1";
             }
+
+            if (text) {
+                if (fromDate && toDate) text.textContent = `${fromDate} to ${toDate}`;
+                else if (fromDate) text.textContent = `From ${fromDate}`;
+                else if (toDate) text.textContent = `Up to ${toDate}`;
+                else text.textContent = "No date selected";
+            }
+        }
+
+        function toggleDateFilter() {
+            const popup = document.getElementById("dateFilterPopup");
+            if (!popup) return;
+
+            const isOpen = popup.classList.contains("open");
+            if (isOpen) {
+                closeDateFilter();
+                return;
+            }
+
+            pendingFromDate = fromDate || "";
+            pendingToDate = toDate || "";
+
+            const fromInput = document.getElementById("fromDateInput");
+            const toInput = document.getElementById("toDateInput");
+
+            if (fromInput) fromInput.value = pendingFromDate;
+            if (toInput) toInput.value = pendingToDate;
+
+            popup.classList.add("open");
+
+            const btn = document.getElementById("dateFilterBtn");
+            if (btn) btn.classList.add("filter-active");
+
+            setTimeout(() => document.addEventListener("click", outsideDateFilterClickHandler), 0);
+        }
+
+        function closeDateFilter() {
+            const popup = document.getElementById("dateFilterPopup");
+            if (popup) popup.classList.remove("open");
+
+            const btn = document.getElementById("dateFilterBtn");
+            if (btn && !(fromDate || toDate)) btn.classList.remove("filter-active");
+
+            document.removeEventListener("click", outsideDateFilterClickHandler);
+        }
+
+        function outsideDateFilterClickHandler(e) {
+            const wrap = document.getElementById("dateFilterWrap");
+            if (wrap && !wrap.contains(e.target)) closeDateFilter();
+        }
+
+        async function applyDateFilter() {
+            const fromInput = document.getElementById("fromDateInput");
+            const toInput = document.getElementById("toDateInput");
+
+            pendingFromDate = fromInput ? fromInput.value : "";
+            pendingToDate = toInput ? toInput.value : "";
+
+            if (pendingFromDate && pendingToDate && pendingFromDate > pendingToDate) {
+                if (window.frappe && frappe.show_alert) {
+                    frappe.show_alert({
+                        message: __("From date cannot be greater than To date"),
+                        indicator: "red"
+                    });
+                }
+                return;
+            }
+
+            fromDate = pendingFromDate;
+            toDate = pendingToDate;
+            currentPage = 1;
+
+            closeDateFilter();
+            updateDateFilterUI();
+            await loadRows(true);
+        }
+
+        async function resetDateFilter() {
+            pendingFromDate = "";
+            pendingToDate = "";
+
+            const fromInput = document.getElementById("fromDateInput");
+            const toInput = document.getElementById("toDateInput");
+
+            if (fromInput) fromInput.value = "";
+            if (toInput) toInput.value = "";
+
+            fromDate = "";
+            toDate = "";
+            currentPage = 1;
+
+            closeDateFilter();
+            updateDateFilterUI();
+            await loadRows(true);
         }
 
         function showExportLoader(message = "Building consolidated report and preparing download…") {
@@ -2632,9 +2830,17 @@
                 setExportButtonLoading(true);
                 showExportLoader("Building consolidated report and preparing download…");
 
+                // const rows = await apiCall("banking_api.www.share_tracker.get_share_tracker_export_rows", {
+                //     search: searchQ ? searchQ : null,
+                //     sol_ids: selectedSolIds.size ? [...selectedSolIds] : null,
+                //     sort_by: getSortBy(),
+                //     sort_order: getSortOrder()
+                // });
                 const rows = await apiCall("banking_api.www.share_tracker.get_share_tracker_export_rows", {
                     search: searchQ ? searchQ : null,
                     sol_ids: selectedSolIds.size ? [...selectedSolIds] : null,
+                    from_date: fromDate || null,
+                    to_date: toDate || null,
                     sort_by: getSortBy(),
                     sort_order: getSortOrder()
                 });
@@ -2906,6 +3112,8 @@
             setupRealtime();
             setupTableScrollPrefetch();
         });
+
+        updateDateFilterUI();
     </script>
     <!-- end -->
 </body>
