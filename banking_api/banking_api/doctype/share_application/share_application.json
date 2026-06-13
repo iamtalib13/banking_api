@@ -19,7 +19,8 @@
   "account_opening_date",
   "payment_status",
   "insufficient_balance",
-  "account_closed"
+  "account_closed",
+  "account_frozen"
  ],
  "fields": [
   {
@@ -49,14 +50,12 @@
    "fieldname": "transaction_id",
    "fieldtype": "Data",
    "label": "Transaction ID",
-   "read_only": 1,
    "search_index": 1
   },
   {
    "fieldname": "error_log",
    "fieldtype": "Code",
-   "label": "API Response",
-   "read_only": 1
+   "label": "API Response"
   },
   {
    "fieldname": "amended_from",
@@ -76,19 +75,19 @@
    "fieldname": "fund_transfer_date",
    "fieldtype": "Datetime",
    "label": "Fund Transfer Date",
-   "read_only": 1
+   "search_index": 1
   },
   {
    "fieldname": "cif_creation_date",
    "fieldtype": "Date",
    "label": "CIF Creation Date",
-   "read_only": 1
+   "search_index": 1
   },
   {
    "fieldname": "account_opening_date",
    "fieldtype": "Date",
    "label": "Account Opening Date",
-   "read_only": 1
+   "search_index": 1
   },
   {
    "default": "Pending",
@@ -104,7 +103,8 @@
   {
    "fieldname": "sol_id",
    "fieldtype": "Data",
-   "label": "SOL ID"
+   "label": "SOL ID",
+   "search_index": 1
   },
   {
    "default": "0",
@@ -119,13 +119,20 @@
    "fieldtype": "Check",
    "label": "Account Closed",
    "search_index": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "account_frozen",
+   "fieldtype": "Check",
+   "label": "Account Frozen",
+   "search_index": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-06-06 10:09:34.969303",
+ "modified": "2026-06-13 12:10:21.667835",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Share Application",
