@@ -318,7 +318,8 @@ def _set_share_application_error(
     docname,
     error_message,
     account_closed=0,
-    insufficient_balance=0
+    insufficient_balance=0,
+    account_frozen=0
 ):
     if not docname:
         return
@@ -330,7 +331,8 @@ def _set_share_application_error(
             "error_log": (error_message or "")[:65535],
             "payment_status": "Failed",
             "account_closed": account_closed,
-            "insufficient_balance": insufficient_balance
+            "insufficient_balance": insufficient_balance,
+            "account_frozen": account_frozen
         },
         update_modified=True
     )
@@ -682,6 +684,26 @@ def pay_now_share_application(entry_name):
         response_text = response.text or ""
         # print(f"[API] Response received for {doc.name}", flush=True)
 
+        response_text_lower = response_text.lower()
+
+        if "frozen" in response_text_lower or "a/c. is frozen" in response_text_lower:
+            error_message = response_text or "Debit account is frozen."
+            _set_share_application_error(
+                doc.name,
+                error_message,
+                account_closed=0,
+                insufficient_balance=0,
+                account_frozen=1
+            )
+            frappe.db.set_single_value(
+                "Share Application Settings", "last_transfer_run", now()
+            )
+            frappe.db.commit()
+            return {
+                "status": "error",
+                "message": "Fund transfer failed because account is frozen."
+            }
+
         try:
             res_dict = xmltodict.parse(response_text)
         except Exception:
@@ -727,7 +749,8 @@ def pay_now_share_application(entry_name):
                     "payment_status": "Success",
                     "error_log": "",
                     "account_closed": 0,
-                    "insufficient_balance": 0
+                    "insufficient_balance": 0,
+                    "account_frozen": 0
                 },
                 update_modified=True
             )
