@@ -340,26 +340,23 @@ def _set_share_application_error(
 
 @frappe.whitelist()
 def pay_now_share_application(entry_name):
-    # print(
-    #     f"[START] pay_now_share_application called for: {entry_name}", flush=True)
 
     settings = frappe.get_single("Share Application Settings")
     lock_name = f"share_application_pay_now::{entry_name}"
 
     if not entry_name:
-        # print("[ERROR] Share Application document name is missing.", flush=True)
+
         frappe.throw(_("Share Application document name is required."))
 
     if not settings.enable_fund_transfer:
-        # print(
-        #     "[SKIP] Fund transfer is disabled in Share Application Settings.", flush=True)
+
         return {
             "status": "skipped",
             "message": "Fund transfer is disabled in Share Application Settings."
         }
 
     if not settings.finacle_api_url:
-        # print("[ERROR] Finacle API URL is missing in settings.", flush=True)
+
         frappe.throw(
             _("Finacle API URL is mandatory in Share Application Settings."))
 
@@ -367,60 +364,50 @@ def pay_now_share_application(entry_name):
     member_fee_amount = cint_safe(settings.member_fee_credit_amount, 0)
     total_debit_amount = share_amount + member_fee_amount
 
-    # print(
-    #     # f"[INFO] share_amount={share_amount}, member_fee_amount={member_fee_amount}, total_debit_amount={total_debit_amount}",
-    #     flush=True
-    # )
-
     if not settings.share_account_gl:
-        # print("[ERROR] Share Account GL is missing.", flush=True)
+
         frappe.throw(
             _("Share Account GL is mandatory in Share Application Settings."))
 
     if not settings.share_member_fee_gl:
-        # print("[ERROR] Share Member Fee GL is missing.", flush=True)
+
         frappe.throw(
             _("Share Member Fee GL is mandatory in Share Application Settings."))
 
     if share_amount <= 0 and member_fee_amount <= 0:
-        # print("[ERROR] Both credit amounts are zero or invalid.", flush=True)
+
         frappe.throw(
             _("At least one credit amount must be greater than zero."))
 
     if total_debit_amount <= 0:
-        # print("[ERROR] Total debit amount is invalid.", flush=True)
+
         frappe.throw(_("Total debit amount must be greater than zero."))
 
     try:
         if frappe.cache().get_value(lock_name):
-            # print(
-            # f"[LOCKED] Transaction already in progress for {entry_name}", flush=True)
+
             frappe.throw(
                 _("A fund transfer is already in progress for this Share Application."))
         frappe.cache().set_value(lock_name, frappe.session.user, expires_in_sec=120)
-        # print(f"[LOCK] Lock acquired for {entry_name}", flush=True)
+
     except frappe.ValidationError:
         raise
     except Exception as lock_error:
-        # print(
-        #     f"[WARN] Lock check failed, continuing: {str(lock_error)}", flush=True)
+
         pass
 
     try:
         doc = frappe.get_doc("Share Application", entry_name)
-        # print(f"[DOC] Loaded Share Application: {doc.name}", flush=True)
 
         if doc.docstatus != 0:
-            # print(
-            # f"[SKIP] Document {doc.name} is not draft. docstatus={doc.docstatus}", flush=True)
+
             return {
                 "status": "warning",
                 "message": "Only draft Share Application documents can be processed."
             }
 
         if doc.payment_status == "Success":
-            # print(
-            # f"[SKIP] Document {doc.name} already has payment_status=Success", flush=True)
+
             return {
                 "status": "warning",
                 "message": "This Share Application is already processed successfully."
@@ -428,11 +415,10 @@ def pay_now_share_application(entry_name):
 
         debit_account = str(doc.account_number).strip(
         ) if doc.account_number else ""
-        # print(f"[INFO] Debit account resolved: {debit_account}", flush=True)
 
         if not debit_account:
             error_message = "Account Number is missing on Share Application."
-            # print(f"[ERROR] {error_message}", flush=True)
+
             _set_share_application_error(
                 doc.name,
                 error_message,
@@ -448,8 +434,7 @@ def pay_now_share_application(entry_name):
         conn = None
         cursor = None
         try:
-            # print(
-            # f"[DB] Checking debit account status for {debit_account}", flush=True)
+
             conn = db_connection()
             cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
@@ -475,7 +460,7 @@ def pay_now_share_application(entry_name):
 
             if closed_account_row:
                 error_message = f"Debit account number is closed: {debit_account}"
-                # print(f"[ERROR] {error_message}", flush=True)
+
                 _set_share_application_error(
                     doc.name,
                     error_message,
@@ -488,8 +473,6 @@ def pay_now_share_application(entry_name):
                     "message": error_message
                 }
 
-            # print(
-                # f"[DB] Checking balance for debit account {debit_account}", flush=True)
             balance_query = """
                 SELECT
                     g.foracid,
@@ -505,7 +488,7 @@ def pay_now_share_application(entry_name):
 
             if not balance_row:
                 error_message = f"Debit account not found or inactive: {debit_account}"
-                # print(f"[ERROR] {error_message}", flush=True)
+
                 _set_share_application_error(
                     doc.name,
                     error_message,
@@ -519,17 +502,13 @@ def pay_now_share_application(entry_name):
                 }
 
             available_balance = float(balance_row.get("clr_bal_amt") or 0)
-            # print(
-            #     # f"[BALANCE] Account={debit_account}, available_balance={available_balance}, required={total_debit_amount}",
-            #     flush=True
-            # )
 
             if available_balance < float(total_debit_amount):
                 error_message = (
                     f"Insufficient balance in debit account {debit_account}. "
                     f"Available balance is {available_balance}, required amount is {total_debit_amount}."
                 )
-                # print(f"[ERROR] {error_message}", flush=True)
+
                 _set_share_application_error(
                     doc.name,
                     error_message,
@@ -544,7 +523,7 @@ def pay_now_share_application(entry_name):
 
         except Exception as db_check_error:
             error_message = f"Debit account validation failed: {str(db_check_error)}"
-            # print(f"[ERROR] {error_message}", flush=True)
+
             _set_share_application_error(
                 doc.name,
                 error_message,
@@ -559,17 +538,13 @@ def pay_now_share_application(entry_name):
         finally:
             if cursor:
                 cursor.close()
-                # print("[DB] Validation cursor closed.", flush=True)
+
             if conn:
                 conn.close()
-                # print("[DB] Validation connection closed.", flush=True)
 
         current_date = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]
         guid = random.randint(1000000000, 9999999999)
         url = settings.finacle_api_url
-
-        # print(
-        # f"[API] Preparing XML for {doc.name}, RequestUUID={guid}", flush=True)
 
         xml_parts = []
         xml_parts.append(
@@ -626,8 +601,7 @@ def pay_now_share_application(entry_name):
 </FIXML>"""
 
         try:
-            # print(
-            # f"[API] Initiating request for {doc.name} to {url}", flush=True)
+
             response = requests.post(
                 url,
                 data=xml_data.encode("utf-8"),
@@ -635,12 +609,11 @@ def pay_now_share_application(entry_name):
                 verify=False,
                 timeout=(10, 30)
             )
-            # print(
-            #     f"[API] HTTP status code: {response.status_code}", flush=True)
+
             response.raise_for_status()
         except (Timeout, ReadTimeout):
             error_message = "Finacle API timeout occurred while processing the transaction. Transaction status is unknown; verify before retrying."
-            # print(f"[ERROR] {error_message}", flush=True)
+
             _set_share_application_error(
                 doc.name,
                 error_message,
@@ -654,7 +627,7 @@ def pay_now_share_application(entry_name):
             }
         except ConnectionError:
             error_message = "Unable to connect to Finacle API. Please verify network or server availability before retrying."
-            # print(f"[ERROR] {error_message}", flush=True)
+
             _set_share_application_error(
                 doc.name,
                 error_message,
@@ -668,7 +641,7 @@ def pay_now_share_application(entry_name):
             }
         except HTTPError:
             error_message = f"Finacle API returned HTTP {getattr(response, 'status_code', 'error')}. Response: {getattr(response, 'text', '')}"
-            # print(f"[ERROR] {error_message}", flush=True)
+
             _set_share_application_error(
                 doc.name,
                 error_message,
@@ -682,7 +655,6 @@ def pay_now_share_application(entry_name):
             }
 
         response_text = response.text or ""
-        # print(f"[API] Response received for {doc.name}", flush=True)
 
         response_text_lower = response_text.lower()
 
@@ -708,7 +680,7 @@ def pay_now_share_application(entry_name):
             res_dict = xmltodict.parse(response_text)
         except Exception:
             error_message = f"Unable to parse Finacle API response. Raw response: {response_text}"
-            # print(f"[ERROR] {error_message}", flush=True)
+
             _set_share_application_error(
                 doc.name,
                 error_message,
@@ -733,11 +705,6 @@ def pay_now_share_application(entry_name):
 
         status = (host_transaction.get("Status") or "").strip().upper()
         transaction_id = (trn_identifier.get("TrnId") or "").strip()
-
-        # print(
-        #     # f"[RESULT] Parsed response for {doc.name}: status={status}, transaction_id={transaction_id}",
-        #     flush=True
-        # )
 
         if status == "SUCCESS" and transaction_id:
             frappe.db.set_value(
@@ -764,13 +731,10 @@ def pay_now_share_application(entry_name):
 
             submitted_doc = frappe.get_doc("Share Application", doc.name)
             if submitted_doc.docstatus == 0:
-                # print(
-                # f"[SUBMIT] Submitting Share Application {doc.name}", flush=True)
+
                 submitted_doc.submit()
 
             frappe.db.commit()
-            # print(
-            #     f"[SUCCESS] Transaction completed for {doc.name}", flush=True)
 
             return {
                 "status": "success",
@@ -779,7 +743,7 @@ def pay_now_share_application(entry_name):
             }
 
         error_message = response_text or "Finacle API did not return a success status."
-        # print(f"[ERROR] API business failure for {doc.name}", flush=True)
+
         _set_share_application_error(
             doc.name,
             error_message,
@@ -799,8 +763,7 @@ def pay_now_share_application(entry_name):
         frappe.db.rollback()
         frappe.log_error(frappe.get_traceback(),
                          "Share Application Pay Now Failed")
-        # print(
-        #     f"[FATAL] pay_now_share_application failed for {entry_name}: {str(e)}", flush=True)
+
         try:
             _set_share_application_error(
                 entry_name,
@@ -818,7 +781,7 @@ def pay_now_share_application(entry_name):
     finally:
         try:
             frappe.cache().delete_value(lock_name)
-            # print(f"[LOCK] Released lock for {entry_name}", flush=True)
+
         except Exception:
             pass
 
