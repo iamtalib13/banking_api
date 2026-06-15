@@ -299,7 +299,8 @@ def hourly_share_application_sync():
     if (settings.sync_timing or "").strip() != "Hourly":
         return
 
-    run_share_application_sync()
+    # run_share_application_sync()
+    run_share_application_sync_and_payment()
 
 
 def daily_share_application_sync():
@@ -311,7 +312,8 @@ def daily_share_application_sync():
     if (settings.sync_timing or "").strip() != "Daily":
         return
 
-    run_share_application_sync()
+    # run_share_application_sync()
+    run_share_application_sync_and_payment()
 
 
 def _set_share_application_error(
@@ -980,3 +982,28 @@ def process_bulk_record():
 
                 time.sleep(5)
                 batch_start = time.time()
+
+
+def run_share_application_sync_and_payment():
+    sync_result = run_share_application_sync()
+
+    if not isinstance(sync_result, dict):
+        return {
+            "status": "warning",
+            "message": "Sync did not return a valid response. Bulk payment was not started."
+        }
+
+    if sync_result.get("status") != "success":
+        return {
+            "status": "warning",
+            "message": "Share Application sync did not complete successfully. Bulk payment was not started.",
+            "sync_result": sync_result
+        }
+
+    payment_result = run_bulk_share_application_payment()
+
+    return {
+        "status": "success" if payment_result.get("status") == "success" else "warning",
+        "sync_result": sync_result,
+        "payment_result": payment_result
+    }
