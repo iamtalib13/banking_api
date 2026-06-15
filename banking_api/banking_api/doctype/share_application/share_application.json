@@ -21,7 +21,9 @@
   "insufficient_balance",
   "account_closed",
   "account_frozen",
-  "account_not_found"
+  "account_not_found",
+  "retry_attempted",
+  "last_retry_attempted"
  ],
  "fields": [
   {
@@ -133,13 +135,23 @@
    "fieldname": "account_not_found",
    "fieldtype": "Check",
    "label": "Account Not Found"
+  },
+  {
+   "fieldname": "retry_attempted",
+   "fieldtype": "Int",
+   "label": "Retry Attempted"
+  },
+  {
+   "fieldname": "last_retry_attempted",
+   "fieldtype": "Datetime",
+   "label": "Last Retry Attempted"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-06-15 16:59:58.847951",
+ "modified": "2026-06-15 17:10:43.757517",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Share Application",
