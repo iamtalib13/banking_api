@@ -1,49 +1,108 @@
 frappe.ui.form.on("Share Application", {
+	// refresh(frm) {
+	// 	if (frm.is_new()) return;
+
+	// 	if (frm.doc.payment_status === "Success") {
+	// 		frm.add_custom_button(__("Print Share Certificate"), function () {
+	// 			open_share_certificate_dialog(frm);
+	// 		});
+
+	// 		frm.change_custom_button_type(__("Print Share Certificate"), null, "primary");
+	// 	}
+
+	// 	const can_pay = frm.doc.docstatus === 0 && frm.doc.payment_status !== "Success";
+	// 	if (!can_pay) return;
+
+	// 	frm.add_custom_button(__("Pay Now"), function () {
+	// 		frappe.confirm(
+	// 			__("Are you sure you want to initiate the fund transfer for this Share Application?"),
+	// 			function () {
+	// 				frappe.call({
+	// 					method: "banking_api.banking_api.doctype.share_application_settings.share_application_settings.pay_now_share_application",
+	// 					args: {
+	// 						entry_name: frm.doc.name
+	// 					},
+	// 					freeze: true,
+	// 					freeze_message: __("Initiating fund transfer..."),
+	// 					callback: function (r) {
+	// 						if (r.message) {
+	// 							frappe.msgprint({
+	// 								title: __("Fund Transfer Result"),
+	// 								message: r.message.message || __("Process completed."),
+	// 								indicator:
+	// 									r.message.status === "success"
+	// 										? "green"
+	// 										: (r.message.status === "warning" ? "orange" : "red")
+	// 							});
+	// 						}
+	// 						frm.reload_doc();
+	// 					}
+	// 				});
+	// 			}
+	// 		);
+	// 	});
+
+	// 	frm.change_custom_button_type(__("Pay Now"), null, "primary");
+	// }
+
 	refresh(frm) {
-		if (frm.is_new()) return;
+        if (frm.is_new()) return;
 
-		if (frm.doc.payment_status === "Success") {
-			frm.add_custom_button(__("Print Share Certificate"), function () {
-				open_share_certificate_dialog(frm);
-			});
+        if (frm.doc.docstatus === 1) {
+            setTimeout(() => {
+                frm.page.wrapper.find('[data-label="Cancel"]').each(function () {
+                    $(this).closest('button, a, .menu-item, li').hide();
+                    $(this).closest('button, a, .menu-item, li').remove();
+                });
 
-			frm.change_custom_button_type(__("Print Share Certificate"), null, "primary");
-		}
+                frm.page.actions.find('[data-label="Cancel"]').parent().parent().remove();
+                frm.page.btn_secondary.find('[data-label="Cancel"]').hide();
+                frm.page.btn_secondary.hide();
+            }, 10);
+        }
 
-		const can_pay = frm.doc.docstatus === 0 && frm.doc.payment_status !== "Success";
-		if (!can_pay) return;
+        if (frm.doc.payment_status === "Success") {
+            frm.add_custom_button(__("Print Share Certificate"), function () {
+                open_share_certificate_dialog(frm);
+            });
 
-		frm.add_custom_button(__("Pay Now"), function () {
-			frappe.confirm(
-				__("Are you sure you want to initiate the fund transfer for this Share Application?"),
-				function () {
-					frappe.call({
-						method: "banking_api.banking_api.doctype.share_application_settings.share_application_settings.pay_now_share_application",
-						args: {
-							entry_name: frm.doc.name
-						},
-						freeze: true,
-						freeze_message: __("Initiating fund transfer..."),
-						callback: function (r) {
-							if (r.message) {
-								frappe.msgprint({
-									title: __("Fund Transfer Result"),
-									message: r.message.message || __("Process completed."),
-									indicator:
-										r.message.status === "success"
-											? "green"
-											: (r.message.status === "warning" ? "orange" : "red")
-								});
-							}
-							frm.reload_doc();
-						}
-					});
-				}
-			);
-		});
+            frm.change_custom_button_type(__("Print Share Certificate"), null, "primary");
+        }
 
-		frm.change_custom_button_type(__("Pay Now"), null, "primary");
-	}
+        const can_pay = frm.doc.docstatus === 0 && frm.doc.payment_status !== "Success";
+        if (!can_pay) return;
+
+        frm.add_custom_button(__("Pay Now"), function () {
+            frappe.confirm(
+                __("Are you sure you want to initiate the fund transfer for this Share Application?"),
+                function () {
+                    frappe.call({
+                        method: "banking_api.banking_api.doctype.share_application_settings.share_application_settings.pay_now_share_application",
+                        args: {
+                            entry_name: frm.doc.name
+                        },
+                        freeze: true,
+                        freeze_message: __("Initiating fund transfer..."),
+                        callback: function (r) {
+                            if (r.message) {
+                                frappe.msgprint({
+                                    title: __("Fund Transfer Result"),
+                                    message: r.message.message || __("Process completed."),
+                                    indicator:
+                                        r.message.status === "success"
+                                            ? "green"
+                                            : (r.message.status === "warning" ? "orange" : "red")
+                                });
+                            }
+                            frm.reload_doc();
+                        }
+                    });
+                }
+            );
+        });
+
+        frm.change_custom_button_type(__("Pay Now"), null, "primary");
+    }
 });
 
 function open_share_certificate_dialog(frm) {
