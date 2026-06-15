@@ -20,7 +20,8 @@
   "payment_status",
   "insufficient_balance",
   "account_closed",
-  "account_frozen"
+  "account_frozen",
+  "account_not_found"
  ],
  "fields": [
   {
@@ -126,13 +127,19 @@
    "fieldtype": "Check",
    "label": "Account Frozen",
    "search_index": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "account_not_found",
+   "fieldtype": "Check",
+   "label": "Account Not Found"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-06-13 12:10:21.667835",
+ "modified": "2026-06-15 16:59:58.847951",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Share Application",
