@@ -290,30 +290,30 @@ def run_share_application_sync_manual():
     return run_share_application_sync()
 
 
-def hourly_share_application_sync():
-    settings = frappe.get_single("Share Application Settings")
+# def hourly_share_application_sync():
+#     settings = frappe.get_single("Share Application Settings")
 
-    if not settings.enable_sync:
-        return
+#     if not settings.enable_sync:
+#         return
 
-    if (settings.sync_timing or "").strip() != "Hourly":
-        return
+#     if (settings.sync_timing or "").strip() != "Hourly":
+#         return
 
-    # run_share_application_sync()
-    run_share_application_sync_and_payment()
+#     # run_share_application_sync()
+#     run_share_application_sync_and_payment()
 
 
-def daily_share_application_sync():
-    settings = frappe.get_single("Share Application Settings")
+# def daily_share_application_sync():
+#     settings = frappe.get_single("Share Application Settings")
 
-    if not settings.enable_sync:
-        return
+#     if not settings.enable_sync:
+#         return
 
-    if (settings.sync_timing or "").strip() != "Daily":
-        return
+#     if (settings.sync_timing or "").strip() != "Daily":
+#         return
 
-    # run_share_application_sync()
-    run_share_application_sync_and_payment()
+#     # run_share_application_sync()
+#     run_share_application_sync_and_payment()
 
 
 def _set_share_application_error(
