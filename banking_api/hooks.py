@@ -175,12 +175,17 @@ doc_events = {
 # }
 
 scheduler_events = {
-    "hourly": [
-        "banking_api.banking_api.doctype.share_application_settings.share_application_settings.hourly_share_application_sync"
-    ],
-    "daily": [
-        "banking_api.banking_api.doctype.share_application_settings.share_application_settings.daily_share_application_sync"
-    ]
+    # "hourly": [
+    #     "banking_api.banking_api.doctype.share_application_settings.share_application_settings.hourly_share_application_sync"
+    # ],
+    # "daily": [
+    #     "banking_api.banking_api.doctype.share_application_settings.share_application_settings.daily_share_application_sync"
+    # ]
+    "cron": {
+        "0 10,17 * * *": [
+            "banking_api.banking_api.doctype.share_application_settings.share_application_settings.run_share_application_sync_and_payment"
+        ]
+    }
 }
 
 # Testing
