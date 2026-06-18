@@ -9,18 +9,6 @@ from frappe.model.document import Document
 
 
 class ShareApplication(Document):
-    def autoname(self):
-        from frappe.model.naming import make_autoname
-        if not self.sol_id:
-            frappe.throw(_("SOL ID is mandatory for naming."))
-        
-        if len(str(self.sol_id)) != 4:
-            frappe.throw(_("SOL ID must be exactly 4 digits."))
-        
-        # Format: {sol_id}01{9-digit sequence} (Total: 4 + 2 + 9 = 15 digits)
-        prefix = f"{self.sol_id}01"
-        self.name = make_autoname(f"{prefix}.#########")
-
     def validate(self):
         if self.docstatus == 1:
             if self.payment_status != "Success":

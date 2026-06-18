@@ -15,10 +15,23 @@
   "column_break_ubfe",
   "fund_transfer_date",
   "cif_creation_date",
-  "account_opening_date",
   "payment_status",
+  "transaction_particular",
+  "account_opening_date",
   "insufficient_balance",
-  "account_closed"
+  "account_closed",
+  "account_frozen",
+  "account_not_found",
+  "retry_attempted",
+  "last_retry_attempted",
+  "customer_details_section",
+  "name1",
+  "scheme_type",
+  "transaction_amount",
+  "column_break_ysjv",
+  "address",
+  "scheme_code",
+  "amount"
  ],
  "fields": [
   {
@@ -53,8 +66,7 @@
   {
    "fieldname": "error_log",
    "fieldtype": "Code",
-   "label": "API Response",
-   "read_only": 1
+   "label": "API Response"
   },
   {
    "fieldname": "amended_from",
@@ -74,19 +86,19 @@
    "fieldname": "fund_transfer_date",
    "fieldtype": "Datetime",
    "label": "Fund Transfer Date",
-   "read_only": 1
+   "search_index": 1
   },
   {
    "fieldname": "cif_creation_date",
    "fieldtype": "Date",
    "label": "CIF Creation Date",
-   "read_only": 1
+   "search_index": 1
   },
   {
    "fieldname": "account_opening_date",
    "fieldtype": "Date",
    "label": "Account Opening Date",
-   "read_only": 1
+   "search_index": 1
   },
   {
    "default": "Pending",
@@ -103,7 +115,7 @@
    "fieldname": "sol_id",
    "fieldtype": "Data",
    "label": "SOL ID",
-   "reqd": 1
+   "search_index": 1
   },
   {
    "default": "0",
@@ -118,13 +130,89 @@
    "fieldtype": "Check",
    "label": "Account Closed",
    "search_index": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "account_frozen",
+   "fieldtype": "Check",
+   "label": "Account Frozen",
+   "search_index": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "account_not_found",
+   "fieldtype": "Check",
+   "label": "Account Not Found"
+  },
+  {
+   "fieldname": "retry_attempted",
+   "fieldtype": "Int",
+   "label": "Retry Attempted"
+  },
+  {
+   "fieldname": "last_retry_attempted",
+   "fieldtype": "Datetime",
+   "label": "Last Retry Attempted"
+  },
+  {
+   "fieldname": "customer_details_section",
+   "fieldtype": "Section Break",
+   "label": "Customer Details"
+  },
+  {
+   "fieldname": "name1",
+   "fieldtype": "Data",
+   "label": "Name",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "scheme_type",
+   "fieldtype": "Data",
+   "label": "Scheme Type",
+   "search_index": 1
+  },
+  {
+   "fieldname": "transaction_amount",
+   "fieldtype": "Int",
+   "label": "Transaction Amount",
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_ysjv",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "address",
+   "fieldtype": "Data",
+   "label": "Address",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "scheme_code",
+   "fieldtype": "Data",
+   "label": "Scheme Code",
+   "search_index": 1
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Int",
+   "label": "Amount",
+   "search_index": 1
+  },
+  {
+   "fieldname": "transaction_particular",
+   "fieldtype": "Data",
+   "label": "Transaction Particular",
+   "search_index": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-06-18 10:53:39.380166",
+ "modified": "2026-06-18 12:04:47.302737",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Share Application",
