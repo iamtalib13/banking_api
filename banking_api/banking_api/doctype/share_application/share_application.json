@@ -1,7 +1,6 @@
 {
  "actions": [],
  "allow_import": 1,
- "autoname": "autoincrement",
  "creation": "2026-05-25 11:32:11.692402",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -19,11 +18,7 @@
   "account_opening_date",
   "payment_status",
   "insufficient_balance",
-  "account_closed",
-  "account_frozen",
-  "account_not_found",
-  "retry_attempted",
-  "last_retry_attempted"
+  "account_closed"
  ],
  "fields": [
   {
@@ -58,7 +53,8 @@
   {
    "fieldname": "error_log",
    "fieldtype": "Code",
-   "label": "API Response"
+   "label": "API Response",
+   "read_only": 1
   },
   {
    "fieldname": "amended_from",
@@ -78,19 +74,19 @@
    "fieldname": "fund_transfer_date",
    "fieldtype": "Datetime",
    "label": "Fund Transfer Date",
-   "search_index": 1
+   "read_only": 1
   },
   {
    "fieldname": "cif_creation_date",
    "fieldtype": "Date",
    "label": "CIF Creation Date",
-   "search_index": 1
+   "read_only": 1
   },
   {
    "fieldname": "account_opening_date",
    "fieldtype": "Date",
    "label": "Account Opening Date",
-   "search_index": 1
+   "read_only": 1
   },
   {
    "default": "Pending",
@@ -107,7 +103,7 @@
    "fieldname": "sol_id",
    "fieldtype": "Data",
    "label": "SOL ID",
-   "search_index": 1
+   "reqd": 1
   },
   {
    "default": "0",
@@ -122,40 +118,16 @@
    "fieldtype": "Check",
    "label": "Account Closed",
    "search_index": 1
-  },
-  {
-   "default": "0",
-   "fieldname": "account_frozen",
-   "fieldtype": "Check",
-   "label": "Account Frozen",
-   "search_index": 1
-  },
-  {
-   "default": "0",
-   "fieldname": "account_not_found",
-   "fieldtype": "Check",
-   "label": "Account Not Found"
-  },
-  {
-   "fieldname": "retry_attempted",
-   "fieldtype": "Int",
-   "label": "Retry Attempted"
-  },
-  {
-   "fieldname": "last_retry_attempted",
-   "fieldtype": "Datetime",
-   "label": "Last Retry Attempted"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-06-15 17:10:43.757517",
+ "modified": "2026-06-18 10:53:39.380166",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Share Application",
- "naming_rule": "Autoincrement",
  "owner": "Administrator",
  "permissions": [
   {
