@@ -117,7 +117,8 @@ function open_share_certificate_dialog(frm) {
 		from_no: "1",
 		to_no: "1",
 		rs: "10",
-		issued_date: frm.doc.cif_creation_date || today
+		// issued_date: frm.doc.cif_creation_date || today
+		issued_date: frappe.datetime.str_to_user(frm.doc.cif_creation_date)
 	};
 
 	const positions = {
