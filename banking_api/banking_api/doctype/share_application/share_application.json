@@ -16,7 +16,6 @@
   "fund_transfer_date",
   "cif_creation_date",
   "payment_status",
-  "transaction_particular",
   "account_opening_date",
   "insufficient_balance",
   "account_closed",
@@ -25,13 +24,12 @@
   "retry_attempted",
   "last_retry_attempted",
   "customer_details_section",
-  "name1",
+  "customer_name",
   "scheme_type",
   "transaction_amount",
   "column_break_ysjv",
   "address",
-  "scheme_code",
-  "amount"
+  "scheme_code"
  ],
  "fields": [
   {
@@ -112,6 +110,7 @@
    "search_index": 1
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "sol_id",
    "fieldtype": "Data",
    "label": "SOL ID",
@@ -160,13 +159,6 @@
    "label": "Customer Details"
   },
   {
-   "fieldname": "name1",
-   "fieldtype": "Data",
-   "label": "Name",
-   "reqd": 1,
-   "search_index": 1
-  },
-  {
    "fieldname": "scheme_type",
    "fieldtype": "Data",
    "label": "Scheme Type",
@@ -184,10 +176,9 @@
   },
   {
    "fieldname": "address",
-   "fieldtype": "Data",
+   "fieldtype": "Small Text",
    "label": "Address",
-   "reqd": 1,
-   "search_index": 1
+   "reqd": 1
   },
   {
    "fieldname": "scheme_code",
@@ -196,15 +187,10 @@
    "search_index": 1
   },
   {
-   "fieldname": "amount",
-   "fieldtype": "Int",
-   "label": "Amount",
-   "search_index": 1
-  },
-  {
-   "fieldname": "transaction_particular",
+   "fieldname": "customer_name",
    "fieldtype": "Data",
-   "label": "Transaction Particular",
+   "label": "Customer Name",
+   "reqd": 1,
    "search_index": 1
   }
  ],
@@ -212,7 +198,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-06-18 12:04:47.302737",
+ "modified": "2026-06-19 16:03:55.346671",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Share Application",
