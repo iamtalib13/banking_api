@@ -1805,6 +1805,55 @@
             return "unknown";
         }
 
+
+        function pad2(value) {
+            return String(value).padStart(2, "0");
+        }
+
+        function parseDateValue(value) {
+            if (!value) return null;
+
+            let cleaned = String(value).trim();
+            if (!cleaned) return null;
+
+            if (cleaned.includes(".")) {
+                cleaned = cleaned.split(".")[0];
+            }
+
+            const m = cleaned.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/);
+            if (m) {
+                return new Date(
+                    Number(m[1]),
+                    Number(m[2]) - 1,
+                    Number(m[3]),
+                    Number(m[4] || 0),
+                    Number(m[5] || 0),
+                    Number(m[6] || 0)
+                );
+            }
+
+            const dt = new Date(cleaned.replace(" ", "T"));
+            return isNaN(dt.getTime()) ? null : dt;
+        }
+
+        function formatDate(value) {
+            if (!value) return "-";
+
+            const dt = parseDateValue(value);
+            if (!dt) return String(value);
+
+            return `${pad2(dt.getDate())}-${pad2(dt.getMonth() + 1)}-${dt.getFullYear()}`;
+        }
+
+        function formatDateTime(value) {
+            if (!value) return "-";
+
+            const dt = parseDateValue(value);
+            if (!dt) return String(value);
+
+            return `${pad2(dt.getDate())}-${pad2(dt.getMonth() + 1)}-${dt.getFullYear()}`;
+        }
+
         function getStatusLabel(row) {
             if (String(row.payment_status || "").trim() === "Success") return "Success";
             if (cintLike(row.insufficient_balance) === 1) return "Insufficient balance";
@@ -2684,9 +2733,13 @@
             }
 
             if (text) {
-                if (fromDate && toDate) text.textContent = `${fromDate} to ${toDate}`;
-                else if (fromDate) text.textContent = `From ${fromDate}`;
-                else if (toDate) text.textContent = `Up to ${toDate}`;
+                // if (fromDate && toDate) text.textContent = `${fromDate} to ${toDate}`;
+                // else if (fromDate) text.textContent = `From ${fromDate}`;
+                // else if (toDate) text.textContent = `Up to ${toDate}`;
+                // else text.textContent = "No date selected";
+                if (fromDate && toDate) text.textContent = `${formatDate(fromDate)} to ${formatDate(toDate)}`;
+                else if (fromDate) text.textContent = `From ${formatDate(fromDate)}`;
+                else if (toDate) text.textContent = `Up to ${formatDate(toDate)}`;
                 else text.textContent = "No date selected";
             }
         }
@@ -2882,10 +2935,14 @@
                         csvSafe(getStatusLabel(row)),
                         csvSafe(cintLike(row.insufficient_balance)),
                         csvSafe(cintLike(row.account_closed)),
-                        csvSafe(row.fund_transfer_date),
-                        csvSafe(row.cif_creation_date),
-                        csvSafe(row.account_opening_date),
-                        csvSafe(row.modified),
+                        // csvSafe(row.fund_transfer_date),
+                        // csvSafe(row.cif_creation_date),
+                        // csvSafe(row.account_opening_date),
+                        // csvSafe(row.modified),
+                        csvSafe(formatDateTime(row.fundtransferdate)),
+                        csvSafe(formatDate(row.cifcreationdate)),
+                        csvSafe(formatDate(row.accountopeningdate)),
+                        csvSafe(formatDateTime(row.modified)),
                         csvSafe(row.error_log)
                     ].join(","));
                 });
