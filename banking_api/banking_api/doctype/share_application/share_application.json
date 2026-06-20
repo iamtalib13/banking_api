@@ -176,7 +176,7 @@
   },
   {
    "fieldname": "address",
-   "fieldtype": "Small Text",
+   "fieldtype": "Long Text",
    "label": "Address",
    "reqd": 1
   },
@@ -198,7 +198,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-06-19 16:03:55.346671",
+ "modified": "2026-06-19 23:18:46.358340",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Share Application",
