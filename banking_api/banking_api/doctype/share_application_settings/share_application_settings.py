@@ -875,7 +875,6 @@ def pay_now_share_application(entry_name):
                     "insufficient_balance": 0,
                     "account_frozen": 0,
                     "transaction_amount": total_debit_amount
-
                 },
                 update_modified=True
             )
