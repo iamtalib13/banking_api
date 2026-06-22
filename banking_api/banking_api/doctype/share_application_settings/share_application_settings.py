@@ -377,7 +377,8 @@ def run_share_application_sync():
                     doc.account_number = foracid
                     doc.sol_id = sol_id
                     doc.cif_creation_date = cif_opening_date
-                    doc.payment_status = "Pending"
+                    # doc.payment_status = "Pending"
+                    doc.status = "Pending"
 
                     doc.customer_name = row.get(
                         "customer_name") or row.get("acct_name") or ""
