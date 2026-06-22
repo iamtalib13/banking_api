@@ -357,13 +357,36 @@ def run_share_application_sync():
                     )
                     continue
 
+                # try:
+                #     doc = frappe.new_doc("Share Application")
+                #     doc.cif = cif_id
+                #     doc.account_number = foracid
+                #     doc.sol_id = sol_id
+                #     doc.cif_creation_date = cif_opening_date
+                #     doc.status = "Pending"
+                #     doc.insert(ignore_permissions=True)
+
+                #     frappe.db.commit()
+
+                #     existing_cifs.add(cif_id_str)
+                #     created_count += 1
+
                 try:
                     doc = frappe.new_doc("Share Application")
                     doc.cif = cif_id
                     doc.account_number = foracid
                     doc.sol_id = sol_id
                     doc.cif_creation_date = cif_opening_date
-                    doc.status = "Pending"
+                    doc.payment_status = "Pending"
+
+                    doc.customer_name = row.get(
+                        "customer_name") or row.get("acct_name") or ""
+                    doc.address = row.get("address") or ""
+                    doc.scheme_code = row.get("schm_code") or ""
+                    doc.scheme_type = row.get("schm_type") or ""
+                    doc.account_opening_date = row.get("acct_opn_date")
+                    # doc.transaction_amount = row.get("clr_bal_amt") or 0
+
                     doc.insert(ignore_permissions=True)
 
                     frappe.db.commit()
@@ -850,7 +873,9 @@ def pay_now_share_application(entry_name):
                     "error_log": "",
                     "account_closed": 0,
                     "insufficient_balance": 0,
-                    "account_frozen": 0
+                    "account_frozen": 0,
+                    "transaction_amount": total_debit_amount
+
                 },
                 update_modified=True
             )
