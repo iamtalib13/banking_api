@@ -2902,48 +2902,92 @@
                 const exportCount = Array.isArray(rows) ? rows.length : 0;
                 showExportLoader(`Finalizing CSV for ${formatNumber(exportCount)} records…`);
 
+                // const headers = [
+                //     "Application ID",
+                //     "SOL ID",
+                //     "SOL Description",
+                //     "CIF",
+                //     "Account Number",
+                //     "Transaction ID",
+                //     "Payment Status",
+                //     "Status Label",
+                //     "Insufficient Balance",
+                //     "Account Closed",
+                //     "Fund Transfer Date",
+                //     "CIF Creation Date",
+                //     "Account Opening Date",
+                //     "Modified",
+                //     "Error Log"
+                // ];
+
+                // const lines = [headers.join(",")];
+
+                // (rows || []).forEach(r => {
+                //     const row = normalizeRecord(r);
+                //     lines.push([
+                //         csvSafe(row.name),
+                //         csvSafe(row.sol_id),
+                //         csvSafe(r.sol_desc || ""),
+                //         csvSafe(row.cif),
+                //         csvSafe(row.account_number),
+                //         csvSafe(row.transaction_id),
+                //         csvSafe(row.payment_status),
+                //         csvSafe(getStatusLabel(row)),
+                //         csvSafe(cintLike(row.insufficient_balance)),
+                //         csvSafe(cintLike(row.account_closed)),
+                //         // csvSafe(row.fund_transfer_date),
+                //         // csvSafe(row.cif_creation_date),
+                //         // csvSafe(row.account_opening_date),
+                //         // csvSafe(row.modified),
+                //         csvSafe(formatDateTime(row.fundtransferdate)),
+                //         csvSafe(formatDate(row.cifcreationdate)),
+                //         csvSafe(formatDate(row.accountopeningdate)),
+                //         csvSafe(formatDateTime(row.modified)),
+                //         csvSafe(row.error_log)
+                //     ].join(","));
+                // });
+
                 const headers = [
-                    "Application ID",
                     "SOL ID",
                     "SOL Description",
+                    "Customer Name",
                     "CIF",
                     "Account Number",
-                    "Transaction ID",
-                    "Payment Status",
-                    "Status Label",
-                    "Insufficient Balance",
-                    "Account Closed",
-                    "Fund Transfer Date",
-                    "CIF Creation Date",
                     "Account Opening Date",
-                    "Modified",
-                    "Error Log"
+                    "Scheme Code",
+                    "Scheme Type",
+                    "Transaction ID",
+                    "Transaction Amount",
+                    "Fund Transfer Date",
+                    "Payment Status",
+                    "Failed Reason",
+                    "CIF Creation Date",
+                    "Address",
+                    "API Response",
+                    // "Modified"
                 ];
 
                 const lines = [headers.join(",")];
 
                 (rows || []).forEach(r => {
-                    const row = normalizeRecord(r);
                     lines.push([
-                        csvSafe(row.name),
-                        csvSafe(row.sol_id),
-                        csvSafe(r.sol_desc || ""),
-                        csvSafe(row.cif),
-                        csvSafe(row.account_number),
-                        csvSafe(row.transaction_id),
-                        csvSafe(row.payment_status),
-                        csvSafe(getStatusLabel(row)),
-                        csvSafe(cintLike(row.insufficient_balance)),
-                        csvSafe(cintLike(row.account_closed)),
-                        // csvSafe(row.fund_transfer_date),
-                        // csvSafe(row.cif_creation_date),
-                        // csvSafe(row.account_opening_date),
-                        // csvSafe(row.modified),
-                        csvSafe(formatDateTime(row.fundtransferdate)),
-                        csvSafe(formatDate(row.cifcreationdate)),
-                        csvSafe(formatDate(row.accountopeningdate)),
-                        csvSafe(formatDateTime(row.modified)),
-                        csvSafe(row.error_log)
+                        csvSafe(r.sol_id ?? "Nil"),
+                        csvSafe(r.sol_desc ?? "Nil"),
+                        csvSafe(r.customer_name ?? "Nil"),
+                        csvSafe(r.cif ?? "Nil"),
+                        csvSafe(r.account_number ?? "Nil"),
+                        csvSafe(r.account_opening_date ?? "Nil"),
+                        csvSafe(r.scheme_code ?? "Nil"),
+                        csvSafe(r.scheme_type ?? "Nil"),
+                        csvSafe(r.transaction_id ?? "Nil"),
+                        csvSafe(r.transaction_amount ?? "Nil"),
+                        csvSafe(r.fund_transfer_date ?? "Nil"),
+                        csvSafe(r.payment_status ?? "Nil"),
+                        csvSafe(r.failed_reason ?? "Nil"),
+                        csvSafe(r.cif_creation_date ?? "Nil"),
+                        csvSafe(r.address ?? "Nil"),
+                        csvSafe(r.api_response ?? "Nil"),
+                        // csvSafe(r.modified ?? "Nil")
                     ].join(","));
                 });
 
