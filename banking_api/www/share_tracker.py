@@ -2,6 +2,112 @@ import json
 import frappe
 from frappe.utils import cint
 
+import json
+import frappe
+from frappe import _
+from frappe.utils import cint
+
+ALLOWED_ROLE = "Share Admin"
+CACHE_TTL = 20
+SOL_DESC_TTL = 4 * 24 * 60 * 60
+
+
+def get_current_user():
+    return (frappe.session.user or "").strip()
+
+
+def get_user_roles(user=None):
+    user = (user or get_current_user()).strip()
+    if not user or user == "Guest":
+        return set()
+    return set(frappe.get_roles(user) or [])
+
+
+def has_share_tracker_access(user=None):
+    user = (user or get_current_user()).strip()
+
+    if not user or user == "Guest":
+        return False
+
+    if user == "Administrator":
+        return True
+
+    return ALLOWED_ROLE in get_user_roles(user)
+
+
+def validate_share_tracker_access():
+    user = get_current_user()
+
+    if not user or user == "Guest":
+        frappe.throw(_("Please login to access Share Fund Tracker."),
+                     frappe.PermissionError)
+
+    if user == "Administrator":
+        return
+
+    if ALLOWED_ROLE not in get_user_roles(user):
+        frappe.throw(
+            _("You are not authorized to access Share Fund Tracker."), frappe.PermissionError)
+
+
+def get_avatar_from_name(full_name):
+    full_name = (full_name or "").strip()
+    if not full_name:
+        return "U"
+
+    parts = [p for p in full_name.split() if p]
+    if not parts:
+        return "U"
+
+    if len(parts) == 1:
+        return parts[0][0].upper()
+
+    return (parts[0][0] + parts[-1][0]).upper()
+
+
+def get_context(context):
+    user = get_current_user()
+    access = has_share_tracker_access(user)
+
+    context.no_cache = 1
+    context.current_user = user
+    context.user_roles = list(get_user_roles(user))
+    context.has_share_tracker_access = access
+
+    if not user or user == "Guest":
+        context.user_display_name = "Guest"
+        context.user_employee_id = "Guest"
+        context.user_avatar = "🔒"
+        return context
+
+    if access:
+        employee = frappe.db.get_value(
+            "Employee",
+            {"user_id": user},
+            ["employee_name", "name"],
+            as_dict=True
+        )
+
+        if employee:
+            display_name = (employee.get("employee_name")
+                            or "").strip() or user
+            employee_id = employee.get("name") or user
+        else:
+            display_name = frappe.db.get_value(
+                "User", user, "full_name") or user
+            employee_id = frappe.db.get_value("User", user, "username") or user
+
+        context.user_display_name = display_name
+        context.user_employee_id = employee_id
+        context.user_avatar = get_avatar_from_name(display_name)
+    else:
+        context.user_display_name = "Access Restricted"
+        context.user_employee_id = user
+        context.user_avatar = "🔒"
+
+    return context
+
+
 CACHE_TTL = 20
 
 
@@ -66,60 +172,42 @@ def get_avatar_from_name(full_name):
     return (parts[0][0] + parts[-1][0]).upper()
 
 
-def get_context(context):
-    user = frappe.session.user
+# def get_context(context):
+#     user = frappe.session.user
 
-    context.user_display_name = "Unknown User"
-    context.user_employee_id = user
-    context.user_avatar = "U"
+#     context.user_display_name = "Unknown User"
+#     context.user_employee_id = user
+#     context.user_avatar = "U"
 
-    if not user or user == "Guest":
-        return context
+#     if not user or user == "Guest":
+#         return context
 
-    employee = frappe.db.get_value(
-        "Employee",
-        {"user_id": user},
-        ["employee_name", "name"],
-        as_dict=True
-    )
+#     employee = frappe.db.get_value(
+#         "Employee",
+#         {"user_id": user},
+#         ["employee_name", "name"],
+#         as_dict=True
+#     )
 
-    if employee:
-        display_name = (employee.get("employee_name") or "").strip() or user
-        employee_id = employee.get("name") or user
+#     if employee:
+#         display_name = (employee.get("employee_name") or "").strip() or user
+#         employee_id = employee.get("name") or user
 
-        context.user_display_name = display_name
-        context.user_employee_id = employee_id
-        context.user_avatar = get_avatar_from_name(display_name)
-    else:
-        fallback_name = frappe.db.get_value("User", user, "full_name") or user
-        context.user_display_name = fallback_name
-        context.user_employee_id = user
-        context.user_avatar = get_avatar_from_name(fallback_name)
+#         context.user_display_name = display_name
+#         context.user_employee_id = employee_id
+#         context.user_avatar = get_avatar_from_name(display_name)
+#     else:
+#         fallback_name = frappe.db.get_value("User", user, "full_name") or user
+#         context.user_display_name = fallback_name
+#         context.user_employee_id = user
+#         context.user_avatar = get_avatar_from_name(fallback_name)
 
-    return context
-
-
-# @frappe.whitelist()
-# def get_share_tracker_counts():
-#     cache_key = _make_cache_key("counts")
-#     cached = _cache().get_value(cache_key)
-#     if cached:
-#         return cached
-
-#     data = {
-#         "total": frappe.db.count("Share Application"),
-#         "pending": frappe.db.count("Share Application", {"payment_status": "Pending"}),
-#         "success": frappe.db.count("Share Application", {"payment_status": "Success"}),
-#         "insuf": frappe.db.count("Share Application", {"insufficient_balance": 1}),
-#         "closed": frappe.db.count("Share Application", {"account_closed": 1}),
-#     }
-
-#     _cache().set_value(cache_key, data, expires_in_sec=CACHE_TTL)
-#     return data
+#     return context
 
 
 @frappe.whitelist()
 def get_share_tracker_counts():
+    validate_share_tracker_access()
     cache_key = _make_cache_key("counts")
     cached = _cache().get_value(cache_key)
     if cached:
@@ -141,6 +229,7 @@ def get_share_tracker_counts():
 
 @frappe.whitelist()
 def get_share_tracker_sol_ids(view="all", search=None):
+    validate_share_tracker_access()
     filters = {}
 
     if view == "pending":
@@ -204,6 +293,7 @@ def get_share_tracker_rows(
     sort_by="modified",
     sort_order="desc"
 ):
+    validate_share_tracker_access()
     page = cint(page) or 1
     page_length = cint(page_length) or 10
     page = max(page, 1)
@@ -371,6 +461,7 @@ def get_share_tracker_rows(
 
 @frappe.whitelist()
 def get_share_application_by_cif(cif):
+    validate_share_tracker_access()
     if not cif:
         frappe.throw("CIF is required")
 
@@ -746,6 +837,7 @@ def get_share_tracker_export_rows(
     sort_by="modified",
     sort_order="desc"
 ):
+    validate_share_tracker_access()
     allowed_sort_by = {
         "modified", "sol_id", "cif_creation_date",
         "fund_transfer_date", "creation", "name"
