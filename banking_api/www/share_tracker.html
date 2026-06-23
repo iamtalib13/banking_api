@@ -1363,15 +1363,6 @@
         <!-- TOPBAR -->
         <header class="topbar">
             <div class="topbar-left">
-                <!-- <a href="https://mysahayog.com/app/sahayog-home" class="logo">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <polygon points="10 2 2 7 2 17 10 18 18 17 18 7" />
-                        <line x1="10" y1="2" x2="10" y2="18" />
-                        <line x1="2" y1="12" x2="18" y2="12" />
-                    </svg>
-                    Acme Corp
-                </a> -->
                 <a href="https://mysahayog.com/app/sahayog-home" class="logo">
                     <img src="/assets/banking_api/images/sahayog_logo_2025.png" alt="Sahayog Logo" class="logo-img">
                 </a>
@@ -1383,13 +1374,6 @@
                 </nav>
             </div>
             <div class="topbar-right">
-                <!-- <button class="icon-btn" title="Notifications" aria-label="Notifications">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                        <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                    </svg>
-                </button> -->
                 <div class="avatar" id="topbarAvatar">{{ user_avatar or "U" }}</div>
                 <div class="user-meta">
                     <div class="user-name" id="topbarUserName">{{ user_display_name or "Unknown User" }}</div>
@@ -1496,15 +1480,6 @@
 
                 <!-- TAB BAR -->
                 <div class="tab-bar">
-                    <!-- <button class="tab active" data-tab="pending" onclick="switchTab('pending')">
-                        Pending <span class="tab-count" id="tc-pending">12</span>
-                    </button>
-                    <button class="tab" data-tab="insuf" onclick="switchTab('insuf')">
-                        Insufficient balance <span class="tab-count" id="tc-insuf">7</span>
-                    </button>
-                    <button class="tab" data-tab="closed" onclick="switchTab('closed')">
-                        Account closed <span class="tab-count" id="tc-closed">5</span>
-                    </button> -->
                     <button class="tab active" data-tab="all">All</button>
                     <button class="tab" data-tab="pending">Pending <span class="tab-count"
                             id="tc-pending">0</span></button>
@@ -1578,16 +1553,7 @@
                         </div>
                     </div>
 
-                    <!-- <button class="toolbar-btn" onclick="toggleDateFilter()">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="4" width="18" height="18" rx="2" />
-                            <line x1="16" y1="2" x2="16" y2="6" />
-                            <line x1="8" y1="2" x2="8" y2="6" />
-                            <line x1="3" y1="10" x2="21" y2="10" />
-                        </svg>
-                        Date range
-                    </button> -->
+                    <!-- DATE FILTER -->
                     <div class="filter-wrap" id="dateFilterWrap">
                         <button class="toolbar-btn" id="dateFilterBtn" onclick="toggleDateFilter()">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -1912,28 +1878,6 @@
             return sortDir === -1 ? "desc" : "asc";
         }
 
-        // function getCacheKey() {
-        //     return JSON.stringify({
-        //         tab: currentTab,
-        //         page: currentPage,
-        //         q: searchQ,
-        //         sol_ids: [...selectedSolIds].sort(),
-        //         sort_by: getSortBy(),
-        //         sort_order: getSortOrder()
-        //     });
-        // }
-
-        // function getCacheKeyForPage(pageNo) {
-        //     return JSON.stringify({
-        //         tab: currentTab,
-        //         page: pageNo,
-        //         q: searchQ,
-        //         sol_ids: [...selectedSolIds].sort(),
-        //         sort_by: getSortBy(),
-        //         sort_order: getSortOrder()
-        //     });
-        // }
-
         function getCacheKey() {
             return JSON.stringify({
                 tab: currentTab,
@@ -1959,27 +1903,6 @@
                 sort_order: getSortOrder()
             });
         }
-
-
-
-
-
-        // async function fetchRowsForPage(pageNo) {
-        //     const message = await apiCall("banking_api.www.share_tracker.get_share_tracker_rows", {
-        //         view: currentTab,
-        //         page: pageNo,
-        //         page_length: PER_PAGE,
-        //         search: searchQ || null,
-        //         sol_ids: [...selectedSolIds],
-        //         sort_by: getSortBy(),
-        //         sort_order: getSortOrder()
-        //     });
-
-        //     const rows = (message.rows || []).map(normalizeRecord);
-        //     const total = cintLike(message.total);
-
-        //     return { rows, total };
-        // }
 
         async function fetchRowsForPage(pageNo) {
             const message = await apiCall("banking_api.www.share_tracker.get_share_tracker_rows", {
@@ -2088,14 +2011,6 @@
             if (closedEl) closedEl.textContent = formatNumber(data.closed);
             if (successEl) successEl.textContent = formatNumber(data.success);
 
-            // const tcPending = document.getElementById("tc-pending");
-            // const tcInsuf = document.getElementById("tc-insuf");
-            // const tcClosed = document.getElementById("tc-closed");
-
-            // if (tcPending) tcPending.textContent = formatNumber(data.pending);
-            // if (tcInsuf) tcInsuf.textContent = formatNumber(data.insuf);
-            // if (tcClosed) tcClosed.textContent = formatNumber(data.closed);
-
             const tcPending = document.getElementById("tc-pending");
             const tcInsuf = document.getElementById("tc-insuf");
             const tcClosed = document.getElementById("tc-closed");
@@ -2127,90 +2042,6 @@
             currentSolIds = Array.isArray(solIds) ? solIds : [];
             pageCache.set(cacheKey, currentSolIds);
         }
-
-        // async function loadRows(force = false) {
-        //     const cacheKey = getCacheKey();
-        //     const empty = document.getElementById("emptyState");
-        //     const tbody = document.getElementById("tableBody");
-
-        //     if (!force && pageCache.has(cacheKey)) {
-        //         const cached = pageCache.get(cacheKey);
-        //         currentRows = cached.rows || [];
-        //         currentTotal = cached.total || 0;
-        //         renderTable();
-        //     }
-
-        //     if (empty && !pageCache.has(cacheKey)) {
-        //         empty.style.display = "block";
-        //         empty.innerHTML = `
-        //         <div class="empty-icon">⏳</div>
-        //         <div class="empty-title">Loading records...</div>
-        //         <div class="empty-sub">Please wait</div>
-        //     `;
-        //     }
-        //     if (tbody && !pageCache.has(cacheKey)) tbody.innerHTML = "";
-
-        //     const message = await apiCall("banking_api.www.share_tracker.get_share_tracker_rows", {
-        //         view: currentTab,
-        //         page: currentPage,
-        //         page_length: PER_PAGE,
-        //         search: searchQ || null,
-        //         sol_ids: [...selectedSolIds],
-        //         sort_by: getSortBy(),
-        //         sort_order: getSortOrder()
-        //     });
-
-        //     currentRows = (message.rows || []).map(normalizeRecord);
-        //     currentTotal = cintLike(message.total);
-
-        //     pageCache.set(cacheKey, {
-        //         rows: currentRows,
-        //         total: currentTotal
-        //     });
-
-        //     renderTable();
-        // }
-
-
-        // new working version
-        // async function loadRows(force = false) {
-        //     const cacheKey = getCacheKey();
-        //     const empty = document.getElementById("emptyState");
-        //     const tbody = document.getElementById("tableBody");
-
-        //     if (!force && pageCache.has(cacheKey)) {
-        //         const cached = pageCache.get(cacheKey);
-        //         currentRows = cached.rows;
-        //         currentTotal = cached.total;
-        //         currentSolIds = cached.sol_ids || [];
-        //         renderTable();
-        //         prefetchAdjacentPages();
-        //         return;
-        //     }
-
-        //     if (empty) {
-        //         empty.style.display = "block";
-        //         empty.innerHTML = `
-        //     <div class="empty-icon">⏳</div>
-        //     <div class="empty-title">Loading records...</div>
-        //     <div class="empty-sub">Please wait</div>
-        // `;
-        //     }
-
-        //     if (tbody) tbody.innerHTML = "";
-
-        //     const data = await fetchRowsForPage(currentPage);
-
-        //     currentRows = data.rows;
-        //     currentTotal = data.total;
-        //     currentSolIds = data.sol_ids || [];
-
-        //     pageCache.set(cacheKey, data);
-
-        //     renderTable();
-        //     prefetchAdjacentPages();
-        // }
-
 
         async function loadRows(force = false) {
             const cacheKey = getCacheKey();
@@ -2323,34 +2154,6 @@
             const index = map[sortCol];
             if (ths && ths[index]) ths[index].classList.add("sorted");
         }
-
-        // function renderPagination(totalPages) {
-        //     const container = document.getElementById("pgBtns");
-        //     if (!container) return;
-
-        //     let html = `
-        //     <button class="pg-btn" onclick="goPage(${currentPage - 1})" ${currentPage === 1 ? "disabled" : ""}>
-        //         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
-        //         Prev
-        //     </button>
-        // `;
-
-        //     const pages = getPaginationPages(currentPage, totalPages);
-        //     pages.forEach(p => {
-        //         if (p === "...") html += `<span class="pg-dots">...</span>`;
-        //         else html += `<button class="pg-btn ${p === currentPage ? "active" : ""}" onclick="goPage(${p})">${p}</button>`;
-        //     });
-
-        //     html += `
-        //     <button class="pg-btn" onclick="goPage(${currentPage + 1})" ${currentPage === totalPages ? "disabled" : ""}>
-        //         Next
-        //         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
-        //     </button>
-        // `;
-
-        //     container.innerHTML = html;
-        // }
-
 
         function renderPagination(totalPages) {
             const container = document.getElementById("pgBtns");
@@ -2712,12 +2515,6 @@
             }
         }
 
-        // function toggleDateFilter() {
-        //     if (window.frappe && frappe.show_alert) {
-        //         frappe.show_alert({ message: __("Date range filter not enabled yet"), indicator: "orange" });
-        //     }
-        // }
-
         function updateDateFilterUI() {
             const btn = document.getElementById("dateFilterBtn");
             const badge = document.getElementById("dateFilterBadge");
@@ -2733,10 +2530,6 @@
             }
 
             if (text) {
-                // if (fromDate && toDate) text.textContent = `${fromDate} to ${toDate}`;
-                // else if (fromDate) text.textContent = `From ${fromDate}`;
-                // else if (toDate) text.textContent = `Up to ${toDate}`;
-                // else text.textContent = "No date selected";
                 if (fromDate && toDate) text.textContent = `${formatDate(fromDate)} to ${formatDate(toDate)}`;
                 else if (fromDate) text.textContent = `From ${formatDate(fromDate)}`;
                 else if (toDate) text.textContent = `Up to ${formatDate(toDate)}`;
@@ -2883,13 +2676,6 @@
             try {
                 setExportButtonLoading(true);
                 showExportLoader("Building consolidated report and preparing download…");
-
-                // const rows = await apiCall("banking_api.www.share_tracker.get_share_tracker_export_rows", {
-                //     search: searchQ ? searchQ : null,
-                //     sol_ids: selectedSolIds.size ? [...selectedSolIds] : null,
-                //     sort_by: getSortBy(),
-                //     sort_order: getSortOrder()
-                // });
                 const rows = await apiCall("banking_api.www.share_tracker.get_share_tracker_export_rows", {
                     search: searchQ ? searchQ : null,
                     sol_ids: selectedSolIds.size ? [...selectedSolIds] : null,
@@ -2901,52 +2687,6 @@
 
                 const exportCount = Array.isArray(rows) ? rows.length : 0;
                 showExportLoader(`Finalizing CSV for ${formatNumber(exportCount)} records…`);
-
-                // const headers = [
-                //     "Application ID",
-                //     "SOL ID",
-                //     "SOL Description",
-                //     "CIF",
-                //     "Account Number",
-                //     "Transaction ID",
-                //     "Payment Status",
-                //     "Status Label",
-                //     "Insufficient Balance",
-                //     "Account Closed",
-                //     "Fund Transfer Date",
-                //     "CIF Creation Date",
-                //     "Account Opening Date",
-                //     "Modified",
-                //     "Error Log"
-                // ];
-
-                // const lines = [headers.join(",")];
-
-                // (rows || []).forEach(r => {
-                //     const row = normalizeRecord(r);
-                //     lines.push([
-                //         csvSafe(row.name),
-                //         csvSafe(row.sol_id),
-                //         csvSafe(r.sol_desc || ""),
-                //         csvSafe(row.cif),
-                //         csvSafe(row.account_number),
-                //         csvSafe(row.transaction_id),
-                //         csvSafe(row.payment_status),
-                //         csvSafe(getStatusLabel(row)),
-                //         csvSafe(cintLike(row.insufficient_balance)),
-                //         csvSafe(cintLike(row.account_closed)),
-                //         // csvSafe(row.fund_transfer_date),
-                //         // csvSafe(row.cif_creation_date),
-                //         // csvSafe(row.account_opening_date),
-                //         // csvSafe(row.modified),
-                //         csvSafe(formatDateTime(row.fundtransferdate)),
-                //         csvSafe(formatDate(row.cifcreationdate)),
-                //         csvSafe(formatDate(row.accountopeningdate)),
-                //         csvSafe(formatDateTime(row.modified)),
-                //         csvSafe(row.error_log)
-                //     ].join(","));
-                // });
-
                 const headers = [
                     "SOL ID",
                     "SOL Description",
@@ -3032,40 +2772,6 @@
             }
         }
 
-        // function exportCSV() {
-        //     const rows = currentRows;
-        //     const headers = [
-        //         "SOL ID", "CIF", "Account Number", "Transaction ID", "Payment Status",
-        //         "Insufficient Balance", "Account Closed", "Fund Transfer Date", "CIF Creation Date", "Account Opening Date"
-        //     ];
-        //     const lines = [headers.join(",")];
-
-        //     rows.forEach(r => {
-        //         lines.push([
-        //             csvSafe(r.sol_id),
-        //             csvSafe(r.cif),
-        //             csvSafe(r.account_number),
-        //             csvSafe(r.transaction_id),
-        //             csvSafe(r.payment_status),
-        //             csvSafe(cintLike(r.insufficient_balance)),
-        //             csvSafe(cintLike(r.account_closed)),
-        //             csvSafe(r.fund_transfer_date),
-        //             csvSafe(r.cif_creation_date),
-        //             csvSafe(r.account_opening_date)
-        //         ].join(","));
-        //     });
-
-        //     const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
-        //     const a = document.createElement("a");
-        //     a.href = URL.createObjectURL(blob);
-        //     a.download = `share-application-${currentTab}.csv`;
-        //     a.click();
-        //     URL.revokeObjectURL(a.href);
-        // }
-
-
-
-
         function csvSafe(val) {
             const str = String(val ?? "");
             return `"${str.replace(/"/g, '""')}"`;
@@ -3122,54 +2828,6 @@
                 if (e.target === overlay) closeRecordModal();
             });
         }
-
-        // async function openRecordModal(cif) {
-        //     ensureModal();
-
-        //     const overlay = document.getElementById("recordDetailOverlay");
-        //     const sub = document.getElementById("recordDetailSub");
-        //     const body = document.getElementById("recordDetailBody");
-
-        //     overlay.style.display = "flex";
-        //     sub.textContent = "Fetching record details...";
-        //     body.innerHTML = `<div style="padding:24px;text-align:center;color:var(--text-secondary);">Loading details...</div>`;
-
-        //     try {
-        //         const doc = await apiCall("banking_api.www.share_tracker.get_share_application_by_cif", {
-        //             cif: decodeURIComponent(cif)
-        //         });
-
-        //         if (!doc) {
-        //             sub.textContent = "Record not found";
-        //             body.innerHTML = `<div style="color:var(--text-secondary);">No details found for CIF ${escapeHtml(decodeURIComponent(cif))}</div>`;
-        //             return;
-        //         }
-
-        //         sub.textContent = `CIF ${doc.cif || "-"} · ${doc.name || "-"}`;
-        //         body.innerHTML = `
-        //         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;">
-        //             ${detailCard("SOL ID", doc.sol_id)}
-        //             ${detailCard("SOL Description", doc.sol_desc || "-")}
-        //             ${detailCard("CIF", doc.cif)}
-        //             ${detailCard("Account Number", doc.account_number)}
-        //             ${detailCard("Transaction ID", doc.transaction_id || "-")}
-        //             ${detailCard("Payment Status", doc.payment_status || "-")}
-        //             ${detailCard("Insufficient Balance", cintLike(doc.insufficient_balance) ? "Yes" : "No")}
-        //             ${detailCard("Account Closed", cintLike(doc.account_closed) ? "Yes" : "No")}
-        //             ${detailCard("Fund Transfer Date", formatDateTime(doc.fund_transfer_date))}
-        //             ${detailCard("CIF Creation Date", formatDate(doc.cif_creation_date))}
-        //             ${detailCard("Account Opening Date", formatDate(doc.account_opening_date))}
-        //         </div>
-        //         <div style="margin-top:16px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;">
-        //             <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em;">API Response</div>
-        //             <pre style="margin:0;white-space:pre-wrap;word-break:break-word;font-size:12px;line-height:1.6;color:var(--text-primary);font-family:'SF Mono','Fira Code',monospace;">${escapeHtml(doc.error_log || "-")}</pre>
-        //         </div>
-        //     `;
-        //     } catch (e) {
-        //         sub.textContent = "Error";
-        //         body.innerHTML = `<div style="color:var(--red);">Unable to fetch record details.</div>`;
-        //     }
-        // }
 
         async function openRecordModal(cif) {
             ensureModal();
