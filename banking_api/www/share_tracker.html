@@ -1861,6 +1861,41 @@
         .tab.active[data-tab="not_found"] {
             border-bottom-color: var(--red);
         }
+
+        #headerExportBtn {
+            position: relative;
+        }
+
+        #headerExportBtn::after {
+            content: "";
+            position: absolute;
+            inset: -4px;
+            border: 2px solid var(--accent);
+            border-radius: calc(var(--radius-md) + 4px);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #headerExportBtn.download-running::after {
+            animation: exportBorderPulse 1.2s ease-in-out infinite;
+        }
+
+        @keyframes exportBorderPulse {
+            0% {
+                opacity: 0.35;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 1;
+                transform: scale(1.04);
+            }
+
+            100% {
+                opacity: 0.35;
+                transform: scale(1);
+            }
+        }
     </style>
 </head>
 
@@ -1900,7 +1935,7 @@
                     <p class="page-sub">Monitor and manage all fund transaction statuses</p>
                 </div>
                 <div class="header-actions">
-                    <button class="btn" onclick="openExportModal()">
+                    <!-- <button class="btn" onclick="openExportModal()">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -1908,6 +1943,16 @@
                             <line x1="12" y1="15" x2="12" y2="3"></line>
                         </svg>
                         Export
+                    </button> -->
+
+                    <button id="headerExportBtn" class="btn" onclick="openExportModal()">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <span class="btn-label">Export</span>
                     </button>
                     <button class="btn btn-primary" style="display: none;">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -3984,8 +4029,7 @@
             const exportView = getViewForReportType(reportType);
 
             closeExportModal();
-            showExportLoader("Preparing download...");
-            setExportButtonLoading(true);
+            setHeaderExportRunning(true);
 
             const params = new URLSearchParams({
                 view: exportView,
@@ -4004,17 +4048,52 @@
             iframe.src = url;
             document.body.appendChild(iframe);
 
-            setTimeout(() => {
-                hideExportLoader();
-                setExportButtonLoading(false);
+            let finished = false;
+
+            const stopDownloadState = () => {
+                if (finished) return;
+                finished = true;
+                setHeaderExportRunning(false);
+                setTimeout(() => iframe.remove(), 8000);
+            };
+
+            iframe.onload = function () {
+                stopDownloadState();
                 if (window.frappe) {
                     frappe.show_alert({
                         message: "Download started",
                         indicator: "green"
                     });
                 }
-                setTimeout(() => iframe.remove(), 10000);
-            }, 1200);
+            };
+
+            setTimeout(() => {
+                stopDownloadState();
+            }, 15000);
+        }
+
+        // function setHeaderExportRunning(isRunning) {
+        //     const btn = document.getElementById("headerExportBtn");
+        //     if (!btn) return;
+
+        //     btn.classList.toggle("download-running", !!isRunning);
+
+        //     const labelNode = btn.childNodes[btn.childNodes.length - 1];
+        //     if (labelNode && labelNode.nodeType === Node.TEXT_NODE) {
+        //         labelNode.textContent = isRunning ? " Downloading..." : " Export";
+        //     }
+        // }
+
+        function setHeaderExportRunning(isRunning) {
+            const btn = document.getElementById("headerExportBtn");
+            if (!btn) return;
+
+            btn.classList.toggle("download-running", !!isRunning);
+
+            const label = btn.querySelector(".btn-label");
+            if (label) {
+                label.textContent = isRunning ? "Downloading..." : "Export";
+            }
         }
 
         function pillHTML(row) {
