@@ -1896,6 +1896,44 @@
                 transform: scale(1);
             }
         }
+
+        #headerExportBtn,
+        #filteredExportBtn {
+            position: relative;
+        }
+
+        #headerExportBtn::after,
+        #filteredExportBtn::after {
+            content: "";
+            position: absolute;
+            inset: -4px;
+            border: 2px solid var(--accent);
+            border-radius: calc(var(--radius-md) + 4px);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #headerExportBtn.download-running::after,
+        #filteredExportBtn.download-running::after {
+            animation: exportBorderPulse 1.2s ease-in-out infinite;
+        }
+
+        @keyframes exportBorderPulse {
+            0% {
+                opacity: 0.35;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 1;
+                transform: scale(1.04);
+            }
+
+            100% {
+                opacity: 0.35;
+                transform: scale(1);
+            }
+        }
     </style>
 </head>
 
@@ -2185,7 +2223,7 @@
 
                     <div class="toolbar-right">
                         <span style="font-size:12px;color:var(--text-tertiary)" id="selectedCount"></span>
-                        <button class="toolbar-btn" onclick="exportFilteredCSV()">
+                        <!-- <button class="toolbar-btn" onclick="exportFilteredCSV()">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -2193,6 +2231,15 @@
                                 <line x1="12" y1="15" x2="12" y2="3"></line>
                             </svg>
                             Export CSV
+                        </button> -->
+                        <button id="filteredExportBtn" class="toolbar-btn" onclick="exportFilteredCSV()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            <span class="btn-label">Export CSV</span>
                         </button>
                     </div>
                 </div>
@@ -3331,47 +3378,91 @@
         }
 
 
-        async function exportFilteredCSV() {
-            try {
-                setExportButtonLoading(true);
-                showExportLoader("Preparing filtered report...");
-                const rows = await apiCall("banking_api.www.share_tracker.get_share_tracker_export_rows", {
-                    view: currentTab,
-                    search: searchQ ? searchQ : null,
-                    sol_ids: selectedSolIds.size ? [...selectedSolIds] : null,
-                    sort_by: getSortBy(),
-                    sort_order: getSortOrder()
-                });
+        // async function exportFilteredCSV() {
+        //     try {
+        //         setExportButtonLoading(true);
+        //         showExportLoader("Preparing filtered report...");
+        //         const rows = await apiCall("banking_api.www.share_tracker.get_share_tracker_export_rows", {
+        //             view: currentTab,
+        //             search: searchQ ? searchQ : null,
+        //             sol_ids: selectedSolIds.size ? [...selectedSolIds] : null,
+        //             sort_by: getSortBy(),
+        //             sort_order: getSortOrder()
+        //         });
 
-                const exportCount = Array.isArray(rows) ? rows.length : 0;
-                showExportLoader(`Finalizing CSV for ${formatNumber(exportCount)} records...`);
+        //         const exportCount = Array.isArray(rows) ? rows.length : 0;
+        //         showExportLoader(`Finalizing CSV for ${formatNumber(exportCount)} records...`);
 
-                const lines = buildExportLines(rows || []);
-                triggerCsvDownload(lines, `share-tracker-filtered-${currentTab}`);
+        //         const lines = buildExportLines(rows || []);
+        //         triggerCsvDownload(lines, `share-tracker-filtered-${currentTab}`);
 
-                setTimeout(() => {
-                    hideExportLoader();
-                    setExportButtonLoading(false);
-                }, 300);
+        //         setTimeout(() => {
+        //             hideExportLoader();
+        //             setExportButtonLoading(false);
+        //         }, 300);
 
-                if (window.frappe && frappe.show_alert) {
+        //         if (window.frappe && frappe.show_alert) {
+        //             frappe.show_alert({
+        //                 message: __("Filtered report downloaded"),
+        //                 indicator: "green"
+        //             });
+        //         }
+        //     } catch (e) {
+        //         console.error(e);
+        //         hideExportLoader();
+        //         setExportButtonLoading(false);
+
+        //         if (window.frappe && frappe.show_alert) {
+        //             frappe.show_alert({
+        //                 message: __("Unable to export filtered report"),
+        //                 indicator: "red"
+        //             });
+        //         }
+        //     }
+        // }
+
+        function exportFilteredCSV() {
+            setFilteredExportRunning(true);
+
+            const params = new URLSearchParams({
+                view: currentTab,
+                search: searchQ || "",
+                sol_ids: selectedSolIds.size ? JSON.stringify([...selectedSolIds]) : "",
+                from_date: fromDate || "",
+                to_date: toDate || "",
+                sort_by: getSortBy(),
+                sort_order: getSortOrder()
+            });
+
+            const url = `/api/method/banking_api.www.share_tracker.download_share_tracker_csv?${params.toString()}`;
+
+            const iframe = document.createElement("iframe");
+            iframe.style.display = "none";
+            iframe.src = url;
+            document.body.appendChild(iframe);
+
+            let finished = false;
+
+            const stopDownloadState = () => {
+                if (finished) return;
+                finished = true;
+                setFilteredExportRunning(false);
+                setTimeout(() => iframe.remove(), 8000);
+            };
+
+            iframe.onload = function () {
+                stopDownloadState();
+                if (window.frappe) {
                     frappe.show_alert({
-                        message: __("Filtered report downloaded"),
+                        message: "Filtered report download started",
                         indicator: "green"
                     });
                 }
-            } catch (e) {
-                console.error(e);
-                hideExportLoader();
-                setExportButtonLoading(false);
+            };
 
-                if (window.frappe && frappe.show_alert) {
-                    frappe.show_alert({
-                        message: __("Unable to export filtered report"),
-                        indicator: "red"
-                    });
-                }
-            }
+            setTimeout(() => {
+                stopDownloadState();
+            }, 15000);
         }
 
         function csvSafe(val) {
@@ -4093,6 +4184,18 @@
             const label = btn.querySelector(".btn-label");
             if (label) {
                 label.textContent = isRunning ? "Downloading..." : "Export";
+            }
+        }
+
+        function setFilteredExportRunning(isRunning) {
+            const btn = document.getElementById("filteredExportBtn");
+            if (!btn) return;
+
+            btn.classList.toggle("download-running", !!isRunning);
+
+            const label = btn.querySelector(".btn-label");
+            if (label) {
+                label.textContent = isRunning ? "Downloading..." : "Export CSV";
             }
         }
 
