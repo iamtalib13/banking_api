@@ -1789,6 +1789,88 @@
             background: var(--accent-hover);
             border-color: var(--accent-hover);
         }
+
+        .metric.failed-m::before {
+            background: var(--red);
+        }
+
+        .metric.today-m::before {
+            background: #38bdf8;
+        }
+
+        .metric.failed-m .metric-icon {
+            background: var(--red-dim);
+            color: var(--red);
+        }
+
+        .metric.today-m .metric-icon {
+            background: rgba(56, 189, 248, 0.12);
+            color: #38bdf8;
+        }
+
+        .failed-tab-group {
+            display: inline-flex;
+            align-items: center;
+            border: 2px dashed var(--red);
+            border-radius: 10px;
+            padding: 3px;
+            margin: 6px 0 6px 8px;
+        }
+
+        .tab-bar {
+            gap: 8px;
+        }
+
+        .all-tab-group,
+        .pending-tab-group,
+        .success-tab-group,
+        .failed-tab-group {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 10px;
+            padding: 3px;
+            margin: 6px 0;
+        }
+
+        .all-tab-group {
+            border: 1px dashed var(--accent);
+        }
+
+        .pending-tab-group {
+            border: 1px dashed var(--amber);
+        }
+
+        .success-tab-group {
+            border: 1px dashed var(--green);
+        }
+
+        .failed-tab-group {
+            border: 1px dashed var(--red);
+        }
+
+        .tab.active {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .tab.active[data-tab="all"] {
+            border-bottom-color: var(--accent);
+        }
+
+        .tab.active[data-tab="pending"] {
+            border-bottom-color: var(--amber);
+        }
+
+        .tab.active[data-tab="success"] {
+            border-bottom-color: var(--green);
+        }
+
+        .tab.active[data-tab="insuf"],
+        .tab.active[data-tab="closed"],
+        .tab.active[data-tab="frozen"],
+        .tab.active[data-tab="not_found"] {
+            border-bottom-color: var(--red);
+        }
     </style>
 </head>
 
@@ -1861,7 +1943,7 @@
             </div>
 
             <!-- METRICS -->
-            <div class="metrics">
+            <!-- <div class="metrics">
                 <div class="metric total" onclick="switchTab('all')" title="View all records">
                     <div class="metric-icon">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -1918,6 +2000,71 @@
                     <div class="metric-val" id="m-success">5</div>
                     <div class="metric-label">Success</div>
                 </div>
+            </div> -->
+
+            <div class="metrics">
+                <div class="metric total active-card" onclick="switchTab('all')" title="View all records">
+                    <div class="metric-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="7" width="20" height="14" rx="2"></rect>
+                            <path d="M16 3H8l-2 4h12z"></path>
+                        </svg>
+                    </div>
+                    <div class="metric-val" id="m-total">0</div>
+                    <div class="metric-label">Total CIFs</div>
+                </div>
+
+                <div class="metric pending-m" onclick="switchTab('pending')">
+                    <div class="metric-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                    </div>
+                    <div class="metric-val" id="m-pending">0</div>
+                    <div class="metric-label">Pending</div>
+                </div>
+
+                <div class="metric failed-m" onclick="switchTab('failed')">
+                    <div class="metric-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="15" y1="9" x2="9" y2="15"></line>
+                            <line x1="9" y1="9" x2="15" y2="15"></line>
+                        </svg>
+                    </div>
+                    <div class="metric-val" id="m-failed">0</div>
+                    <div class="metric-label">Failed</div>
+                </div>
+
+                <div class="metric today-m" onclick="switchTab('today')">
+                    <div class="metric-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                        </svg>
+                    </div>
+                    <div class="metric-val" id="m-today">0</div>
+                    <div class="metric-label">Today</div>
+                </div>
+
+                <div class="metric success-m" onclick="switchTab('success')">
+                    <div class="metric-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                        </svg>
+                    </div>
+                    <div class="metric-val" id="m-success">0</div>
+                    <div class="metric-label">Success</div>
+                </div>
             </div>
 
             <!-- TABLE CARD -->
@@ -1936,25 +2083,36 @@
                             id="tc-closed">0</span></button>
                 </div> -->
                 <div class="tab-bar">
-                    <button class="tab active" data-tab="all">All</button>
-                    <button class="tab" data-tab="pending">Pending <span class="tab-count"
-                            id="tc-pending">0</span></button>
-                    <button class="tab" data-tab="success">Success <span class="tab-count"
-                            id="tc-success">0</span></button>
-                    <button class="tab" data-tab="insuf">Insufficient balance <span class="tab-count"
-                            id="tc-insuf">0</span></button>
-                    <button class="tab" data-tab="closed">Closed account <span class="tab-count"
-                            id="tc-closed">0</span></button>
-                    <!-- <button class="tab" data-tab="frozen">Account Frozen <span class="tab-count"
-                            id="tc-frozen">0</span></button>
-                    <button class="tab" data-tab="not_found">Account Not Found <span class="tab-count"
-                            id="tc-not-found">0</span></button> -->
-                    <button class="tab" data-tab="frozen">
-                        Account frozen <span class="tab-count" id="tc-frozen">0</span>
-                    </button>
-                    <button class="tab" data-tab="not_found">
-                        Account not found <span class="tab-count" id="tc-not-found">0</span>
-                    </button>
+                    <div class="all-tab-group">
+                        <button class="tab" data-tab="all">All</button>
+                    </div>
+
+                    <div class="pending-tab-group">
+                        <button class="tab" data-tab="pending">
+                            Pending <span class="tab-count" id="tc-pending">69</span>
+                        </button>
+                    </div>
+
+                    <div class="success-tab-group">
+                        <button class="tab" data-tab="success">
+                            Success <span class="tab-count" id="tc-success">487,783</span>
+                        </button>
+                    </div>
+
+                    <div class="failed-tab-group">
+                        <button class="tab" data-tab="insuf">
+                            Insufficient balance <span class="tab-count" id="tc-insuf">278</span>
+                        </button>
+                        <button class="tab" data-tab="closed">
+                            Closed account <span class="tab-count" id="tc-closed">19</span>
+                        </button>
+                        <button class="tab" data-tab="frozen">
+                            Account frozen <span class="tab-count" id="tc-frozen">353</span>
+                        </button>
+                        <button class="tab" data-tab="not_found">
+                            Account not found <span class="tab-count" id="tc-not-found">1</span>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- TOOLBAR -->
@@ -2626,17 +2784,45 @@
         //     if (tcSuccess) tcSuccess.textContent = formatNumber(data.success);
         // }
 
+        // function renderMetrics(data) {
+        //     const totalEl = document.getElementById("m-total");
+        //     const pendingEl = document.getElementById("m-pending");
+        //     const insufEl = document.getElementById("m-insuf");
+        //     const closedEl = document.getElementById("m-closed");
+        //     const successEl = document.getElementById("m-success");
+
+        //     if (totalEl) totalEl.textContent = formatNumber(data.total || 0);
+        //     if (pendingEl) pendingEl.textContent = formatNumber(data.pending || 0);
+        //     if (insufEl) insufEl.textContent = formatNumber(data.insuf || 0);
+        //     if (closedEl) closedEl.textContent = formatNumber(data.closed || 0);
+        //     if (successEl) successEl.textContent = formatNumber(data.success || 0);
+
+        //     const tcPending = document.getElementById("tc-pending");
+        //     const tcInsuf = document.getElementById("tc-insuf");
+        //     const tcClosed = document.getElementById("tc-closed");
+        //     const tcSuccess = document.getElementById("tc-success");
+        //     const tcFrozen = document.getElementById("tc-frozen");
+        //     const tcNotFound = document.getElementById("tc-not-found");
+
+        //     if (tcPending) tcPending.textContent = formatNumber(data.pending || 0);
+        //     if (tcInsuf) tcInsuf.textContent = formatNumber(data.insuf || 0);
+        //     if (tcClosed) tcClosed.textContent = formatNumber(data.closed || 0);
+        //     if (tcSuccess) tcSuccess.textContent = formatNumber(data.success || 0);
+        //     if (tcFrozen) tcFrozen.textContent = formatNumber(data.frozen || 0);
+        //     if (tcNotFound) tcNotFound.textContent = formatNumber(data.not_found || 0);
+        // }
+
         function renderMetrics(data) {
             const totalEl = document.getElementById("m-total");
             const pendingEl = document.getElementById("m-pending");
-            const insufEl = document.getElementById("m-insuf");
-            const closedEl = document.getElementById("m-closed");
+            const failedEl = document.getElementById("m-failed");
+            const todayEl = document.getElementById("m-today");
             const successEl = document.getElementById("m-success");
 
             if (totalEl) totalEl.textContent = formatNumber(data.total || 0);
             if (pendingEl) pendingEl.textContent = formatNumber(data.pending || 0);
-            if (insufEl) insufEl.textContent = formatNumber(data.insuf || 0);
-            if (closedEl) closedEl.textContent = formatNumber(data.closed || 0);
+            if (failedEl) failedEl.textContent = formatNumber(data.failed || 0);
+            if (todayEl) todayEl.textContent = formatNumber(data.today || 0);
             if (successEl) successEl.textContent = formatNumber(data.success || 0);
 
             const tcPending = document.getElementById("tc-pending");
@@ -2727,23 +2913,39 @@
         //     if (active) active.classList.add("active-card");
         // }
 
+        // function updateCardSelection() {
+        //     document.querySelectorAll(".metric").forEach(el => el.classList.remove("active-card"));
+
+        //     const selectorMap = {
+        //         all: ".metric.total",
+        //         pending: ".metric.pending-m",
+        //         insuf: ".metric.insuf-m",
+        //         closed: ".metric.closed-m",
+        //         success: ".metric.success-m",
+        //         frozen: null,
+        //         not_found: null
+        //     };
+
+        //     const selector = selectorMap[currentTab];
+        //     if (!selector) return;
+
+        //     const active = document.querySelector(selector);
+        //     if (active) active.classList.add("active-card");
+        // }
+
+
         function updateCardSelection() {
             document.querySelectorAll(".metric").forEach(el => el.classList.remove("active-card"));
 
             const selectorMap = {
                 all: ".metric.total",
                 pending: ".metric.pending-m",
-                insuf: ".metric.insuf-m",
-                closed: ".metric.closed-m",
-                success: ".metric.success-m",
-                frozen: null,
-                not_found: null
+                failed: ".metric.failed-m",
+                today: ".metric.today-m",
+                success: ".metric.success-m"
             };
 
-            const selector = selectorMap[currentTab];
-            if (!selector) return;
-
-            const active = document.querySelector(selector);
+            const active = document.querySelector(selectorMap[currentTab]);
             if (active) active.classList.add("active-card");
         }
 
@@ -3862,6 +4064,25 @@
             if (overlay) overlay.style.display = "none";
         }
 
+        // function bindExistingTabButtons() {
+        //     document.querySelectorAll(".tab").forEach(tabEl => {
+        //         const tab = tabEl.dataset.tab;
+        //         tabEl.onclick = function () { switchTab(tab); };
+        //     });
+
+        //     const totalCard = document.querySelector(".metric.total");
+        //     const pendingCard = document.querySelector(".metric.pending-m");
+        //     const insufCard = document.querySelector(".metric.insuf-m");
+        //     const closedCard = document.querySelector(".metric.closed-m");
+        //     const successCard = document.querySelector(".metric.success-m");
+
+        //     if (totalCard) totalCard.onclick = () => switchTab("all");
+        //     if (pendingCard) pendingCard.onclick = () => switchTab("pending");
+        //     if (insufCard) insufCard.onclick = () => switchTab("insuf");
+        //     if (closedCard) closedCard.onclick = () => switchTab("closed");
+        //     if (successCard) successCard.onclick = () => switchTab("success");
+        // }
+
         function bindExistingTabButtons() {
             document.querySelectorAll(".tab").forEach(tabEl => {
                 const tab = tabEl.dataset.tab;
@@ -3870,14 +4091,14 @@
 
             const totalCard = document.querySelector(".metric.total");
             const pendingCard = document.querySelector(".metric.pending-m");
-            const insufCard = document.querySelector(".metric.insuf-m");
-            const closedCard = document.querySelector(".metric.closed-m");
+            const failedCard = document.querySelector(".metric.failed-m");
+            const todayCard = document.querySelector(".metric.today-m");
             const successCard = document.querySelector(".metric.success-m");
 
             if (totalCard) totalCard.onclick = () => switchTab("all");
             if (pendingCard) pendingCard.onclick = () => switchTab("pending");
-            if (insufCard) insufCard.onclick = () => switchTab("insuf");
-            if (closedCard) closedCard.onclick = () => switchTab("closed");
+            if (failedCard) failedCard.onclick = () => switchTab("failed");
+            if (todayCard) todayCard.onclick = () => switchTab("today");
             if (successCard) successCard.onclick = () => switchTab("success");
         }
 

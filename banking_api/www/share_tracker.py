@@ -6,6 +6,7 @@ import json
 import frappe
 from frappe import _
 from frappe.utils import cint
+from frappe.utils import nowdate
 
 ALLOWED_ROLE = "Share Admin"
 CACHE_TTL = 20
@@ -205,6 +206,28 @@ def get_avatar_from_name(full_name):
 #     return context
 
 
+# @frappe.whitelist()
+# def get_share_tracker_counts():
+#     validate_share_tracker_access()
+#     cache_key = _make_cache_key("counts")
+#     cached = _cache().get_value(cache_key)
+#     if cached:
+#         return cached
+
+#     data = {
+#         "total": frappe.db.count("Share Application"),
+#         "pending": frappe.db.count("Share Application", {"payment_status": "Pending"}),
+#         "success": frappe.db.count("Share Application", {"payment_status": "Success"}),
+#         "insuf": frappe.db.count("Share Application", {"insufficient_balance": 1}),
+#         "closed": frappe.db.count("Share Application", {"account_closed": 1}),
+#         "frozen": frappe.db.count("Share Application", {"account_frozen": 1}),
+#         "not_found": frappe.db.count("Share Application", {"account_not_found": 1}),
+#     }
+
+#     _cache().set_value(cache_key, data, expires_in_sec=CACHE_TTL)
+#     return data
+
+
 @frappe.whitelist()
 def get_share_tracker_counts():
     validate_share_tracker_access()
@@ -213,10 +236,16 @@ def get_share_tracker_counts():
     if cached:
         return cached
 
+    today = nowdate()
+
     data = {
         "total": frappe.db.count("Share Application"),
         "pending": frappe.db.count("Share Application", {"payment_status": "Pending"}),
         "success": frappe.db.count("Share Application", {"payment_status": "Success"}),
+        "failed": frappe.db.count("Share Application", {"payment_status": "Failed"}),
+        "today": frappe.db.count("Share Application", {
+            "creation": ["between", [f"{today} 00:00:00", f"{today} 23:59:59"]]
+        }),
         "insuf": frappe.db.count("Share Application", {"insufficient_balance": 1}),
         "closed": frappe.db.count("Share Application", {"account_closed": 1}),
         "frozen": frappe.db.count("Share Application", {"account_frozen": 1}),
@@ -309,10 +338,29 @@ def get_share_tracker_rows(
 
     filters = {}
 
+    # if view == "pending":
+    #     filters["payment_status"] = "Pending"
+    # elif view == "success":
+    #     filters["payment_status"] = "Success"
+    # elif view == "insuf":
+    #     filters["insufficient_balance"] = 1
+    # elif view == "closed":
+    #     filters["account_closed"] = 1
+    # elif view == "frozen":
+    #     filters["account_frozen"] = 1
+    # elif view == "not_found":
+    #     filters["account_not_found"] = 1
+
     if view == "pending":
         filters["payment_status"] = "Pending"
     elif view == "success":
         filters["payment_status"] = "Success"
+    elif view == "failed":
+        filters["payment_status"] = "Failed"
+    elif view == "today":
+        today = nowdate()
+        filters["creation"] = ["between", [
+            f"{today} 00:00:00", f"{today} 23:59:59"]]
     elif view == "insuf":
         filters["insufficient_balance"] = 1
     elif view == "closed":
