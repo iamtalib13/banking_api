@@ -16,13 +16,10 @@ def execute():
         ]
     }
     create_custom_fields(custom_fields)
-    print("Custom field 'custom_finacle_synced' created in Employee.")
-
+    
     # 2. Update existing employees to have custom_finacle_synced = 1
     frappe.db.sql("UPDATE `tabEmployee` SET custom_finacle_synced = 1 WHERE IFNULL(custom_finacle_synced, 0) = 0")
-    frappe.db.commit()
-    print("Existing Employees updated: custom_finacle_synced = 1.")
-
+    
     # 3. Create 'Finacle EDR Sync Log' DocType if it doesn't exist
     if not frappe.db.exists("DocType", "Finacle EDR Sync Log"):
         doc = frappe.get_doc({
@@ -84,7 +81,52 @@ def execute():
             ]
         })
         doc.insert(ignore_permissions=True)
-        frappe.db.commit()
-        print("DocType 'Finacle EDR Sync Log' created successfully.")
+
+    # 4. Create or Update Client Script for the DocType List view button
+    js_code = """
+frappe.listview_settings['Finacle EDR Sync Log'] = {
+    primary_action: function() {
+        frappe.confirm(
+            __('Are you sure you want to sync new employees to Finacle?'),
+            function() {
+                frappe.call({
+                    method: "banking_api.finacle_sync.sync_employees_to_finacle",
+                    freeze: true,
+                    freeze_message: __('Syncing new employees to Finacle...'),
+                    callback: function(r) {
+                        frappe.msgprint(__('Sync process completed.'));
+                        cur_list.refresh();
+                    }
+                });
+            }
+        );
+    },
+    refresh: function(listview) {
+        setTimeout(() => {
+            if (listview.page.btn_primary) {
+                listview.page.btn_primary.html('<span class="hidden-xs">Sync Employees to Finacle</span>');
+            }
+        }, 10);
+    }
+};
+    """
+
+    script_name = frappe.db.get_value("Client Script", {"dt": "Finacle EDR Sync Log", "view": "List"})
+    
+    if script_name:
+        script_doc = frappe.get_doc("Client Script", script_name)
+        script_doc.script = js_code
+        script_doc.save(ignore_permissions=True)
     else:
-        print("DocType 'Finacle EDR Sync Log' already exists.")
+        script_doc = frappe.get_doc({
+            "doctype": "Client Script",
+            "name": "Finacle EDR Sync Log - List",
+            "dt": "Finacle EDR Sync Log",
+            "view": "List",
+            "script": js_code,
+            "module": "Banking API",
+            "enabled": 1
+        })
+        script_doc.insert(ignore_permissions=True)
+
+    frappe.db.commit()
