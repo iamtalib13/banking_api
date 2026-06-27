@@ -3329,22 +3329,106 @@
             await loadRows(true);
         }
 
-        function showExportLoader(message = "Building consolidated report and preparing download…") {
-            const overlay = document.getElementById("exportLoader");
+        // function showExportLoader(message = "Building consolidated report and preparing download…") {
+        //     const overlay = document.getElementById("exportLoader");
+        //     const text = document.getElementById("exportLoaderText");
+        //     if (text) text.textContent = message;
+        //     if (overlay) {
+        //         overlay.classList.add("show");
+        //         overlay.setAttribute("aria-hidden", "false");
+        //     }
+        // }
+
+        // function hideExportLoader() {
+        //     const overlay = document.getElementById("exportLoader");
+        //     if (overlay) {
+        //         overlay.classList.remove("show");
+        //         overlay.setAttribute("aria-hidden", "true");
+        //     }
+        // }
+
+
+        function showExportLoader(message) {
+            const loader = document.getElementById("exportLoader");
             const text = document.getElementById("exportLoaderText");
-            if (text) text.textContent = message;
-            if (overlay) {
-                overlay.classList.add("show");
-                overlay.setAttribute("aria-hidden", "false");
-            }
+            if (text) text.textContent = message || "Preparing export...";
+            if (loader) loader.classList.add("show");
         }
 
         function hideExportLoader() {
-            const overlay = document.getElementById("exportLoader");
-            if (overlay) {
-                overlay.classList.remove("show");
-                overlay.setAttribute("aria-hidden", "true");
+            const loader = document.getElementById("exportLoader");
+            if (loader) loader.classList.remove("show");
+        }
+
+        function startExportPolling(exportId) {
+            if (exportPollTimer) {
+                clearInterval(exportPollTimer);
             }
+
+            checkExportStatus(exportId);
+
+            exportPollTimer = setInterval(() => {
+                checkExportStatus(exportId);
+            }, 3000);
+        }
+
+        async function checkExportStatus(exportId) {
+            try {
+                const result = await apiCall(
+                    "banking_api.www.share_tracker.get_share_tracker_export_status",
+                    { export_id: exportId }
+                );
+
+                if (result.status === "Queued") {
+                    showExportLoader("Export queued...");
+                    return;
+                }
+
+                if (result.status === "Running") {
+                    const rowsText = result.rows_written
+                        ? ` Generated ${formatNumber(result.rows_written)} rows so far.`
+                        : "";
+                    showExportLoader(`Preparing CSV in background...${rowsText}`);
+                    return;
+                }
+
+                if (result.status === "Completed") {
+                    clearInterval(exportPollTimer);
+                    exportPollTimer = null;
+                    hideExportLoader();
+
+                    if (result.file_url) {
+                        downloadFileUrl(result.file_url);
+                    } else {
+                        alert("Export completed, but file URL is missing.");
+                    }
+                    return;
+                }
+
+                if (result.status === "Failed") {
+                    clearInterval(exportPollTimer);
+                    exportPollTimer = null;
+                    hideExportLoader();
+                    alert("Export failed. Please check error logs.");
+                    return;
+                }
+
+            } catch (e) {
+                clearInterval(exportPollTimer);
+                exportPollTimer = null;
+                hideExportLoader();
+                alert("Failed to fetch export status: " + (e.message || e));
+            }
+        }
+
+        function downloadFileUrl(url) {
+            const a = document.createElement("a");
+            a.href = url;
+            a.target = "_blank";
+            a.rel = "noopener noreferrer";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
         }
 
         function setExportButtonLoading(isLoading) {
@@ -3421,49 +3505,199 @@
         //     }
         // }
 
-        function exportFilteredCSV() {
-            setFilteredExportRunning(true);
+        // working server side download code
+        // function exportFilteredCSV() {
+        //     setFilteredExportRunning(true);
 
-            const params = new URLSearchParams({
-                view: currentTab,
-                search: searchQ || "",
-                sol_ids: selectedSolIds.size ? JSON.stringify([...selectedSolIds]) : "",
-                from_date: fromDate || "",
-                to_date: toDate || "",
-                sort_by: getSortBy(),
-                sort_order: getSortOrder()
-            });
+        //     const params = new URLSearchParams({
+        //         view: currentTab,
+        //         search: searchQ || "",
+        //         sol_ids: selectedSolIds.size ? JSON.stringify([...selectedSolIds]) : "",
+        //         from_date: fromDate || "",
+        //         to_date: toDate || "",
+        //         sort_by: getSortBy(),
+        //         sort_order: getSortOrder()
+        //     });
 
-            const url = `/api/method/banking_api.www.share_tracker.download_share_tracker_csv?${params.toString()}`;
+        //     const url = `/api/method/banking_api.www.share_tracker.download_share_tracker_csv?${params.toString()}`;
 
-            const iframe = document.createElement("iframe");
-            iframe.style.display = "none";
-            iframe.src = url;
-            document.body.appendChild(iframe);
+        //     const iframe = document.createElement("iframe");
+        //     iframe.style.display = "none";
+        //     iframe.src = url;
+        //     document.body.appendChild(iframe);
 
-            let finished = false;
+        //     let finished = false;
 
-            const stopDownloadState = () => {
-                if (finished) return;
-                finished = true;
-                setFilteredExportRunning(false);
-                setTimeout(() => iframe.remove(), 8000);
+        //     const stopDownloadState = () => {
+        //         if (finished) return;
+        //         finished = true;
+        //         setFilteredExportRunning(false);
+        //         setTimeout(() => iframe.remove(), 8000);
+        //     };
+
+        //     iframe.onload = function () {
+        //         stopDownloadState();
+        //         if (window.frappe) {
+        //             frappe.show_alert({
+        //                 message: "Filtered report download started",
+        //                 indicator: "green"
+        //             });
+        //         }
+        //     };
+
+        //     setTimeout(() => {
+        //         stopDownloadState();
+        //     }, 15000);
+        // }
+
+
+        let activeExportPoller = null;
+
+        function getCurrentExportArgs() {
+            return {
+                view: currentTab || 'all',
+                search: (searchQ || '').trim() || null,
+                solids: Array.from(selectedSolIds || []),
+                fromdate: fromDate || null,
+                todate: toDate || null,
+                sortby: getSortBy(),
+                sortorder: getSortOrder()
             };
-
-            iframe.onload = function () {
-                stopDownloadState();
-                if (window.frappe) {
-                    frappe.show_alert({
-                        message: "Filtered report download started",
-                        indicator: "green"
-                    });
-                }
-            };
-
-            setTimeout(() => {
-                stopDownloadState();
-            }, 15000);
         }
+
+        function setButtonLoading(btnId, isLoading) {
+            const btn = document.getElementById(btnId);
+            if (!btn) return;
+            btn.disabled = !!isLoading;
+            btn.classList.toggle('download-running', !!isLoading);
+        }
+
+        function showExportLoaderText(message) {
+            const loader = document.getElementById('exportLoader');
+            const text = document.getElementById('exportLoaderText');
+            if (loader) loader.classList.add('show');
+            if (text) text.textContent = message || 'Preparing export...';
+        }
+
+        function hideExportLoader() {
+            const loader = document.getElementById('exportLoader');
+            if (loader) loader.classList.remove('show');
+        }
+
+        async function startBackgroundExport(payload, options = {}) {
+            const {
+                buttonId = null,
+                loadingText = 'Preparing export...'
+            } = options;
+
+            try {
+                if (buttonId) setButtonLoading(buttonId, true);
+                showExportLoaderText(loadingText);
+
+                const enqueueRes = await apiCall(
+                    'banking_api.www.share_tracker.enqueue_share_tracker_export',
+                    payload
+                );
+
+                const exportId = enqueueRes.export_id;
+                if (!exportId) {
+                    throw new Error('Export ID not returned from server.');
+                }
+
+                if (activeExportPoller) {
+                    clearInterval(activeExportPoller);
+                    activeExportPoller = null;
+                }
+
+                return await new Promise((resolve, reject) => {
+                    activeExportPoller = setInterval(async () => {
+                        try {
+                            const status = await apiCall(
+                                'banking_api.www.share_tracker.get_share_tracker_export_status',
+                                { export_id: exportId }
+                            );
+
+                            const progress = Number(status.progress || 0);
+                            const loaderText = document.getElementById('exportLoaderText');
+
+                            if (loaderText) {
+                                const rowsWritten = status.rows_written
+                                    ? ` • ${Number(status.rows_written).toLocaleString('en-US')} rows`
+                                    : '';
+                                loaderText.textContent =
+                                    `${status.status || 'Running'} ${progress}%${rowsWritten}`;
+                            }
+
+                            if (status.status === 'Completed') {
+                                clearInterval(activeExportPoller);
+                                activeExportPoller = null;
+
+                                hideExportLoader();
+                                if (buttonId) setButtonLoading(buttonId, false);
+
+                                if (!status.file_url) {
+                                    reject(new Error('Export completed but file URL is missing.'));
+                                    return;
+                                }
+
+                                const link = document.createElement('a');
+                                link.href = status.file_url;
+                                link.target = '_blank';
+                                link.rel = 'noopener noreferrer';
+                                document.body.appendChild(link);
+                                link.click();
+                                link.remove();
+
+                                resolve(status);
+                                return;
+                            }
+
+                            if (status.status === 'Failed' || status.status === 'Not Found') {
+                                clearInterval(activeExportPoller);
+                                activeExportPoller = null;
+
+                                hideExportLoader();
+                                if (buttonId) setButtonLoading(buttonId, false);
+
+                                reject(new Error(status.error || 'Export failed.'));
+                            }
+                        } catch (pollErr) {
+                            clearInterval(activeExportPoller);
+                            activeExportPoller = null;
+
+                            hideExportLoader();
+                            if (buttonId) setButtonLoading(buttonId, false);
+
+                            reject(pollErr);
+                        }
+                    }, 2000);
+                });
+            } catch (err) {
+                hideExportLoader();
+                if (buttonId) setButtonLoading(buttonId, false);
+                throw err;
+            }
+        }
+
+        async function exportFilteredCSV() {
+            try {
+                const payload = getCurrentExportArgs();
+
+                await startBackgroundExport(payload, {
+                    buttonId: 'filteredExportBtn',
+                    loadingText: 'Preparing filtered report and download...'
+                });
+            } catch (err) {
+                console.error('Filtered export failed:', err);
+                const msg = err && err.message ? err.message : 'Filtered export failed.';
+                if (window.frappe && frappe.msgprint) {
+                    frappe.msgprint(msg);
+                } else {
+                    alert(msg);
+                }
+            }
+        }
+
 
         function csvSafe(val) {
             const str = String(val ?? "");
@@ -3988,7 +4222,7 @@
                 insuf: "insuf",
                 closed: "closed",
                 frozen: "frozen",
-                notfound: "notfound"
+                not_found: "not_found"
             };
             return map[reportType] || "all";
         }
@@ -4103,64 +4337,102 @@
         //     }
         // }
 
-        function downloadExportFromModal() {
-            const reportType = getSelectedExportReportType();
-            const { fromdate, todate } = getExportModalDateRange();
 
-            if (fromdate && todate && fromdate > todate) {
-                if (window.frappe) {
-                    frappe.show_alert({
-                        message: "From date cannot be greater than To date",
-                        indicator: "orange"
-                    });
-                }
-                return;
+        // working server side download code
+        // function downloadExportFromModal() {
+        //     const reportType = getSelectedExportReportType();
+        //     const { fromdate, todate } = getExportModalDateRange();
+
+        //     if (fromdate && todate && fromdate > todate) {
+        //         if (window.frappe) {
+        //             frappe.show_alert({
+        //                 message: "From date cannot be greater than To date",
+        //                 indicator: "orange"
+        //             });
+        //         }
+        //         return;
+        //     }
+
+        //     const exportView = getViewForReportType(reportType);
+
+        //     closeExportModal();
+        //     setHeaderExportRunning(true);
+
+        //     const params = new URLSearchParams({
+        //         view: exportView,
+        //         search: searchQ || "",
+        //         sol_ids: selectedSolIds.size ? JSON.stringify([...selectedSolIds]) : "",
+        //         from_date: fromdate || "",
+        //         to_date: todate || "",
+        //         sort_by: getSortBy(),
+        //         sort_order: getSortOrder()
+        //     });
+
+        //     const url = `/api/method/banking_api.www.share_tracker.download_share_tracker_csv?${params.toString()}`;
+
+        //     const iframe = document.createElement("iframe");
+        //     iframe.style.display = "none";
+        //     iframe.src = url;
+        //     document.body.appendChild(iframe);
+
+        //     let finished = false;
+
+        //     const stopDownloadState = () => {
+        //         if (finished) return;
+        //         finished = true;
+        //         setHeaderExportRunning(false);
+        //         setTimeout(() => iframe.remove(), 8000);
+        //     };
+
+        //     iframe.onload = function () {
+        //         stopDownloadState();
+        //         if (window.frappe) {
+        //             frappe.show_alert({
+        //                 message: "Download started",
+        //                 indicator: "green"
+        //             });
+        //         }
+        //     };
+
+        //     setTimeout(() => {
+        //         stopDownloadState();
+        //     }, 15000);
+        // }
+
+        let activeExportId = null;
+        let exportPollTimer = null;
+
+        async function downloadExportFromModal() {
+            const selected = document.querySelector('input[name="exportReportType"]:checked');
+            const view = selected ? selected.value : "all";
+            const fromDate = document.getElementById("exportFromDate")?.value || null;
+            const toDate = document.getElementById("exportToDate")?.value || null;
+
+            showExportLoader("Queueing export job...");
+
+            try {
+                const result = await apiCall(
+                    "banking_api.www.share_tracker.enqueue_share_tracker_export",
+                    {
+                        view,
+                        search: searchQ || null,
+                        sol_ids: [...selectedSolIds],
+                        from_date: fromDate,
+                        to_date: toDate,
+                        sort_by: getSortBy(),
+                        sort_order: getSortOrder()
+                    }
+                );
+
+                activeExportId = result.export_id;
+                closeExportModal();
+                showExportLoader("Preparing CSV in background...");
+                startExportPolling(activeExportId);
+
+            } catch (e) {
+                hideExportLoader();
+                alert("Failed to queue export: " + (e.message || e));
             }
-
-            const exportView = getViewForReportType(reportType);
-
-            closeExportModal();
-            setHeaderExportRunning(true);
-
-            const params = new URLSearchParams({
-                view: exportView,
-                search: searchQ || "",
-                sol_ids: selectedSolIds.size ? JSON.stringify([...selectedSolIds]) : "",
-                from_date: fromdate || "",
-                to_date: todate || "",
-                sort_by: getSortBy(),
-                sort_order: getSortOrder()
-            });
-
-            const url = `/api/method/banking_api.www.share_tracker.download_share_tracker_csv?${params.toString()}`;
-
-            const iframe = document.createElement("iframe");
-            iframe.style.display = "none";
-            iframe.src = url;
-            document.body.appendChild(iframe);
-
-            let finished = false;
-
-            const stopDownloadState = () => {
-                if (finished) return;
-                finished = true;
-                setHeaderExportRunning(false);
-                setTimeout(() => iframe.remove(), 8000);
-            };
-
-            iframe.onload = function () {
-                stopDownloadState();
-                if (window.frappe) {
-                    frappe.show_alert({
-                        message: "Download started",
-                        indicator: "green"
-                    });
-                }
-            };
-
-            setTimeout(() => {
-                stopDownloadState();
-            }, 15000);
         }
 
         // function setHeaderExportRunning(isRunning) {
