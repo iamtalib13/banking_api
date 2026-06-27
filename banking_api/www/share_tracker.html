@@ -3553,7 +3553,7 @@
 
         let activeExportPoller = null;
 
-        function getCurrentExportArgs() {
+        function getAppliedTableFilters() {
             return {
                 view: currentTab || 'all',
                 search: (searchQ || '').trim() || null,
@@ -3565,139 +3565,141 @@
             };
         }
 
-        function setButtonLoading(btnId, isLoading) {
-            const btn = document.getElementById(btnId);
+        function setExportButtonLoading(isLoading) {
+            const btn = document.getElementById('filteredExportBtn');
             if (!btn) return;
             btn.disabled = !!isLoading;
             btn.classList.toggle('download-running', !!isLoading);
         }
 
-        function showExportLoaderText(message) {
-            const loader = document.getElementById('exportLoader');
+        function showExportLoader(message) {
+            const overlay = document.getElementById('exportLoader');
             const text = document.getElementById('exportLoaderText');
-            if (loader) loader.classList.add('show');
-            if (text) text.textContent = message || 'Preparing export...';
+            if (overlay) overlay.classList.add('show');
+            if (text) text.textContent = message || 'Preparing filtered export...';
         }
 
         function hideExportLoader() {
-            const loader = document.getElementById('exportLoader');
-            if (loader) loader.classList.remove('show');
+            const overlay = document.getElementById('exportLoader');
+            if (overlay) overlay.classList.remove('show');
         }
 
-        async function startBackgroundExport(payload, options = {}) {
-            const {
-                buttonId = null,
-                loadingText = 'Preparing export...'
-            } = options;
-
+        function getCurrentFiltersPayload() {
+            return {
+                view: currentTab || 'all',
+                search: (searchQ || '').trim() || null,
+                solids: Array.from(selectedSolIds || []),
+                fromdate: fromDate || null,
+                todate: toDate || null,
+                sortby: getSortBy(),
+                sortorder: getSortOrder()
+            };
+        }
+        function getRowFiltersPayload() {
+            return {
+                view: currentTab || 'all',
+                search: (searchQ || '').trim() || null,
+                sol_ids: Array.from(selectedSolIds || []),
+                from_date: fromDate || null,
+                to_date: toDate || null,
+                sort_by: getSortBy(),
+                sort_order: getSortOrder()
+            };
+        }
+        async function exportFilteredCSV() {
             try {
-                if (buttonId) setButtonLoading(buttonId, true);
-                showExportLoaderText(loadingText);
+                const payload = {
+                    view: currentTab || 'all',
+                    search: (searchQ || '').trim() || null,
+                    sol_ids: Array.from(selectedSolIds || []),
+                    from_date: fromDate || null,
+                    to_date: toDate || null,
+                    sort_by: getSortBy(),
+                    sort_order: getSortOrder()
+                };
+
+                console.log('Export payload:', JSON.stringify(payload));
+                console.log('selectedSolIds', Array.from(selectedSolIds || []));
+                console.log('fromDate', fromDate, 'toDate', toDate);
+                console.log('method', 'banking_api.www.share_tracker.enqueue_share_tracker_export');
+                console.log('payload', payload);
+
+                setExportButtonLoading(true);
+                showExportLoader('Preparing filtered report and download...');
 
                 const enqueueRes = await apiCall(
                     'banking_api.www.share_tracker.enqueue_share_tracker_export',
                     payload
                 );
 
-                const exportId = enqueueRes.export_id;
+                const exportId = enqueueRes && enqueueRes.export_id;
                 if (!exportId) {
-                    throw new Error('Export ID not returned from server.');
+                    throw new Error('Export ID not returned');
                 }
 
-                if (activeExportPoller) {
-                    clearInterval(activeExportPoller);
-                    activeExportPoller = null;
+                if (window.activeExportPoller) {
+                    clearInterval(window.activeExportPoller);
+                    window.activeExportPoller = null;
                 }
 
-                return await new Promise((resolve, reject) => {
-                    activeExportPoller = setInterval(async () => {
-                        try {
-                            const status = await apiCall(
-                                'banking_api.www.share_tracker.get_share_tracker_export_status',
-                                { export_id: exportId }
-                            );
+                window.activeExportPoller = setInterval(async () => {
+                    try {
+                        const status = await apiCall(
+                            'banking_api.www.share_tracker.get_share_tracker_export_status',
+                            { export_id: exportId }
+                        );
 
+                        const text = document.getElementById('exportLoaderText');
+                        if (text) {
                             const progress = Number(status.progress || 0);
-                            const loaderText = document.getElementById('exportLoaderText');
-
-                            if (loaderText) {
-                                const rowsWritten = status.rows_written
-                                    ? ` • ${Number(status.rows_written).toLocaleString('en-US')} rows`
-                                    : '';
-                                loaderText.textContent =
-                                    `${status.status || 'Running'} ${progress}%${rowsWritten}`;
-                            }
-
-                            if (status.status === 'Completed') {
-                                clearInterval(activeExportPoller);
-                                activeExportPoller = null;
-
-                                hideExportLoader();
-                                if (buttonId) setButtonLoading(buttonId, false);
-
-                                if (!status.file_url) {
-                                    reject(new Error('Export completed but file URL is missing.'));
-                                    return;
-                                }
-
-                                const link = document.createElement('a');
-                                link.href = status.file_url;
-                                link.target = '_blank';
-                                link.rel = 'noopener noreferrer';
-                                document.body.appendChild(link);
-                                link.click();
-                                link.remove();
-
-                                resolve(status);
-                                return;
-                            }
-
-                            if (status.status === 'Failed' || status.status === 'Not Found') {
-                                clearInterval(activeExportPoller);
-                                activeExportPoller = null;
-
-                                hideExportLoader();
-                                if (buttonId) setButtonLoading(buttonId, false);
-
-                                reject(new Error(status.error || 'Export failed.'));
-                            }
-                        } catch (pollErr) {
-                            clearInterval(activeExportPoller);
-                            activeExportPoller = null;
-
-                            hideExportLoader();
-                            if (buttonId) setButtonLoading(buttonId, false);
-
-                            reject(pollErr);
+                            const rowsWritten = Number(status.rows_written || 0);
+                            text.textContent = rowsWritten
+                                ? `${status.status || 'Running'} ${progress}% • ${rowsWritten.toLocaleString('en-US')} rows`
+                                : `${status.status || 'Running'} ${progress}%`;
                         }
-                    }, 2000);
-                });
+
+                        if (status.status === 'Completed') {
+                            clearInterval(window.activeExportPoller);
+                            window.activeExportPoller = null;
+                            hideExportLoader();
+                            setExportButtonLoading(false);
+
+                            const fileUrl = status.file_url;
+                            if (!fileUrl) {
+                                throw new Error('Export completed but file URL is missing');
+                            }
+
+                            window.open(fileUrl, '_blank', 'noopener,noreferrer');
+                            return;
+                        }
+
+                        if (status.status === 'Failed' || status.status === 'Not Found') {
+                            clearInterval(window.activeExportPoller);
+                            window.activeExportPoller = null;
+                            hideExportLoader();
+                            setExportButtonLoading(false);
+                            throw new Error(status.error || 'Export failed');
+                        }
+                    } catch (err) {
+                        clearInterval(window.activeExportPoller);
+                        window.activeExportPoller = null;
+                        hideExportLoader();
+                        setExportButtonLoading(false);
+                        throw err;
+                    }
+                }, 2000);
+
             } catch (err) {
                 hideExportLoader();
-                if (buttonId) setButtonLoading(buttonId, false);
-                throw err;
-            }
-        }
-
-        async function exportFilteredCSV() {
-            try {
-                const payload = getCurrentExportArgs();
-
-                await startBackgroundExport(payload, {
-                    buttonId: 'filteredExportBtn',
-                    loadingText: 'Preparing filtered report and download...'
-                });
-            } catch (err) {
-                console.error('Filtered export failed:', err);
-                const msg = err && err.message ? err.message : 'Filtered export failed.';
+                setExportButtonLoading(false);
+                console.error(err);
                 if (window.frappe && frappe.msgprint) {
-                    frappe.msgprint(msg);
+                    frappe.msgprint(err.message || 'Export failed');
                 } else {
-                    alert(msg);
+                    alert(err.message || 'Export failed');
                 }
             }
         }
-
 
         function csvSafe(val) {
             const str = String(val ?? "");
