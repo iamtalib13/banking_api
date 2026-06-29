@@ -2290,6 +2290,22 @@
                 gap: 6px;
             }
         }
+
+        .record-chip.network {
+            background: rgba(59, 130, 246, 0.14);
+            color: #60a5fa;
+            border-color: rgba(96, 165, 250, 0.18);
+        }
+
+        .pill-network {
+            background: rgba(59, 130, 246, 0.12);
+            color: #60a5fa;
+            border: 1px solid rgba(96, 165, 250, 0.2);
+        }
+
+        .pill-network::before {
+            background: #60a5fa;
+        }
     </style>
 </head>
 
@@ -2820,7 +2836,7 @@
             if (cintLike(row.account_frozen) === 1) return "frozen";
             if (cintLike(row.account_not_found) === 1) return "not_found";
             if (String(row.payment_status || "").trim() === "Pending") return "pending";
-            if (String(row.payment_status || "").trim() === "Failed") return "failed";
+            if (String(row.payment_status || "").trim() === "Failed") return "network_issue";
             return "unknown";
         }
 
@@ -2879,9 +2895,28 @@
             if (cintLike(row.account_frozen) === 1) return "Account frozen";
             if (cintLike(row.account_not_found) === 1) return "Account not found";
             if (String(row.payment_status || "").trim() === "Pending") return "Pending";
-            if (String(row.payment_status || "").trim() === "Failed") return "Failed";
+            if (String(row.payment_status || "").trim() === "Failed") return "Network Issue";
             return row.payment_status || "Unknown";
         }
+
+        // function pillHTML(row) {
+        //     const key = getStatusKey(row);
+        //     const label = getStatusLabel(row);
+
+        //     const clsMap = {
+        //         pending: "pill-pending",
+        //         insuf: "pill-insuf",
+        //         closed: "pill-closed",
+        //         frozen: "pill-frozen",
+        //         not_found: "pill-not-found",
+        //         success: "pill-success",
+        //         failed: "pill-insuf",
+        //         unknown: "pill-closed"
+        //     };
+
+        //     return `<span class="pill ${clsMap[key] || "pill-closed"}">${escapeHtml(label)}</span>`;
+        // }
+
 
         function pillHTML(row) {
             const key = getStatusKey(row);
@@ -2892,8 +2927,9 @@
                 insuf: "pill-insuf",
                 closed: "pill-closed",
                 frozen: "pill-frozen",
-                not_found: "pill-not-found",
+                notfound: "pill-not-found",
                 success: "pill-success",
+                network_issue: "pill-network",
                 failed: "pill-insuf",
                 unknown: "pill-closed"
             };
@@ -4100,7 +4136,7 @@
 
                 <div class="record-tabs">
                     <button class="record-tab active" data-panel="details" onclick="switchRecordPanel('details', this)">Details</button>
-                    <button class="record-tab" data-panel="flags" onclick="switchRecordPanel('flags', this)">Failure Flags</button>
+                    <button style="display:none;" class="record-tab" data-panel="flags" onclick="switchRecordPanel('flags', this)">Failure Flags</button>
                     <button class="record-tab" data-panel="address" onclick="switchRecordPanel('address', this)">Address</button>
                     <button class="record-tab" data-panel="logs" onclick="switchRecordPanel('logs', this)">API Response</button>
                 </div>
@@ -4155,16 +4191,31 @@
     `;
         }
 
+        // function statusChipFromDoc(doc) {
+        //     const key = getStatusKey(doc);
+        //     const label = getStatusLabel(doc);
+        //     const cls = key === "success"
+        //         ? "success"
+        //         : key === "pending"
+        //             ? "pending"
+        //             : (key === "insuf" || key === "closed" || key === "frozen" || key === "notfound" || key === "failed")
+        //                 ? "failed"
+        //                 : "neutral";
+
+        //     return `<span class="record-chip ${cls}">${escapeHtml(label)}</span>`;
+        // }
+
         function statusChipFromDoc(doc) {
             const key = getStatusKey(doc);
             const label = getStatusLabel(doc);
-            const cls = key === "success"
-                ? "success"
-                : key === "pending"
-                    ? "pending"
-                    : (key === "insuf" || key === "closed" || key === "frozen" || key === "notfound" || key === "failed")
-                        ? "failed"
-                        : "neutral";
+
+            const cls =
+                key === "success" ? "success" :
+                    key === "pending" ? "pending" :
+                        key === "network_issue" ? "network" :
+                            (key === "insuf" || key === "closed" || key === "frozen" || key === "notfound" || key === "failed")
+                                ? "failed"
+                                : "neutral";
 
             return `<span class="record-chip ${cls}">${escapeHtml(label)}</span>`;
         }
@@ -4226,7 +4277,7 @@
             ${topMetaRow("SOL / Branch", `<span class="mono">${escapeHtml(doc.sol_id || "-")}</span><span>${escapeHtml(doc.sol_desc || "-")}</span>`)}
             ${topMetaRow("Transaction ID", `<span class="record-meta-value mono">${escapeHtml(doc.transaction_id || "-")}</span>`)}
             ${topMetaRow("Scheme", `<span>${escapeHtml(doc.scheme_type || "-")} / ${escapeHtml(doc.scheme_code || "-")}</span>`)}
-            ${topMetaRow("Dates", `<span>CIF ${escapeHtml(formatDate(doc.cif_creation_date))}</span><span> · </span><span>Txn ${escapeHtml(formatDateTime(doc.fund_transfer_date))}</span>`)}
+            ${topMetaRow("Dates", `<span>${escapeHtml(formatDate(doc.cif_creation_date))}</span><span> · </span><span>Txn ${escapeHtml(formatDateTime(doc.fund_transfer_date))}</span>`)}
         `;
 
                 if (printBtn && String(doc.payment_status || "").trim() === "Success") {
