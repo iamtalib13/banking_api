@@ -2829,14 +2829,58 @@
             return num.toLocaleString("en-US");
         }
 
+        function resolveStatusContext(row) {
+            const paymentStatus = String(
+                row.payment_status ?? row.paymentstatus ?? ""
+            ).trim();
+
+            const insufficientBalance = cintLike(
+                row.insufficient_balance ?? row.insufficientbalance
+            );
+
+            const accountClosed = cintLike(
+                row.account_closed ?? row.accountclosed
+            );
+
+            const accountFrozen = cintLike(
+                row.account_frozen ?? row.accountfrozen
+            );
+
+            const accountNotFound = cintLike(
+                row.account_not_found ?? row.accountnotfound
+            );
+
+            return {
+                paymentStatus,
+                insufficientBalance,
+                accountClosed,
+                accountFrozen,
+                accountNotFound
+            };
+        }
+
+        // function getStatusKey(row) {
+        //     if (String(row.payment_status || "").trim() === "Success") return "success";
+        //     if (cintLike(row.insufficient_balance) === 1) return "insuf";
+        //     if (cintLike(row.account_closed) === 1) return "closed";
+        //     if (cintLike(row.account_frozen) === 1) return "frozen";
+        //     if (cintLike(row.account_not_found) === 1) return "not_found";
+        //     if (String(row.payment_status || "").trim() === "Pending") return "pending";
+        //     if (String(row.payment_status || "").trim() === "Failed") return "network_issue";
+        //     return "unknown";
+        // }
+
         function getStatusKey(row) {
-            if (String(row.payment_status || "").trim() === "Success") return "success";
-            if (cintLike(row.insufficient_balance) === 1) return "insuf";
-            if (cintLike(row.account_closed) === 1) return "closed";
-            if (cintLike(row.account_frozen) === 1) return "frozen";
-            if (cintLike(row.account_not_found) === 1) return "not_found";
-            if (String(row.payment_status || "").trim() === "Pending") return "pending";
-            if (String(row.payment_status || "").trim() === "Failed") return "network_issue";
+            const s = resolveStatusContext(row);
+
+            if (s.paymentStatus === "Success") return "success";
+            if (s.insufficientBalance === 1) return "insuf";
+            if (s.accountClosed === 1) return "closed";
+            if (s.accountFrozen === 1) return "frozen";
+            if (s.accountNotFound === 1) return "notfound";
+            if (s.paymentStatus === "Pending") return "pending";
+            if (s.paymentStatus === "Failed") return "network_issue";
+
             return "unknown";
         }
 
@@ -2888,15 +2932,29 @@
             return `${pad2(dt.getDate())}-${pad2(dt.getMonth() + 1)}-${dt.getFullYear()}`;
         }
 
+        // function getStatusLabel(row) {
+        //     if (String(row.payment_status || "").trim() === "Success") return "Success";
+        //     if (cintLike(row.insufficient_balance) === 1) return "Insufficient balance";
+        //     if (cintLike(row.account_closed) === 1) return "Account closed";
+        //     if (cintLike(row.account_frozen) === 1) return "Account frozen";
+        //     if (cintLike(row.account_not_found) === 1) return "Account not found";
+        //     if (String(row.payment_status || "").trim() === "Pending") return "Pending";
+        //     if (String(row.payment_status || "").trim() === "Failed") return "Network Issue";
+        //     return row.payment_status || "Unknown";
+        // }
+
         function getStatusLabel(row) {
-            if (String(row.payment_status || "").trim() === "Success") return "Success";
-            if (cintLike(row.insufficient_balance) === 1) return "Insufficient balance";
-            if (cintLike(row.account_closed) === 1) return "Account closed";
-            if (cintLike(row.account_frozen) === 1) return "Account frozen";
-            if (cintLike(row.account_not_found) === 1) return "Account not found";
-            if (String(row.payment_status || "").trim() === "Pending") return "Pending";
-            if (String(row.payment_status || "").trim() === "Failed") return "Network Issue";
-            return row.payment_status || "Unknown";
+            const s = resolveStatusContext(row);
+
+            if (s.paymentStatus === "Success") return "Success";
+            if (s.insufficientBalance === 1) return "Insufficient Balance";
+            if (s.accountClosed === 1) return "Account Closed";
+            if (s.accountFrozen === 1) return "Account Frozen";
+            if (s.accountNotFound === 1) return "Account Not Found";
+            if (s.paymentStatus === "Pending") return "Pending";
+            if (s.paymentStatus === "Failed") return "Network Issue";
+
+            return s.paymentStatus || "Unknown";
         }
 
         // function pillHTML(row) {
@@ -2918,43 +2976,68 @@
         // }
 
 
-        function pillHTML(row) {
-            const key = getStatusKey(row);
-            const label = getStatusLabel(row);
+        // function pillHTML(row) {
+        //     const key = getStatusKey(row);
+        //     const label = getStatusLabel(row);
 
-            const clsMap = {
-                pending: "pill-pending",
-                insuf: "pill-insuf",
-                closed: "pill-closed",
-                frozen: "pill-frozen",
-                notfound: "pill-not-found",
-                success: "pill-success",
-                network_issue: "pill-network",
-                failed: "pill-insuf",
-                unknown: "pill-closed"
-            };
+        //     const clsMap = {
+        //         pending: "pill-pending",
+        //         insuf: "pill-insuf",
+        //         closed: "pill-closed",
+        //         frozen: "pill-frozen",
+        //         notfound: "pill-not-found",
+        //         success: "pill-success",
+        //         network_issue: "pill-network",
+        //         failed: "pill-insuf",
+        //         unknown: "pill-closed"
+        //     };
 
-            return `<span class="pill ${clsMap[key] || "pill-closed"}">${escapeHtml(label)}</span>`;
-        }
+        //     return `<span class="pill ${clsMap[key] || "pill-closed"}">${escapeHtml(label)}</span>`;
+        // }
+
+        // function normalizeRecord(row) {
+        //     return {
+        //         name: row.name || "",
+        //         sol_id: row.sol_id || "",
+        //         sol_desc: row.sol_desc || "",
+        //         cif: row.cif != null ? String(row.cif) : "",
+        //         account_number: row.account_number != null ? String(row.account_number) : "",
+        //         transaction_id: row.transaction_id || "",
+        //         payment_status: row.payment_status || "",
+        //         insufficient_balance: cintLike(row.insufficient_balance),
+        //         account_closed: cintLike(row.account_closed),
+        //         account_frozen: cintLike(row.account_frozen),
+        //         account_not_found: cintLike(row.account_not_found),
+        //         fund_transfer_date: row.fund_transfer_date || "",
+        //         cif_creation_date: row.cif_creation_date || "",
+        //         account_opening_date: row.account_opening_date || "",
+        //         error_log: row.error_log || "",
+        //         modified: row.modified || ""
+        //     };
+        // }
 
         function normalizeRecord(row) {
             return {
-                name: row.name || "",
-                sol_id: row.sol_id || "",
-                sol_desc: row.sol_desc || "",
+                name: row.name,
+                sol_id: row.sol_id ?? row.solid ?? "",
+                sol_desc: row.sol_desc ?? row.soldesc ?? "",
                 cif: row.cif != null ? String(row.cif) : "",
-                account_number: row.account_number != null ? String(row.account_number) : "",
-                transaction_id: row.transaction_id || "",
-                payment_status: row.payment_status || "",
-                insufficient_balance: cintLike(row.insufficient_balance),
-                account_closed: cintLike(row.account_closed),
-                account_frozen: cintLike(row.account_frozen),
-                account_not_found: cintLike(row.account_not_found),
-                fund_transfer_date: row.fund_transfer_date || "",
-                cif_creation_date: row.cif_creation_date || "",
-                account_opening_date: row.account_opening_date || "",
-                error_log: row.error_log || "",
-                modified: row.modified || ""
+                account_number: row.account_number != null
+                    ? String(row.account_number)
+                    : (row.accountnumber != null ? String(row.accountnumber) : ""),
+                transaction_id: row.transaction_id ?? row.transactionid ?? "",
+                payment_status: row.payment_status ?? row.paymentstatus ?? "",
+
+                insufficient_balance: cintLike(row.insufficient_balance ?? row.insufficientbalance),
+                account_closed: cintLike(row.account_closed ?? row.accountclosed),
+                account_frozen: cintLike(row.account_frozen ?? row.accountfrozen),
+                account_not_found: cintLike(row.account_not_found ?? row.accountnotfound),
+
+                fund_transfer_date: row.fund_transfer_date ?? row.fundtransferdate ?? "",
+                cif_creation_date: row.cif_creation_date ?? row.cifcreationdate ?? "",
+                account_opening_date: row.account_opening_date ?? row.accountopeningdate ?? "",
+                error_logsahayog_dashboard: row.error_log ?? row.errorlog ?? "",
+                modified: row.modified
             };
         }
 
@@ -4986,22 +5069,105 @@
         }
 
         function pillHTML(row) {
-            const key = getStatusKey(row);
-            const label = getStatusLabel(row);
+            let key = getStatusKey(row);
+            let label = getStatusLabel(row);
+
+            const hasFailureFlag =
+                cintLike(row.account_frozen ?? row.accountfrozen) === 1 ||
+                cintLike(row.account_closed ?? row.accountclosed) === 1 ||
+                cintLike(row.account_not_found ?? row.accountnotfound) === 1 ||
+                cintLike(row.insufficient_balance ?? row.insufficientbalance) === 1;
+
+            const paymentStatus = String(row.payment_status ?? row.paymentstatus ?? "").trim();
+
+            if (!hasFailureFlag) {
+                if (currentTab === "frozen") {
+                    key = "frozen";
+                    label = "Account Frozen";
+                } else if (currentTab === "not_found") {
+                    key = "not_found";
+                    label = "Account Not Found";
+                } else if (currentTab === "closed") {
+                    key = "closed";
+                    label = "Account Closed";
+                } else if (currentTab === "insuf") {
+                    key = "insuf";
+                    label = "Insufficient Balance";
+                } else if (currentTab === "pending" && paymentStatus === "Pending") {
+                    key = "pending";
+                    label = "Pending";
+                } else if (currentTab === "success" && paymentStatus === "Success") {
+                    key = "success";
+                    label = "Success";
+                } else if (paymentStatus === "Failed") {
+                    key = "network_issue";
+                    label = "Network Issue";
+                }
+            }
 
             const clsMap = {
                 pending: "pill-pending",
                 insuf: "pill-insuf",
                 closed: "pill-closed",
                 frozen: "pill-frozen",
-                not_found: "pill-not-found",
+                notfound: "pill-not-found",
                 success: "pill-success",
+                network_issue: "pill-network",
                 failed: "pill-insuf",
                 unknown: "pill-closed"
             };
 
             return `<span class="pill ${clsMap[key] || "pill-closed"}">${escapeHtml(label)}</span>`;
         }
+
+        // function pillHTML(row) {
+        //     let key = getStatusKey(row);
+        //     let label = getStatusLabel(row);
+
+        //     const hasFailureFlag =
+        //         cintLike(row.account_frozen ?? row.accountfrozen) === 1 ||
+        //         cintLike(row.account_closed ?? row.accountclosed) === 1 ||
+        //         cintLike(row.account_not_found ?? row.accountnotfound) === 1 ||
+        //         cintLike(row.insufficient_balance ?? row.insufficientbalance) === 1;
+
+        //     const paymentStatus = String(row.payment_status ?? row.paymentstatus ?? "").trim();
+
+        //     if (!hasFailureFlag) {
+        //         if (currentTab === "frozen") {
+        //             key = "frozen";
+        //             label = "Account Frozen";
+        //         } else if (currentTab === "notfound") {
+        //             key = "notfound";
+        //             label = "Account Not Found";
+        //         } else if (currentTab === "closed") {
+        //             key = "closed";
+        //             label = "Account Closed";
+        //         } else if (currentTab === "insuf") {
+        //             key = "insuf";
+        //             label = "Insufficient Balance";
+        //         } else if (currentTab === "pending" && paymentStatus === "Pending") {
+        //             key = "pending";
+        //             label = "Pending";
+        //         } else if (currentTab === "success" && paymentStatus === "Success") {
+        //             key = "success";
+        //             label = "Success";
+        //         }
+        //     }
+
+        //     const clsMap = {
+        //         pending: "pill-pending",
+        //         insuf: "pill-insuf",
+        //         closed: "pill-closed",
+        //         frozen: "pill-frozen",
+        //         notfound: "pill-not-found",
+        //         success: "pill-success",
+        //         network_issue: "pill-network",
+        //         failed: "pill-insuf",
+        //         unknown: "pill-closed"
+        //     };
+
+        //     return `<span class="pill ${clsMap[key] || "pill-closed"}">${escapeHtml(label)}</span>`;
+        // }
 
         document.addEventListener("DOMContentLoaded", async function () {
             bindExistingTabButtons();
