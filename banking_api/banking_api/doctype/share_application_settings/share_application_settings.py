@@ -447,6 +447,15 @@ def run_share_application_sync():
 
 @frappe.whitelist()
 def run_share_application_sync_manual():
+    current_hour = now_datetime().hour
+
+    # Run only from 10 AM to 6 PM
+    if not (10 <= current_hour <= 18):
+        return {
+            "status": "skipped",
+            "message": "Share Application Sync runs only between 10 AM and 6 PM."
+        }
+
     return run_share_application_sync()
 
 
