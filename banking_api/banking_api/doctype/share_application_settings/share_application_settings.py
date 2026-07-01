@@ -283,12 +283,13 @@ def get_share_application_query(sync_days=30):
             AND g.entity_cre_flg = 'Y'
             AND g.del_flg = 'N'
             AND g.acct_cls_flg = 'N'
-            AND g.clr_bal_amt >= 20
             AND cif_htd.cif_id IS NULL
             AND a.relationshipopeningdate IS NOT NULL
         ) AS final_data
         WHERE rn = 1;
     """
+
+# AND g.clr_bal_amt >= 20
 
 
 def run_share_application_sync():
