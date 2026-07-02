@@ -160,7 +160,7 @@ def download_share_application_report(report_type):
 
     export_fields = [
         "name",
-        "docstatus",
+        # "docstatus",
         "sol_id",
         "cif",
         "account_number",
@@ -176,11 +176,11 @@ def download_share_application_report(report_type):
         "cif_creation_date",
         "account_opening_date",
         # "amended_from",
-        "retry_attempted",
-        "last_retry_attempted",
-        "error_log",
-        "owner",
-        "creation",
+        # "retry_attempted",
+        # "last_retry_attempted",
+        # "error_log",
+        # "owner",
+        # "creation",
     ]
 
     db_fields = [
@@ -200,11 +200,11 @@ def download_share_application_report(report_type):
         "cif_creation_date",
         "account_opening_date",
         # "amended_from",
-        "retry_attempted",
-        "last_retry_attempted",
-        "error_log",
-        "owner",
-        "creation",
+        # "retry_attempted",
+        # "last_retry_attempted",
+        # "error_log",
+        # "owner",
+        # "creation",
         "insufficient_balance",
         "account_closed",
         "account_frozen",
