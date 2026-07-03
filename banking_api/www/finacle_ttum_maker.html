@@ -17,7 +17,18 @@
                 <label for="excelFile">Upload Excel File</label>
                 <input type="file" id="excelFile" accept=".xlsx,.xls,.xlsb,.csv,.ods" class="form-control">
                 <small class="help-text">
-                    Excel header row must contain: Account Number, Sol ID, Amount, Narration
+                    Excel header row must contain: Account Number, Sol ID, Amount, Narration.
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label for="debitAccount">Debit Account Number</label>
+                <input type="text" id="debitAccount" class="form-control" inputmode="numeric" maxlength="15"
+                    minlength="4" pattern="[0-9]{4,15}" title="Debit account number must be 4 to 15 digits only"
+                    autocomplete="off" placeholder="Enter debit account number" required>
+                <small class="help-text">
+                    Only digits allowed, minimum 4 digits and maximum 15 digits. Debit Sol ID will be taken from first 4
+                    digits.
                 </small>
             </div>
 
@@ -42,12 +53,14 @@
         <div class="ttum-info">
             <h3>Excel Format</h3>
             <ul>
-                <li>Row 1 must contain headers</li>
+                <li>Row 1 must contain headers.</li>
                 <li>Headers: <strong>Account Number</strong>, <strong>Sol ID</strong>, <strong>Amount</strong>,
-                    <strong>Narration</strong></li>
-                <li>Data starts from row 2</li>
-                <li>All uploaded rows will be treated as credit entries</li>
-                <li>One static debit entry will be added per generated file</li>
+                    <strong>Narration</strong>.
+                </li>
+                <li>Data starts from row 2.</li>
+                <li>All uploaded rows will be treated as credit entries.</li>
+                <li>One debit entry will be added per generated file using the entered debit account number.</li>
+                <li>Debit Sol ID will be the first 4 digits of the entered debit account number.</li>
             </ul>
         </div>
 
@@ -206,5 +219,6 @@
 
 {% block script %}
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="/finacle_ttum_maker.js"></script>
 {% endblock %}

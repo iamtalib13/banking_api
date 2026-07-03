@@ -1,11 +1,11 @@
 (() => {
     console.log("Starting Finacle TTUM Maker...");
 
-    const STATIC_DEBIT_ACCOUNT = "12345678901234";
     const DEFAULT_NARRATION = "Share Fund Debit";
     const ALLOWED_EXTENSIONS = ["xlsx", "xls", "xlsb", "csv", "ods"];
 
     const fileInput = document.getElementById("excelFile");
+    const debitAccountInput = document.getElementById("debitAccount");
     const recordsInput = document.getElementById("recordsPerFile");
     const processBtn = document.getElementById("processBtn");
     const statusBox = document.getElementById("statusBox");
@@ -35,13 +35,33 @@
     }
 
     function validateRecordsPerFile(value) {
-        const parsed = Number(value);
+        const cleaned = String(value || "").trim();
+
+        if (!/^\d+$/.test(cleaned)) {
+            throw new Error("Records per file must be an integer.");
+        }
+
+        const parsed = Number(cleaned);
 
         if (!Number.isInteger(parsed) || parsed < 2) {
-            throw new Error("Records per file must be an integer greater than or equal to 2.");
+            throw new Error("Records per file must be greater than or equal to 2.");
         }
 
         return parsed;
+    }
+
+    function validateDebitAccount(value) {
+        const cleaned = String(value || "").replace(/\D/g, "").trim();
+
+        if (!cleaned) {
+            throw new Error("Please enter debit account number.");
+        }
+
+        if (!/^[0-9]{4,15}$/.test(cleaned)) {
+            throw new Error("Debit account number must contain only digits and be between 4 and 15 digits.");
+        }
+
+        return cleaned;
     }
 
     function formatAmount(amount) {
@@ -79,8 +99,7 @@
         return out;
     }
 
-    function downloadTextFile(filename, content) {
-        const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    function downloadBlob(filename, blob) {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
@@ -88,7 +107,7 @@
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
     function parseWorkbook(file) {
@@ -147,15 +166,25 @@
                 throw new Error(`Missing Amount in row ${index + 2}.`);
             }
 
-            const numericAmount = Number(String(amount).toString().replace(/,/g, "").trim());
+            const accountStr = String(accountNumber).trim();
+            const solIdStr = String(solId).trim();
+            const numericAmount = Number(String(amount).replace(/,/g, "").trim());
+
+            if (!/^\d+$/.test(accountStr)) {
+                throw new Error(`Invalid Account Number in row ${index + 2}. Only digits allowed.`);
+            }
+
+            if (!/^\d+$/.test(solIdStr)) {
+                throw new Error(`Invalid Sol ID in row ${index + 2}. Only digits allowed.`);
+            }
 
             if (Number.isNaN(numericAmount) || numericAmount <= 0) {
                 throw new Error(`Invalid Amount in row ${index + 2}.`);
             }
 
             return {
-                account_number: String(accountNumber).trim(),
-                sol_id: String(solId).trim(),
+                account_number: accountStr,
+                sol_id: solIdStr,
                 amount: numericAmount,
                 narration: String(narration || "").trim() || DEFAULT_NARRATION
             };
@@ -164,7 +193,7 @@
         return parsedRows;
     }
 
-    function generateTTUMFiles(rows, recordsPerFile) {
+    function generateTTUMFiles(rows, recordsPerFile, debitAccountNumber) {
         const creditPerFile = recordsPerFile - 1;
 
         if (creditPerFile < 1) {
@@ -173,6 +202,7 @@
 
         const chunks = chunkArray(rows, creditPerFile);
         const outputs = [];
+        const debitSolId = debitAccountNumber.slice(0, 4);
 
         chunks.forEach((chunk, index) => {
             const lines = [];
@@ -192,11 +222,9 @@
                 );
             });
 
-            const debitSolId = chunk[0].sol_id;
-
             lines.push(
                 buildTTUMLine(
-                    STATIC_DEBIT_ACCOUNT,
+                    debitAccountNumber,
                     debitSolId,
                     "D",
                     totalCredit,
@@ -216,6 +244,55 @@
         return outputs;
     }
 
+    async function downloadZipFile(files, debitAccountNumber) {
+        if (typeof JSZip === "undefined") {
+            throw new Error("JSZip library not loaded. Please include JSZip CDN in HTML.");
+        }
+
+        const zip = new JSZip();
+        const folder = zip.folder("ttum_files");
+
+        files.forEach((fileObj) => {
+            folder.file(fileObj.filename, fileObj.content);
+        });
+
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+        const zipFilename = `TTUM_${debitAccountNumber}_${timestamp}.zip`;
+
+        setStatus(`Creating ZIP file with ${files.length} TTUM files...`);
+
+        const zipBlob = await zip.generateAsync({
+            type: "blob",
+            compression: "DEFLATE",
+            compressionOptions: { level: 6 }
+        });
+
+        downloadBlob(zipFilename, zipBlob);
+        return zipFilename;
+    }
+
+    if (debitAccountInput) {
+        debitAccountInput.addEventListener("input", function () {
+            this.value = this.value.replace(/\D/g, "").slice(0, 15);
+            this.setCustomValidity("");
+        });
+
+        debitAccountInput.addEventListener("blur", function () {
+            const val = this.value.trim();
+            if (val && !/^[0-9]{4,15}$/.test(val)) {
+                this.setCustomValidity("Debit account number must be 4 to 15 digits only.");
+            } else {
+                this.setCustomValidity("");
+            }
+        });
+    }
+
+    if (recordsInput) {
+        recordsInput.addEventListener("input", function () {
+            this.value = this.value.replace(/\D/g, "");
+        });
+    }
+
     if (!processBtn) {
         console.error("Process button not found.");
         return;
@@ -224,25 +301,33 @@
     processBtn.addEventListener("click", async () => {
         try {
             setStatus("Processing...");
-            const file = fileInput ? fileInput.files[0] : null;
 
+            const file = fileInput ? fileInput.files[0] : null;
             validateFile(file);
 
-            const recordsPerFile = validateRecordsPerFile(recordsInput ? recordsInput.value : "");
+            const debitAccountNumber = validateDebitAccount(
+                debitAccountInput ? debitAccountInput.value : ""
+            );
+
+            const recordsPerFile = validateRecordsPerFile(
+                recordsInput ? recordsInput.value : ""
+            );
+
             const workbook = await parseWorkbook(file);
             const rows = extractRows(workbook);
-            const txtFiles = generateTTUMFiles(rows, recordsPerFile);
 
-            txtFiles.forEach((fileObj) => {
-                downloadTextFile(fileObj.filename, fileObj.content);
-            });
+            setStatus(`Excel parsed successfully. Total rows: ${rows.length}. Generating TTUM files...`);
+
+            const txtFiles = generateTTUMFiles(rows, recordsPerFile, debitAccountNumber);
+
+            const zipFilename = await downloadZipFile(txtFiles, debitAccountNumber);
 
             const summary = txtFiles.map((f, i) => {
-                return `File ${i + 1}: ${f.credit_count} credit + 1 debit, debit amount ${f.total_amount}, Sol ID ${f.debit_sol_id}`;
+                return `File ${i + 1}: ${f.credit_count} credit + 1 debit, debit amount ${f.total_amount}, Debit Sol ID ${f.debit_sol_id}`;
             }).join("\n");
 
             setStatus(
-                `Success.\nRows processed: ${rows.length}\nFiles generated: ${txtFiles.length}\n\n${summary}`
+                `Success.\nDebit account: ${debitAccountNumber}\nDebit Sol ID: ${debitAccountNumber.slice(0, 4)}\nRows processed: ${rows.length}\nFiles generated: ${txtFiles.length}\nDownloaded: ${zipFilename}\n\n${summary}`
             );
         } catch (err) {
             console.error(err);
