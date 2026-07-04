@@ -5,6 +5,15 @@ app_description = "Banking API"
 app_email = "talibsheikh16@gmail.com"
 app_license = "mit"
 
+# Fixtures
+# ------------------
+fixtures = [
+    {
+        "dt": "Email Template",
+        "filters": [["name", "=", "Finacle EDR Sync Summary"]],
+    }
+]
+
 # Apps
 # ------------------
 
