@@ -160,6 +160,12 @@ def sync_employees_to_finacle():
         if connection:
             connection.close()
 
+    try:
+        from banking_api.finacle_edr_email import send_edr_sync_summary
+        send_edr_sync_summary()
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "EDR Sync Summary Email Failed")
+
 
 def log_sync_attempt(employee, finacle_emp_id, request_data, response_data, status):
     """
