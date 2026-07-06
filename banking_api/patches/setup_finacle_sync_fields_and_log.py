@@ -101,35 +101,6 @@ frappe.listview_settings['Finacle EDR Sync Log'] = {
             }
         );
     },
-    onload: function(listview) {
-        frappe.call({
-            method: "frappe.client.get_count",
-            args: {
-                doctype: "Finacle EDR Sync Log",
-                filters: { status: "Failed" }
-            },
-            callback: function(r) {
-                if (r.message && r.message > 0) {
-                    listview.page.add_button(__("Retry Failed (" + r.message + ")"), function() {
-                        frappe.confirm(
-                            __('Are you sure you want to retry ' + r.message + ' failed records?'),
-                            function() {
-                                frappe.call({
-                                    method: "banking_api.finacle_sync.retry_failed_finacle_sync",
-                                    freeze: true,
-                                    freeze_message: __('Retrying failed employees...'),
-                                    callback: function(r) {
-                                        frappe.msgprint(__('Retry process completed.'));
-                                        cur_list.refresh();
-                                    }
-                                });
-                            }
-                        );
-                    }).addClass("btn-danger");
-                }
-            }
-        });
-    },
     refresh: function(listview) {
         setTimeout(() => {
             if (listview.page.btn_primary) {
