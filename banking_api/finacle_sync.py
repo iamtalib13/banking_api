@@ -62,7 +62,7 @@ def sync_employees_to_finacle():
         for emp in employees:
             finacle_emp_id = f"SAH0{emp.name}"
             emp_name = (emp.employee_name or "")[:50]
-            emp_short_name = (emp.first_name or emp_name)[:15]
+            emp_short_name = (emp.first_name or emp_name)[:10]
             sol_id = (emp.sol_id or "").strip()
 
             if not sol_id:
