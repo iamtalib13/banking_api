@@ -160,6 +160,12 @@ def sync_employees_to_finacle():
         if connection:
             connection.close()
 
+    try:
+        from banking_api.finacle_edr_email import send_edr_sync_summary
+        send_edr_sync_summary()
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "EDR Sync Summary Email Failed")
+
 
 def log_sync_attempt(employee, finacle_emp_id, request_data, response_data, status):
     """
@@ -301,6 +307,23 @@ def retry_failed_finacle_sync():
                                     "response_data", frappe.as_json({
                                         "status": "success",
                                         "message": "Record inserted to Finacle DB (retry)"
+                                    }))
+
+                retried += 1
+
+            except psycopg2.errors.UniqueViolation:
+                connection.rollback()
+
+                frappe.db.set_value("Employee", emp.name,
+                                    "custom_finacle_synced", 1)
+
+                frappe.db.set_value("Finacle EDR Sync Log", log.name,
+                                    "status", "Success")
+
+                frappe.db.set_value("Finacle EDR Sync Log", log.name,
+                                    "response_data", frappe.as_json({
+                                        "status": "success",
+                                        "message": "Record already exists in Finacle DB"
                                     }))
 
                 retried += 1
