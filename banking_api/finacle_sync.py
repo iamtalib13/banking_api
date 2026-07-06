@@ -305,6 +305,23 @@ def retry_failed_finacle_sync():
 
                 retried += 1
 
+            except psycopg2.errors.UniqueViolation:
+                connection.rollback()
+
+                frappe.db.set_value("Employee", emp.name,
+                                    "custom_finacle_synced", 1)
+
+                frappe.db.set_value("Finacle EDR Sync Log", log.name,
+                                    "status", "Success")
+
+                frappe.db.set_value("Finacle EDR Sync Log", log.name,
+                                    "response_data", frappe.as_json({
+                                        "status": "success",
+                                        "message": "Record already exists in Finacle DB"
+                                    }))
+
+                retried += 1
+
             except Exception as e:
                 connection.rollback()
                 error_trace = frappe.get_traceback()
