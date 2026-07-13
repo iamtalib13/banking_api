@@ -33,6 +33,19 @@ def sync_employees_to_finacle():
         frappe.logger().info("Finacle Sync: No new employees found to sync.")
         return
 
+    already_attempted = frappe.get_all(
+        "Finacle EDR Sync Log",
+        filters={"status": "Success"},
+        fields=["employee"],
+        pluck="employee",
+    )
+
+    employees = [emp for emp in employees if emp.name not in already_attempted]
+
+    if not employees:
+        frappe.logger().info("Finacle Sync: No new employees found to sync.")
+        return
+
     settings = frappe.get_single("Finacle Settings")
     host = (settings.host or "").strip()
     port = settings.port
