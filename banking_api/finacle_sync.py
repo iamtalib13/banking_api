@@ -26,8 +26,11 @@ def sync_employees_to_finacle():
             "last_name",
             "user_id",
             "sol_id",
+            "custom_is_support_staff",
         ],
     )
+
+    employees = [emp for emp in employees if not emp.custom_is_support_staff]
 
     if not employees:
         frappe.logger().info("Finacle Sync: No new employees found to sync.")
@@ -256,11 +259,14 @@ def retry_failed_finacle_sync():
             emp = frappe.get_value(
                 "Employee",
                 emp_name,
-                ["name", "employee_name", "first_name", "sol_id"],
+                ["name", "employee_name", "first_name", "sol_id", "custom_is_support_staff"],
                 as_dict=True,
             )
 
             if not emp:
+                continue
+
+            if emp.custom_is_support_staff:
                 continue
 
             emp_name_val = (emp.employee_name or "")[:50]
