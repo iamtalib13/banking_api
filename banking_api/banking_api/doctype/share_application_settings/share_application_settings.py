@@ -49,7 +49,7 @@ def cint_safe(value, default=0):
     except Exception:
         return default
 
-
+# old not used
 # def get_share_application_query(sync_days=None):
 #     return """
 #         SELECT *
@@ -160,7 +160,7 @@ def cint_safe(value, default=0):
 #     """
 
 
-# working tilljuly 16 2026
+# working till july 16 2026
 # def get_share_application_query(sync_days=30):
 #     sync_days = cint_safe(sync_days, 30)
 
@@ -291,6 +291,160 @@ def cint_safe(value, default=0):
 #     """
 
 # # AND g.clr_bal_amt >= 20
+
+
+# working till july 16 2026
+# def run_share_application_sync():
+#     settings = frappe.get_single("Share Application Settings")
+
+#     if not settings.enable_sync:
+#         return {
+#             "status": "skipped",
+#             "message": "Share Application Sync is disabled."
+#         }
+
+#     # set sync days
+#     sync_days = cint_safe(settings.sync_back_days, 30)
+
+#     conn = None
+#     cursor = None
+#     created_count = 0
+#     skipped_count = 0
+#     total_rows = 0
+
+#     try:
+#         conn = db_connection()
+#         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+#         # sync_days = cint_safe(settings.sync_back_days, 30)
+#         query = get_share_application_query(sync_days)
+#         cursor.execute(query)
+
+#         existing_cifs = set(
+#             str(cif).strip()
+#             for cif in frappe.get_all("Share Application", pluck="cif")
+#             if cif is not None
+#         )
+
+#         with tqdm(
+#             total=None,
+#             desc="Share Application Sync",
+#             unit="row",
+#             ncols=120
+#         ) as pbar:
+
+#             while True:
+#                 row = cursor.fetchone()
+#                 if not row:
+#                     break
+
+#                 total_rows += 1
+
+#                 cif_id = row.get("cif_id")
+#                 foracid = row.get("account_no")
+#                 sol_id = row.get("sol_id")
+#                 cif_opening_date = row.get("cif_opening_date")
+
+#                 if cif_id is None:
+#                     skipped_count += 1
+#                     pbar.update(1)
+#                     pbar.set_postfix(
+#                         created=created_count,
+#                         skipped=skipped_count
+#                     )
+#                     continue
+
+#                 cif_id_str = str(cif_id).strip()
+#                 if cif_id_str in existing_cifs:
+#                     skipped_count += 1
+#                     pbar.update(1)
+#                     pbar.set_postfix(
+#                         created=created_count,
+#                         skipped=skipped_count
+#                     )
+#                     continue
+
+#                 # try:
+#                 #     doc = frappe.new_doc("Share Application")
+#                 #     doc.cif = cif_id
+#                 #     doc.account_number = foracid
+#                 #     doc.sol_id = sol_id
+#                 #     doc.cif_creation_date = cif_opening_date
+#                 #     doc.status = "Pending"
+#                 #     doc.insert(ignore_permissions=True)
+
+#                 #     frappe.db.commit()
+
+#                 #     existing_cifs.add(cif_id_str)
+#                 #     created_count += 1
+
+#                 try:
+#                     doc = frappe.new_doc("Share Application")
+#                     doc.cif = cif_id
+#                     doc.account_number = foracid
+#                     doc.sol_id = sol_id
+#                     doc.cif_creation_date = cif_opening_date
+#                     # doc.payment_status = "Pending"
+#                     doc.status = "Pending"
+
+#                     doc.customer_name = row.get(
+#                         "customer_name") or row.get("acct_name") or ""
+#                     doc.address = row.get("address") or ""
+#                     doc.scheme_code = row.get("schm_code") or ""
+#                     doc.scheme_type = row.get("schm_type") or ""
+#                     doc.account_opening_date = row.get("acct_opn_date")
+#                     # doc.transaction_amount = row.get("clr_bal_amt") or 0
+
+#                     doc.insert(ignore_permissions=True)
+
+#                     frappe.db.commit()
+
+#                     existing_cifs.add(cif_id_str)
+#                     created_count += 1
+
+#                 except Exception:
+#                     frappe.db.rollback()
+#                     skipped_count += 1
+#                     frappe.log_error(
+#                         frappe.get_traceback(),
+#                         f"Share Application Sync Row Failed - CIF {cif_id}"
+#                     )
+
+#                 pbar.update(1)
+#                 pbar.set_postfix(
+#                     created=created_count,
+#                     skipped=skipped_count
+#                 )
+
+#         frappe.db.set_single_value(
+#             "Share Application Settings",
+#             "last_sync_run",
+#             now()
+#         )
+#         frappe.db.commit()
+
+#         return {
+#             "status": "success",
+#             "total_rows": total_rows,
+#             "created_count": created_count,
+#             "skipped_count": skipped_count,
+#             "message": (
+#                 f"Sync completed. Total fetched: {total_rows}, "
+#                 f"created: {created_count}, skipped existing/errors: {skipped_count}."
+#             )
+#         }
+
+#     except Exception:
+#         frappe.db.rollback()
+#         frappe.log_error(frappe.get_traceback(),
+#                          "Share Application Sync Failed")
+#         raise
+
+#     finally:
+#         if cursor:
+#             cursor.close()
+#         if conn:
+#             conn.close()
 
 
 def get_share_application_query():
@@ -429,9 +583,6 @@ def run_share_application_sync():
             "message": "Share Application Sync is disabled."
         }
 
-    # set sync days
-    sync_days = cint_safe(settings.sync_back_days, 30)
-
     conn = None
     cursor = None
     created_count = 0
@@ -442,8 +593,7 @@ def run_share_application_sync():
         conn = db_connection()
         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-        # sync_days = cint_safe(settings.sync_back_days, 30)
-        query = get_share_application_query(sync_days)
+        query = get_share_application_query()
         cursor.execute(query)
 
         existing_cifs = set(
@@ -490,39 +640,21 @@ def run_share_application_sync():
                     )
                     continue
 
-                # try:
-                #     doc = frappe.new_doc("Share Application")
-                #     doc.cif = cif_id
-                #     doc.account_number = foracid
-                #     doc.sol_id = sol_id
-                #     doc.cif_creation_date = cif_opening_date
-                #     doc.status = "Pending"
-                #     doc.insert(ignore_permissions=True)
-
-                #     frappe.db.commit()
-
-                #     existing_cifs.add(cif_id_str)
-                #     created_count += 1
-
                 try:
                     doc = frappe.new_doc("Share Application")
                     doc.cif = cif_id
                     doc.account_number = foracid
                     doc.sol_id = sol_id
                     doc.cif_creation_date = cif_opening_date
-                    # doc.payment_status = "Pending"
                     doc.status = "Pending"
-
                     doc.customer_name = row.get(
                         "customer_name") or row.get("acct_name") or ""
                     doc.address = row.get("address") or ""
                     doc.scheme_code = row.get("schm_code") or ""
                     doc.scheme_type = row.get("schm_type") or ""
                     doc.account_opening_date = row.get("acct_opn_date")
-                    # doc.transaction_amount = row.get("clr_bal_amt") or 0
 
                     doc.insert(ignore_permissions=True)
-
                     frappe.db.commit()
 
                     existing_cifs.add(cif_id_str)
@@ -562,8 +694,10 @@ def run_share_application_sync():
 
     except Exception:
         frappe.db.rollback()
-        frappe.log_error(frappe.get_traceback(),
-                         "Share Application Sync Failed")
+        frappe.log_error(
+            frappe.get_traceback(),
+            "Share Application Sync Failed"
+        )
         raise
 
     finally:
