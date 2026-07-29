@@ -1175,3 +1175,22 @@ def retry_share_application_payment():
         "failed_count": failed_count,
         "skipped_count": skipped_count
     }
+
+
+@frappe.whitelist()
+def get_share_certificate_image():
+    image = frappe.db.get_single_value(
+        "Share Application Settings",
+        "share_certificate_image"
+    )
+
+    if not image:
+        return {
+            "status": "error",
+            "message": "Share Certificate Image is not set in Share Application Settings."
+        }
+
+    return {
+        "status": "success",
+        "image_url": image
+    }
