@@ -18,7 +18,8 @@
   "tenure_days",
   "sol_description",
   "scheme_description",
-  "collection"
+  "collection",
+  "commission_amount"
  ],
  "fields": [
   {
@@ -102,12 +103,17 @@
   {
    "fieldname": "column_break_ajmr",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "commission_amount",
+   "fieldtype": "Int",
+   "label": "Commission Amount"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-07-27 17:38:14.295339",
+ "modified": "2026-07-31 16:28:03.562504",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Commission",
