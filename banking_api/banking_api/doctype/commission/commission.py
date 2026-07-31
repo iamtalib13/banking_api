@@ -5,6 +5,7 @@ from tqdm import tqdm
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.utils import flt
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -606,3 +607,48 @@ def debug_create_one_commission():
     finally:
         if conn:
             conn.close()
+
+
+@frappe.whitelist()
+def calculate_commission_amount(docname):
+    if not docname:
+        frappe.throw(_("Commission document name is required"))
+
+    commission_doc = frappe.get_doc("Commission", docname)
+
+    if not commission_doc.scheme_code:
+        frappe.throw(_("Scheme Code is required in Commission document"))
+
+    if commission_doc.collection in (None, ""):
+        frappe.throw(_("Collection value is required in Commission document"))
+
+    product_name = str(commission_doc.scheme_code).strip()
+
+    if not frappe.db.exists("Product", product_name):
+        frappe.throw(
+            _("No Product record found with ID / Name: {0}").format(product_name))
+
+    commission_rate = frappe.db.get_value(
+        "Product", product_name, "commission_rate")
+
+    if commission_rate in (None, ""):
+        frappe.throw(
+            _("Commission Rate is empty in Product: {0}").format(product_name))
+
+    collection_amount = flt(commission_doc.collection)
+    commission_rate = flt(commission_rate)
+
+    commission_amount = (collection_amount * commission_rate) / 100
+
+    commission_doc.commission_amount = commission_amount
+    commission_doc.save(ignore_permissions=True)
+    frappe.db.commit()
+
+    return {
+        "docname": commission_doc.name,
+        "scheme_code": commission_doc.scheme_code,
+        "product_name": product_name,
+        "collection": collection_amount,
+        "commission_rate": commission_rate,
+        "commission_amount": commission_amount,
+    }
