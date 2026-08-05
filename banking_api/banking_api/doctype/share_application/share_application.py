@@ -582,6 +582,7 @@ def download_share_application_report(report_type):
         "fund_transfer_date",
         "cif_creation_date",
         "account_opening_date",
+        "success_but_fund_not_debited",
         # "retry_attempted",
         # "last_retry_attempted",
         # "owner",
@@ -605,6 +606,7 @@ def download_share_application_report(report_type):
         "fund_transfer_date",
         "cif_creation_date",
         "account_opening_date",
+        "success_but_fund_not_debited",
         # "retry_attempted",
         # "last_retry_attempted",
         # "owner",
@@ -652,6 +654,7 @@ def download_share_application_report(report_type):
         "fund_transfer_date": "Fund Transfer Date",
         "cif_creation_date": "CIF Creation Date",
         "account_opening_date": "Account Opening Date",
+        "success_but_fund_not_debited": "Success But Fund Not Debited",
         # "retry_attempted": "Retry Attempted",
         # "last_retry_attempted": "Last Retry Attempted",
         # "owner": "Owner",
@@ -680,6 +683,11 @@ def download_share_application_report(report_type):
 
         return "Network Issue"
 
+    def set_success_but_fund_not_debited(row):
+        if row.get("payment_status") == "Success" and row.get("success_but_fund_not_debited"):
+            return "Yes"
+        return "No"
+
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow([label_map.get(field, field) for field in export_fields])
@@ -703,11 +711,23 @@ def download_share_application_report(report_type):
         for row in records:
             row_data = []
 
+            # for field in export_fields:
+            #     if field == "failed_reason":
+            #         value = get_failed_reason(row)
+            #     elif field == "docstatus":
+            #         value = docstatus_map.get(row.get(field), row.get(field))
+            #     else:
+            #         value = row.get(field, "")
+
+            #     row_data.append(value)
+
             for field in export_fields:
                 if field == "failed_reason":
                     value = get_failed_reason(row)
                 elif field == "docstatus":
                     value = docstatus_map.get(row.get(field), row.get(field))
+                elif field == "success_but_fund_not_debited":
+                    value = set_success_but_fund_not_debited(row)
                 else:
                     value = row.get(field, "")
 
