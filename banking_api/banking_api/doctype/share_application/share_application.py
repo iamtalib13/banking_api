@@ -586,9 +586,17 @@ def download_proceeding_form(account_opening_date):
         order_by="name asc"
     )
 
+    # if not records:
+    #     frappe.throw(
+    #         _("No Share Application records with successful payment found for the selected Account Opening Date."))
+
     if not records:
-        frappe.throw(
-            _("No Share Application records with successful payment found for the selected Account Opening Date."))
+        frappe.msgprint(
+            _("No Share Application records with successful payment found for the selected Account Opening Date."),
+            title=_("No Records"),
+            indicator="orange"
+        )
+        return
 
     doc = DocxDocument()
 
