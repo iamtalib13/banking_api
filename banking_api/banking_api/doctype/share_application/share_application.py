@@ -578,6 +578,7 @@ def download_share_application_report(report_type):
         "payment_status",
         "failed_reason",
         "transaction_id",
+        "error_log",
         "fund_transfer_date",
         "cif_creation_date",
         "account_opening_date",
@@ -586,7 +587,6 @@ def download_share_application_report(report_type):
         # "owner",
         # "creation",
         "address",
-        # "error_log",
     ]
 
     db_fields = [
@@ -601,6 +601,7 @@ def download_share_application_report(report_type):
         "transaction_amount",
         "payment_status",
         "transaction_id",
+        "error_log",
         "fund_transfer_date",
         "cif_creation_date",
         "account_opening_date",
@@ -609,7 +610,6 @@ def download_share_application_report(report_type):
         # "owner",
         # "creation",
         "address",
-        # "error_log",
         "insufficient_balance",
         "account_closed",
         "account_frozen",
@@ -648,6 +648,7 @@ def download_share_application_report(report_type):
         "payment_status": "Payment Status",
         "failed_reason": "Failed Reason",
         "transaction_id": "Transaction ID",
+        "error_log": "API Response",
         "fund_transfer_date": "Fund Transfer Date",
         "cif_creation_date": "CIF Creation Date",
         "account_opening_date": "Account Opening Date",
@@ -656,7 +657,6 @@ def download_share_application_report(report_type):
         # "owner": "Owner",
         # "creation": "Created On",
         "address": "Address",
-        # "error_log": "API Response",
     }
 
     docstatus_map = {
