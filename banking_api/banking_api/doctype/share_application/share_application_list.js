@@ -100,6 +100,7 @@ frappe.listview_settings["Share Application"] = {
     },
 
     refresh(listview) {
+        hide_share_application_sidebar(listview);
         hide_share_application_list_view_button(listview);
 
         if (listview.page.__share_actions_added) return;
@@ -415,37 +416,97 @@ function fix_share_application_header_layout(listview) {
     });
 }
 
+// function hide_share_application_sidebar(listview) {
+//     const $wrapper = listview.page.wrapper;
+//     const $side_section = $wrapper.find(".layout-side-section");
+//     const $main_section = $wrapper.find(".layout-main-section");
+
+//     if ($side_section.length) {
+//         $side_section.hide();
+//     }
+
+//     if ($main_section.length) {
+//         $main_section.removeClass("col-lg-10 col-md-10");
+//         $main_section.addClass("col-lg-12 col-md-12");
+//         $main_section.css({
+//             width: "100%",
+//             maxWidth: "100%",
+//             flex: "0 0 100%"
+//         });
+//     }
+
+//     $wrapper.find(".layout-main").css({
+//         width: "100%"
+//     });
+
+//     $wrapper.find(".list-row-container, .result, .frappe-list").css({
+//         width: "100%",
+//         maxWidth: "100%"
+//     });
+
+//     $wrapper.find(".sidebar-toggle-btn").hide();
+// }
+
 function hide_share_application_sidebar(listview) {
     const $wrapper = listview.page.wrapper;
-    const $side_section = $wrapper.find(".layout-side-section");
-    const $main_section = $wrapper.find(".layout-main-section");
 
-    if ($side_section.length) {
+    const apply_full_width = () => {
+        const $side_section = $wrapper.find(
+            ".layout-side-section, .list-sidebar, .overlay-sidebar"
+        );
+
+        const $main_section = $wrapper.find(".layout-main-section");
+
+        // Hide complete sidebar
+        $side_section
+            .closest(".layout-side-section")
+            .hide();
+
         $side_section.hide();
-    }
 
-    if ($main_section.length) {
-        $main_section.removeClass("col-lg-10 col-md-10");
-        $main_section.addClass("col-lg-12 col-md-12");
-        $main_section.css({
+        // Make main content full width
+        if ($main_section.length) {
+            $main_section
+                .removeClass(
+                    "col-lg-2 col-md-2 col-sm-2 col-lg-10 col-md-10 col-sm-10"
+                )
+                .addClass("col-lg-12 col-md-12 col-sm-12")
+                .css({
+                    width: "100%",
+                    maxWidth: "100%",
+                    flex: "0 0 100%",
+                    paddingLeft: "15px",
+                    paddingRight: "15px"
+                });
+        }
+
+        $wrapper.find(".layout-main").css({
             width: "100%",
             maxWidth: "100%",
-            flex: "0 0 100%"
+            display: "block"
         });
-    }
 
-    $wrapper.find(".layout-main").css({
-        width: "100%"
-    });
+        $wrapper.find(
+            ".list-row-container, .result, .frappe-list, .list-view-container"
+        ).css({
+            width: "100%",
+            maxWidth: "100%"
+        });
 
-    $wrapper.find(".list-row-container, .result, .frappe-list").css({
-        width: "100%",
-        maxWidth: "100%"
-    });
+        // Hide sidebar toggle button
+        $wrapper.find(
+            ".sidebar-toggle-btn, .list-sidebar-toggle, [data-label='Toggle Sidebar']"
+        ).hide();
+    };
 
-    $wrapper.find(".sidebar-toggle-btn").hide();
+    apply_full_width();
+
+    // Frappe may recreate the sidebar after rendering/filtering
+    setTimeout(apply_full_width, 0);
+    setTimeout(apply_full_width, 100);
+    setTimeout(apply_full_width, 300);
+    setTimeout(apply_full_width, 700);
 }
-
 
 function hide_share_application_list_view_button(listview) {
     const hide_list_view_button = () => {
