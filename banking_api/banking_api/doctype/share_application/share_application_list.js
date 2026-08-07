@@ -100,6 +100,8 @@ frappe.listview_settings["Share Application"] = {
     },
 
     refresh(listview) {
+        hide_share_application_list_view_button(listview);
+
         if (listview.page.__share_actions_added) return;
         listview.page.__share_actions_added = true;
 
@@ -442,4 +444,33 @@ function hide_share_application_sidebar(listview) {
     });
 
     $wrapper.find(".sidebar-toggle-btn").hide();
+}
+
+
+function hide_share_application_list_view_button(listview) {
+    const hide_list_view_button = () => {
+        const $wrapper = listview.page.wrapper;
+
+        $wrapper.find(".custom-btn-group").each(function () {
+            const $group = $(this);
+            const label = $group
+                .find(".custom-btn-group-label")
+                .first()
+                .text()
+                .trim();
+
+            if (label === __("List View") || label === "List View") {
+                $group.hide();
+            }
+        });
+    };
+
+    // Hide immediately if already rendered
+    hide_list_view_button();
+
+    // Frappe may render the view switcher after refresh
+    setTimeout(hide_list_view_button, 0);
+    setTimeout(hide_list_view_button, 100);
+    setTimeout(hide_list_view_button, 300);
+    setTimeout(hide_list_view_button, 700);
 }
