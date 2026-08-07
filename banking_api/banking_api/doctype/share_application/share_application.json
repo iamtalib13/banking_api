@@ -30,7 +30,8 @@
   "transaction_amount",
   "column_break_ysjv",
   "address",
-  "scheme_code"
+  "scheme_code",
+  "amount"
  ],
  "fields": [
   {
@@ -203,13 +204,21 @@
    "fieldtype": "Check",
    "label": "Success But Fund Not Debited",
    "search_index": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "amount",
+   "fieldtype": "Int",
+   "label": "Amount",
+   "read_only": 1,
+   "search_index": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-07-31 13:14:13.224033",
+ "modified": "2026-08-07 16:40:22.613516",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Share Application",
