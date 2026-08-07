@@ -102,6 +102,8 @@ frappe.listview_settings["Share Application"] = {
     refresh(listview) {
         hide_share_application_sidebar(listview);
         hide_share_application_list_view_button(listview);
+        hide_share_application_menu_button(listview);
+        fix_share_application_header_layout(listview);
 
         if (listview.page.__share_actions_added) return;
         listview.page.__share_actions_added = true;
@@ -416,68 +418,42 @@ function fix_share_application_header_layout(listview) {
     });
 }
 
-// function hide_share_application_sidebar(listview) {
-//     const $wrapper = listview.page.wrapper;
-//     const $side_section = $wrapper.find(".layout-side-section");
-//     const $main_section = $wrapper.find(".layout-main-section");
-
-//     if ($side_section.length) {
-//         $side_section.hide();
-//     }
-
-//     if ($main_section.length) {
-//         $main_section.removeClass("col-lg-10 col-md-10");
-//         $main_section.addClass("col-lg-12 col-md-12");
-//         $main_section.css({
-//             width: "100%",
-//             maxWidth: "100%",
-//             flex: "0 0 100%"
-//         });
-//     }
-
-//     $wrapper.find(".layout-main").css({
-//         width: "100%"
-//     });
-
-//     $wrapper.find(".list-row-container, .result, .frappe-list").css({
-//         width: "100%",
-//         maxWidth: "100%"
-//     });
-
-//     $wrapper.find(".sidebar-toggle-btn").hide();
-// }
-
 function hide_share_application_sidebar(listview) {
     const $wrapper = listview.page.wrapper;
 
     const apply_full_width = () => {
-        const $side_section = $wrapper.find(
-            ".layout-side-section, .list-sidebar, .overlay-sidebar"
-        );
-
+        const $side_section = $wrapper.find(".layout-side-section");
         const $main_section = $wrapper.find(".layout-main-section");
+        const $main_wrapper = $wrapper.find(".col.layout-main-section-wrapper");
 
-        // Hide complete sidebar
-        $side_section
-            .closest(".layout-side-section")
-            .hide();
+        $side_section.hide().css({
+            display: "none",
+            width: "0",
+            minWidth: "0",
+            flex: "0 0 0%",
+            maxWidth: "0"
+        });
 
-        $side_section.hide();
+        if ($main_wrapper.length) {
+            $main_wrapper.removeClass("col-lg-10 col-md-10 col-sm-10");
+            $main_wrapper.addClass("col-lg-12 col-md-12 col-sm-12");
+            $main_wrapper.css({
+                width: "100%",
+                maxWidth: "100%",
+                flex: "0 0 100%"
+            });
+        }
 
-        // Make main content full width
         if ($main_section.length) {
-            $main_section
-                .removeClass(
-                    "col-lg-2 col-md-2 col-sm-2 col-lg-10 col-md-10 col-sm-10"
-                )
-                .addClass("col-lg-12 col-md-12 col-sm-12")
-                .css({
-                    width: "100%",
-                    maxWidth: "100%",
-                    flex: "0 0 100%",
-                    paddingLeft: "15px",
-                    paddingRight: "15px"
-                });
+            $main_section.removeClass("col-lg-10 col-md-10 col-sm-10");
+            $main_section.addClass("col-lg-12 col-md-12 col-sm-12");
+            $main_section.css({
+                width: "100%",
+                maxWidth: "100%",
+                flex: "0 0 100%",
+                paddingLeft: "15px",
+                paddingRight: "15px"
+            });
         }
 
         $wrapper.find(".layout-main").css({
@@ -486,22 +462,15 @@ function hide_share_application_sidebar(listview) {
             display: "block"
         });
 
-        $wrapper.find(
-            ".list-row-container, .result, .frappe-list, .list-view-container"
-        ).css({
+        $wrapper.find(".list-row-container, .result, .frappe-list, .list-view-container").css({
             width: "100%",
             maxWidth: "100%"
         });
 
-        // Hide sidebar toggle button
-        $wrapper.find(
-            ".sidebar-toggle-btn, .list-sidebar-toggle, [data-label='Toggle Sidebar']"
-        ).hide();
+        $wrapper.find(".sidebar-toggle-btn, .list-sidebar-toggle, [data-label='Toggle Sidebar']").hide();
     };
 
     apply_full_width();
-
-    // Frappe may recreate the sidebar after rendering/filtering
     setTimeout(apply_full_width, 0);
     setTimeout(apply_full_width, 100);
     setTimeout(apply_full_width, 300);
@@ -534,4 +503,106 @@ function hide_share_application_list_view_button(listview) {
     setTimeout(hide_list_view_button, 100);
     setTimeout(hide_list_view_button, 300);
     setTimeout(hide_list_view_button, 700);
+}
+
+
+function hide_share_application_menu_button(listview) {
+    const hide_menu_button = () => {
+        const $wrapper = listview.page.wrapper;
+
+        $wrapper
+            .find('button[aria-label="Menu"]')
+            .closest(".menu-btn-group")
+            .hide();
+    };
+
+    hide_menu_button();
+
+    // Frappe may render it after the initial refresh
+    setTimeout(hide_menu_button, 0);
+    setTimeout(hide_menu_button, 100);
+    setTimeout(hide_menu_button, 300);
+    setTimeout(hide_menu_button, 700);
+}
+
+function fix_share_application_header_layout(listview) {
+    const $wrapper = listview.page.wrapper;
+
+    $wrapper.find(".page-head-content").css({
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        flexWrap: "nowrap",
+        width: "100%",
+        maxWidth: "100%"
+    });
+
+    $wrapper.find(".page-title").css({
+        flex: "0 1 auto",
+        minWidth: "0"
+    });
+
+    $wrapper.find(".page-actions").css({
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "flex-end",
+        flexWrap: "nowrap",
+        whiteSpace: "nowrap",
+        gap: "8px",
+        marginLeft: "auto",
+        marginRight: "0",
+        width: "auto"
+    });
+
+    $wrapper.find(".page-actions .custom-actions").css({
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "flex-start",
+        flexWrap: "nowrap",
+        whiteSpace: "nowrap",
+        gap: "10px",
+        marginBottom: "0",
+        flex: "0 0 auto",
+        marginRight: "0"
+    });
+
+    $wrapper.find(".page-actions .standard-actions").css({
+        display: "inline-flex",
+        alignItems: "center",
+        flexWrap: "nowrap",
+        whiteSpace: "nowrap",
+        flex: "0 0 auto",
+        marginLeft: "0"
+    });
+
+    $wrapper.find(".share-status-wrap").css({
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "flex-start",
+        gap: "8px",
+        flexWrap: "nowrap",
+        whiteSpace: "nowrap",
+        marginRight: "12px",
+        flex: "0 0 auto"
+    });
+
+    $wrapper.find(".share-status-capsules").css({
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "flex-start",
+        flexWrap: "nowrap",
+        whiteSpace: "nowrap",
+        gap: "6px",
+        flex: "0 0 auto"
+    });
+
+    // Remove any hidden button groups still taking space
+    $wrapper.find(".custom-btn-group, .menu-btn-group").css({
+        display: "none",
+        width: "0",
+        minWidth: "0",
+        margin: "0",
+        padding: "0",
+        border: "0"
+    });
 }
