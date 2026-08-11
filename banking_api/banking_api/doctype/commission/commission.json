@@ -12,13 +12,17 @@
   "scheme_code",
   "demand",
   "pan_card",
+  "remarks",
+  "agent_total_eligible_collection",
   "column_break_ajmr",
   "agent_name",
   "customer_account_number",
+  "account_opening_date",
   "tenure_days",
   "sol_description",
   "scheme_description",
   "collection",
+  "eligible_amount",
   "commission_amount"
  ],
  "fields": [
@@ -106,14 +110,34 @@
   },
   {
    "fieldname": "commission_amount",
-   "fieldtype": "Int",
+   "fieldtype": "Data",
    "label": "Commission Amount"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Data",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "account_opening_date",
+   "fieldtype": "Date",
+   "label": "Account Opening Date"
+  },
+  {
+   "fieldname": "eligible_amount",
+   "fieldtype": "Data",
+   "label": "Eligible Amount"
+  },
+  {
+   "fieldname": "agent_total_eligible_collection",
+   "fieldtype": "Data",
+   "label": "Agent Total Eligible Collection"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-07-31 16:28:03.562504",
+ "modified": "2026-08-11 15:20:46.827383",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Commission",
