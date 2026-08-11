@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 from tqdm import tqdm
+
 import frappe
 from frappe import _
 from frappe.model.document import Document
@@ -16,247 +17,303 @@ class Commission(Document):
 
 
 def db_connection():
-    """Connect to external PostgreSQL (Finacle) using Finacle DB Credentials."""
+    """Connect to external PostgreSQL using Finacle DB Credentials."""
     try:
         creds = frappe.get_single("Finacle DB Credentials")
 
         port = int(creds.db_port) if creds.db_port else 5432
 
-        conn = psycopg2.connect(
+        return psycopg2.connect(
             host=creds.db_host,
             port=port,
             user=creds.db_user,
             password=creds.get_password("db_password"),
-            database=creds.db_name
+            database=creds.db_name,
         )
-        return conn
-    except Exception as e:
-        frappe.log_error(frappe.get_traceback(),
-                         "PostgreSQL Connection Failed")
-        frappe.throw(_("Database Connection Error: {0}").format(str(e)))
+
+    except Exception:
+        frappe.log_error(
+            frappe.get_traceback(),
+            "PostgreSQL Connection Failed",
+        )
+        frappe.throw(_("Database Connection Error"))
 
 
+# Keep your updated QUERY_1 exactly as provided.
 QUERY_1 = """
 WITH account_data AS (
-    SELECT
-        d.rm_id,
-        g2.emp_name AS rm_name,
-        d2.operacc,
-        g.cif_id,
-        g.acct_opn_date,
-        a2.relationshipopeningdate AS cif_id_opening_date,
-        g.foracid,
-        g.sol_id,
-        sol.sol_desc,
-        g.schm_code AS scheme_code,
-        gsp.schm_desc
-    FROM custom.dsamap d
-    INNER JOIN tbaadm.gam g
-        ON g.foracid = d.account_number
-       AND g.schm_code IN (
-            '2004','2005','2006','2010','2011','2012','2013','2014','2015'
-       )
-    LEFT JOIN crmuser.accounts a2
-        ON g.cif_id = a2.orgkey
-    LEFT JOIN tbaadm.sol sol
-        ON g.sol_id = sol.sol_id
-    LEFT JOIN tbaadm.gsp gsp
-        ON g.schm_code = gsp.schm_code
-    LEFT JOIN custom.dsaauth d2
-        ON d.rm_id = d2.user_id
-    LEFT JOIN tbaadm.get g2
-        ON d2.user_id = g2.emp_id
+SELECT
+d.rm_id,
+g2.emp_name AS rm_name,
+d2.operacc,
+g.cif_id,
+g.acct_opn_date,
+a2.relationshipopeningdate AS cif_id_opening_date,
+g.foracid,
+g.sol_id,
+sol.sol_desc,
+g.schm_code AS scheme_code,
+gsp.schm_desc,
+tam.deposit_period_days,
+tam.deposit_period_mths
+FROM custom.dsamap d
+INNER JOIN tbaadm.gam g
+ON g.foracid = d.account_number
+AND g.schm_code IN (
+'2004','2005','2006','2010','2011','2012','2013','2014','2015'
+)
+LEFT JOIN tbaadm.tam tam
+ON tam.acid = g.acid
+LEFT JOIN crmuser.accounts a2
+ON g.cif_id = a2.orgkey
+LEFT JOIN tbaadm.sol sol
+ON g.sol_id = sol.sol_id
+LEFT JOIN tbaadm.gsp gsp
+ON g.schm_code = gsp.schm_code
+LEFT JOIN custom.dsaauth d2
+ON d.rm_id = d2.user_id
+LEFT JOIN tbaadm.get g2
+ON d2.user_id = g2.emp_id
 ),
 flow_data AS (
-    SELECT
-        d.rm_id,
-        g.foracid,
-        g.schm_code,
-        SUM(tdt.flow_amt) AS total_flow_amount
-    FROM custom.dsamap d
-    INNER JOIN tbaadm.gam g
-        ON g.foracid = d.account_number
-       AND g.schm_code IN (
-            '2004','2005','2006','2010','2011','2012','2013','2014','2015'
-       )
-    INNER JOIN tbaadm.tdt tdt
-        ON tdt.acid = g.acid
-       AND tdt.flow_code = 'NI'
-    WHERE tdt.flow_date BETWEEN DATE '2026-06-01' AND DATE '2026-06-30'
-    GROUP BY d.rm_id, g.foracid, g.schm_code
-    HAVING SUM(tdt.flow_amt) > 0
+SELECT
+d.rm_id,
+g.foracid,
+g.schm_code,
+SUM(tdt.flow_amt) AS total_flow_amount
+FROM custom.dsamap d
+INNER JOIN tbaadm.gam g
+ON g.foracid = d.account_number
+AND g.schm_code IN (
+'2004','2005','2006','2010','2011','2012','2013','2014','2015'
+)
+INNER JOIN tbaadm.tdt tdt
+ON tdt.acid = g.acid
+AND tdt.flow_code = 'NI'
+WHERE
+tdt.flow_date BETWEEN DATE '2026-06-01' AND DATE '2026-06-30'
+GROUP BY d.rm_id,g.foracid,g.schm_code
+HAVING SUM(tdt.flow_amt) > 0
 ),
 tran_data AS (
-    SELECT
-        d.rm_id,
-        g.foracid,
-        g.schm_code,
-        SUM(dtt.tran_amt) AS total_tran_amt
-    FROM custom.dsamap d
-    INNER JOIN tbaadm.gam g
-        ON g.foracid = d.account_number
-       AND g.schm_code IN (
-            '2004','2005','2006','2010','2011','2012','2013','2014','2015'
-       )
-    INNER JOIN tbaadm.dtt dtt
-        ON dtt.acid = g.acid
-       AND dtt.flow_code = 'NI'
-    WHERE (
-        (
-            dtt.tran_date BETWEEN DATE '2026-06-01' AND DATE '2026-06-30'
-            AND dtt.value_date > DATE '2026-05-31'
-        )
-        OR
-        (
-            dtt.tran_date > DATE '2026-06-30'
-            AND dtt.value_date BETWEEN DATE '2026-06-01' AND DATE '2026-06-30'
-        )
-        OR
-        (
-            dtt.value_date BETWEEN DATE '2026-06-01' AND DATE '2026-06-30'
-            AND dtt.tran_date > DATE '2026-06-30'
-        )
-    )
-    GROUP BY d.rm_id, g.foracid, g.schm_code
-    HAVING SUM(dtt.tran_amt) > 0
+SELECT
+d.rm_id,
+g.foracid,
+g.schm_code,
+SUM(dtt.tran_amt) AS total_tran_amt
+FROM custom.dsamap d
+INNER JOIN tbaadm.gam g
+ON g.foracid = d.account_number
+AND g.schm_code IN (
+'2004','2005','2006','2010','2011','2012','2013','2014','2015'
+)
+INNER JOIN tbaadm.dtt dtt
+ON dtt.acid = g.acid
+AND dtt.flow_code = 'NI'
+WHERE
+(
+(
+dtt.tran_date BETWEEN DATE '2026-06-01' AND DATE '2026-06-30'
+AND dtt.value_date > DATE '2026-05-31'
+)
+OR
+(
+dtt.tran_date > DATE '2026-06-30'
+AND dtt.value_date BETWEEN DATE '2026-06-01' AND DATE '2026-06-30'
+)
+OR
+(
+dtt.value_date BETWEEN DATE '2026-06-01' AND DATE '2026-06-30'
+AND dtt.tran_date > DATE '2026-06-30'
+)
+)
+GROUP BY d.rm_id,g.foracid,g.schm_code
+HAVING SUM(dtt.tran_amt) > 0
 ),
 reference_data AS (
-    SELECT
-        ed.referencenumber,
-        da.user_id AS rm_id
-    FROM crmuser.entitydocument ed
-    INNER JOIN tbaadm.gam g
-        ON ed.orgkey = g.cif_id
-    INNER JOIN custom.dsaauth da
-        ON g.foracid = da.operacc
-    WHERE ed.doccode = 'PAN'
+SELECT
+ed.referencenumber,
+da.user_id AS rm_id
+FROM crmuser.entitydocument ed
+INNER JOIN tbaadm.gam g
+ON ed.orgkey = g.cif_id
+INNER JOIN custom.dsaauth da
+ON g.foracid = da.operacc
+WHERE ed.doccode = 'PAN'
 )
 SELECT
-    ad.rm_id,
-    ad.rm_name,
-    ad.operacc,
-    ad.cif_id,
-    ad.acct_opn_date,
-    ad.cif_id_opening_date,
-    ad.foracid,
-    COALESCE(fd.total_flow_amount, 0) AS total_flow_amount,
-    COALESCE(td.total_tran_amt, 0) AS total_tran_amt,
-    COALESCE(rd.referencenumber, 'N/A') AS referencenumber,
-    ad.scheme_code,
-    ad.schm_desc,
-    ad.sol_id,
-    ad.sol_desc
+ad.rm_id,
+ad.rm_name,
+ad.operacc,
+ad.cif_id,
+ad.acct_opn_date,
+ad.acct_opn_date,
+ad.cif_id_opening_date,
+ad.foracid,
+COALESCE(fd.total_flow_amount,0) AS total_flow_amount,
+COALESCE(td.total_tran_amt,0) AS total_tran_amt,
+LEAST(
+COALESCE(fd.total_flow_amount,0),
+COALESCE(td.total_tran_amt,0)
+) AS commission_amount,
+CASE
+WHEN ad.acct_opn_date + INTERVAL '1 year' <= DATE '2026-06-30' THEN 'YES'
+ELSE 'NO'
+END AS one_year_completed,
+ad.deposit_period_days,
+ad.deposit_period_mths,
+COALESCE(rd.referencenumber,'N/A') AS referencenumber,
+ad.scheme_code,
+ad.schm_desc,
+ad.sol_id,
+ad.sol_desc
 FROM account_data ad
 LEFT JOIN flow_data fd
-    ON ad.rm_id = fd.rm_id
-   AND ad.foracid = fd.foracid
-   AND ad.scheme_code = fd.schm_code
+ON ad.rm_id = fd.rm_id
+AND ad.foracid = fd.foracid
+AND ad.scheme_code = fd.schm_code
 LEFT JOIN tran_data td
-    ON ad.rm_id = td.rm_id
-   AND ad.foracid = td.foracid
-   AND ad.scheme_code = td.schm_code
+ON ad.rm_id = td.rm_id
+AND ad.foracid = td.foracid
+AND ad.scheme_code = td.schm_code
 LEFT JOIN reference_data rd
-    ON ad.rm_id = rd.rm_id
-WHERE COALESCE(td.total_tran_amt, 0) > 0
-ORDER BY ad.foracid, ad.rm_id, ad.scheme_code
+ON ad.rm_id = rd.rm_id
+WHERE
+COALESCE(td.total_tran_amt,0) > 0
+ORDER BY
+ad.foracid,
+ad.rm_id,
+ad.scheme_code
 """
 
+
+# Keep your updated QUERY_2 exactly as provided.
 QUERY_2 = """
 WITH account_data AS (
-    SELECT
-        ds.rm_id,
-        g2.emp_name AS rm_name,
-        d2.operacc,
-        g.foracid,
-        tam.deposit_period_mths,
-        tam.deposit_period_days,
-        COUNT(DISTINCT g.acid) AS count_acid_gam,
-        SUM(dtt.tran_amt) AS total_tran_amt_dtt,
-        SUM(tdt.flow_amt) AS total_flow_amt_tdt,
-        g.sol_id,
-        sol.sol_desc,
-        g.schm_code AS scheme_code,
-        gsp.schm_desc
-    FROM custom.dsamap AS ds
-    LEFT JOIN tbaadm.gam AS g
-        ON g.foracid = ds.account_number
-       AND g.schm_code IN (
-            '2001','2002','2003',
-            '2018','2019','2020','2021','2022','2023','2024','2025','2026','2027','2028','2029','2030','2031','2032','2033','2034','2035',
-            '2101','2102','2103','2104','2105','2106',
-            '2201','2202','2203',
-            '9001','9002'
-       )
-       AND g.acct_opn_date BETWEEN DATE '2026-06-01' AND DATE '2026-06-30'
-       AND g.acct_cls_flg = 'N'
-    LEFT JOIN tbaadm.tam AS tam
-        ON tam.acid = g.acid
-    LEFT JOIN tbaadm.dtt AS dtt
-        ON dtt.acid = g.acid
-       AND dtt.flow_code = 'PI'
-       AND dtt.tran_date BETWEEN DATE '2026-06-01' AND DATE '2026-06-30'
-       AND NOT (
-            dtt.value_date >= DATE '2026-05-01'
-            AND dtt.value_date < DATE '2026-06-01'
-       )
-    LEFT JOIN tbaadm.tdt AS tdt
-        ON tdt.acid = g.acid
-       AND tdt.flow_code = 'PI'
-       AND tdt.flow_date BETWEEN DATE '2026-06-01' AND DATE '2026-06-30'
-    LEFT JOIN custom.dsaauth AS d2
-        ON UPPER(ds.rm_id) = UPPER(d2.user_id)
-    LEFT JOIN tbaadm.get AS g2
-        ON d2.user_id = g2.emp_id
-    LEFT JOIN tbaadm.sol AS sol
-        ON g.sol_id = sol.sol_id
-    LEFT JOIN tbaadm.gsp AS gsp
-        ON gsp.schm_code = g.schm_code
-    GROUP BY
-        ds.rm_id, g2.emp_name, d2.operacc, g.foracid,
-        tam.deposit_period_mths, tam.deposit_period_days,
-        g.sol_id, sol.sol_desc, g.schm_code, gsp.schm_desc
+SELECT
+ds.rm_id,
+g2.emp_name AS rm_name,
+d2.operacc,
+g.foracid,
+g.acct_opn_date,
+tam.deposit_period_mths,
+tam.deposit_period_days,
+COUNT(DISTINCT g.acid) AS count_acid_gam,
+SUM(dtt.tran_amt) AS total_tran_amt_dtt,
+SUM(tdt.flow_amt) AS total_flow_amt_tdt,
+g.sol_id,
+sol.sol_desc,
+g.schm_code AS scheme_code,
+gsp.schm_desc
+FROM custom.dsamap AS ds
+LEFT JOIN tbaadm.gam AS g
+ON g.foracid = ds.account_number
+AND g.schm_code IN (
+'2001','2002','2003',
+'2018','2019','2020','2021','2022','2023','2024','2025','2026','2027','2028','2029','2030','2031','2032','2033','2034','2035',
+'2101','2102','2103','2104','2105','2106',
+'2201','2202','2203',
+'9001','9002'
+)
+AND g.acct_opn_date BETWEEN DATE '2026-06-01' AND DATE '2026-06-30'
+AND g.acct_cls_flg = 'N'
+LEFT JOIN tbaadm.tam AS tam
+ON tam.acid = g.acid
+LEFT JOIN tbaadm.dtt AS dtt
+ON dtt.acid = g.acid
+AND dtt.flow_code = 'PI'
+AND dtt.tran_date BETWEEN DATE '2026-06-01' AND DATE '2026-06-30'
+AND NOT (
+dtt.value_date >= DATE '2026-05-01'
+AND dtt.value_date < DATE '2026-06-01'
+)
+LEFT JOIN tbaadm.tdt AS tdt
+ON tdt.acid = g.acid
+AND tdt.flow_code = 'PI'
+AND tdt.flow_date BETWEEN DATE '2026-06-01' AND DATE '2026-06-30'
+LEFT JOIN custom.dsaauth AS d2
+ON UPPER(ds.rm_id) = UPPER(d2.user_id)
+LEFT JOIN tbaadm.get AS g2
+ON d2.user_id = g2.emp_id
+LEFT JOIN tbaadm.sol AS sol
+ON g.sol_id = sol.sol_id
+LEFT JOIN tbaadm.gsp AS gsp
+ON gsp.schm_code = g.schm_code
+GROUP BY
+ds.rm_id,
+g2.emp_name,
+d2.operacc,
+g.foracid,
+g.acct_opn_date,
+tam.deposit_period_mths,
+tam.deposit_period_days,
+g.sol_id,
+sol.sol_desc,
+g.schm_code,
+gsp.schm_desc
 ),
 reference_data AS (
-    SELECT
-        ed.referencenumber,
-        da.user_id AS rm_id
-    FROM crmuser.entitydocument AS ed
-    JOIN tbaadm.gam AS g
-        ON ed.orgkey = g.cif_id
-    JOIN custom.dsaauth AS da
-        ON g.foracid = da.operacc
-    WHERE ed.doccode = 'PAN'
+SELECT
+ed.referencenumber,
+da.user_id AS rm_id
+FROM crmuser.entitydocument AS ed
+JOIN tbaadm.gam AS g
+ON ed.orgkey = g.cif_id
+JOIN custom.dsaauth AS da
+ON g.foracid = da.operacc
+WHERE ed.doccode = 'PAN'
 )
 SELECT
-    ad.rm_id,
-    ad.rm_name,
-    ad.operacc,
-    ad.foracid,
-    ad.deposit_period_mths,
-    ad.deposit_period_days,
-    ad.sol_id,
-    ad.sol_desc,
-    ad.scheme_code,
-    ad.schm_desc,
-    SUM(ad.total_tran_amt_dtt) AS total_tran_amt_dtt,
-    SUM(ad.total_flow_amt_tdt) AS total_flow_amt_tdt,
-    MAX(COALESCE(rd.referencenumber, 'N/A')) AS referencenumber
+ad.rm_id,
+ad.rm_name,
+ad.operacc,
+ad.foracid,
+ad.acct_opn_date,
+ad.deposit_period_mths,
+ad.deposit_period_days,
+ad.sol_id,
+ad.sol_desc,
+ad.scheme_code,
+ad.schm_desc,
+SUM(ad.total_tran_amt_dtt) AS total_tran_amt_dtt,
+SUM(ad.total_flow_amt_tdt) AS total_flow_amt_tdt,
+LEAST(
+COALESCE(SUM(ad.total_tran_amt_dtt),0),
+COALESCE(SUM(ad.total_flow_amt_tdt),0)
+) AS commission_amount,
+CASE
+WHEN ad.acct_opn_date + INTERVAL '1 year' <= DATE '2026-06-30' THEN 'YES'
+ELSE 'NO'
+END AS one_year_completed,
+MAX(COALESCE(rd.referencenumber,'N/A')) AS referencenumber
 FROM account_data AS ad
 LEFT JOIN reference_data AS rd
-    ON UPPER(ad.rm_id) = UPPER(rd.rm_id)
+ON UPPER(ad.rm_id) = UPPER(rd.rm_id)
 WHERE ad.total_tran_amt_dtt > 0
 GROUP BY
-    ad.rm_id, ad.rm_name, ad.operacc, ad.foracid,
-    ad.deposit_period_mths, ad.deposit_period_days,
-    ad.sol_id, ad.sol_desc, ad.scheme_code, ad.schm_desc
+ad.rm_id,
+ad.rm_name,
+ad.operacc,
+ad.foracid,
+ad.acct_opn_date,
+ad.deposit_period_mths,
+ad.deposit_period_days,
+ad.sol_id,
+ad.sol_desc,
+ad.scheme_code,
+ad.schm_desc
 ORDER BY
-    ad.sol_id, ad.rm_id, ad.scheme_code, ad.deposit_period_mths
+ad.sol_id,
+ad.rm_id,
+ad.scheme_code,
+ad.deposit_period_mths
 """
 
 
 def _safe_int(value):
     if value in (None, "", "N/A"):
         return None
+
     try:
         return int(value)
     except Exception:
@@ -269,90 +326,73 @@ def _safe_int(value):
 def _safe_str(value):
     if value is None:
         return None
+
     return str(value).strip()
-
-
-# def _create_commission_from_query_1(row):
-#     doc = frappe.get_doc({
-#         "doctype": "Commission",
-#         "agent_code": _safe_str(row.get("rm_id")),
-#         "agent_name": _safe_str(row.get("rm_name")),
-#         "agent_operative_account": _safe_int(row.get("operacc")),
-#         "customer_account_number": _safe_int(row.get("foracid")),
-#         "demand": _safe_int(row.get("total_flow_amount")),
-#         "collection": _safe_int(row.get("total_tran_amt")),
-#         "pan_card": _safe_str(row.get("referencenumber")),
-#         "scheme_code": _safe_int(row.get("scheme_code")),
-#         "scheme_description": _safe_str(row.get("schm_desc")),
-#         "sol_id": _safe_int(row.get("sol_id")),
-#         "sol_description": _safe_str(row.get("sol_desc")),
-#     })
-#     doc.insert(ignore_permissions=True)
-#     frappe.db.commit()
-#     return doc.name
-
-
-# def _create_commission_from_query_2(row):
-#     doc = frappe.get_doc({
-#         "doctype": "Commission",
-#         "agent_code": _safe_str(row.get("rm_id")),
-#         "agent_name": _safe_str(row.get("rm_name")),
-#         "agent_operative_account": _safe_int(row.get("operacc")),
-#         "customer_account_number": _safe_int(row.get("foracid")),
-#         "tenure_months": _safe_int(row.get("deposit_period_mths")),
-#         "tenure_days": _safe_int(row.get("deposit_period_days")),
-#         "sol_id": _safe_int(row.get("sol_id")),
-#         "sol_description": _safe_str(row.get("sol_desc")),
-#         "scheme_code": _safe_int(row.get("scheme_code")),
-#         "scheme_description": _safe_str(row.get("schm_desc")),
-#         "collection": _safe_int(row.get("total_tran_amt_dtt")),
-#         "demand": _safe_int(row.get("total_flow_amt_tdt")),
-#         "pan_card": _safe_str(row.get("referencenumber")),
-#     })
-#     doc.insert(ignore_permissions=True)
-#     frappe.db.commit()
-#     return doc.name
 
 
 def _create_commission_from_query_1(row):
     doc = frappe.get_doc({
         "doctype": "Commission",
+
         "agent_code": _safe_str(row.get("rm_id")),
         "agent_name": _safe_str(row.get("rm_name")),
         "agent_operative_account": _safe_str(row.get("operacc")),
         "customer_account_number": _safe_str(row.get("foracid")),
+
+        "tenure_months": _safe_int(row.get("deposit_period_mths")),
+        "tenure_days": _safe_int(row.get("deposit_period_days")),
+
         "demand": _safe_int(row.get("total_flow_amount")),
         "collection": _safe_int(row.get("total_tran_amt")),
+
+        # New fields
+        "eligible_amount": _safe_int(row.get("commission_amount")),
+        "account_opening_date": row.get("acct_opn_date"),
+        "remarks": _safe_str(row.get("one_year_completed")),
+
         "pan_card": _safe_str(row.get("referencenumber")),
         "scheme_code": _safe_str(row.get("scheme_code")),
         "scheme_description": _safe_str(row.get("schm_desc")),
         "sol_id": _safe_str(row.get("sol_id")),
         "sol_description": _safe_str(row.get("sol_desc")),
     })
+
     doc.insert(ignore_permissions=True)
     frappe.db.commit()
+
     return doc.name
 
 
 def _create_commission_from_query_2(row):
     doc = frappe.get_doc({
         "doctype": "Commission",
+
         "agent_code": _safe_str(row.get("rm_id")),
         "agent_name": _safe_str(row.get("rm_name")),
         "agent_operative_account": _safe_str(row.get("operacc")),
         "customer_account_number": _safe_str(row.get("foracid")),
+
         "tenure_months": _safe_int(row.get("deposit_period_mths")),
         "tenure_days": _safe_int(row.get("deposit_period_days")),
-        "sol_id": _safe_str(row.get("sol_id")),
-        "sol_description": _safe_str(row.get("sol_desc")),
+
+        "demand": _safe_int(row.get("total_flow_amt_tdt")),
+        "collection": _safe_int(row.get("total_tran_amt_dtt")),
+
+        # New fields
+        "eligible_amount": _safe_int(row.get("commission_amount")),
+        "account_opening_date": row.get("acct_opn_date"),
+        "remarks": _safe_str(row.get("one_year_completed")),
+
+        "pan_card": _safe_str(row.get("referencenumber")),
         "scheme_code": _safe_str(row.get("scheme_code")),
         "scheme_description": _safe_str(row.get("schm_desc")),
-        "collection": _safe_int(row.get("total_tran_amt_dtt")),
-        "demand": _safe_int(row.get("total_flow_amt_tdt")),
-        "pan_card": _safe_str(row.get("referencenumber")),
+        "sol_id": _safe_str(row.get("sol_id")),
+        "sol_description": _safe_str(row.get("sol_desc")),
     })
+
     doc.insert(ignore_permissions=True)
     frappe.db.commit()
+
     return doc.name
 
 
@@ -365,69 +405,88 @@ def _run_query(connection, query):
 @frappe.whitelist()
 def fetch_and_create_commission():
     """
-    Run both external PostgreSQL queries one by one,
-    create Commission documents row by row,
-    and commit after each document.
+    Execute Query 2 first, then Query 1.
+    Each document is inserted and committed individually.
     """
     frappe.only_for(("System Manager",))
 
     conn = None
     inserted_docs = []
     errors = []
+    query_1_rows = []
+    query_2_rows = []
 
     try:
         conn = db_connection()
 
-        # query_1_rows = _run_query(conn, QUERY_1)
-        # for row in query_1_rows:
-        #     try:
-        #         docname = _create_commission_from_query_1(row)
-        #         inserted_docs.append(docname)
-        #     except Exception:
-        #         frappe.db.rollback()
-        #         error_message = f"Query 1 row failed for foracid {row.get('foracid')}: {frappe.get_traceback()}"
-        #         frappe.log_error(
-        #             error_message, "Commission Import Query 1 Row Error")
-        #         errors.append(error_message)
-
+        # Query 2 first, preserving current logic
         query_2_rows = _run_query(conn, QUERY_2)
+
         for row in query_2_rows:
             try:
                 docname = _create_commission_from_query_2(row)
                 inserted_docs.append(docname)
+
             except Exception:
                 frappe.db.rollback()
-                error_message = f"Query 2 row failed for foracid {row.get('foracid')}: {frappe.get_traceback()}"
+
+                error_message = (
+                    f"Query 2 row failed for foracid "
+                    f"{row.get('foracid')}: {frappe.get_traceback()}"
+                )
+
                 frappe.log_error(
-                    error_message, "Commission Import Query 2 Row Error")
+                    error_message,
+                    "Commission Import Query 2 Row Error",
+                )
+
                 errors.append(error_message)
 
+        # Query 1 second, preserving current logic
         query_1_rows = _run_query(conn, QUERY_1)
+
         for row in query_1_rows:
             try:
                 docname = _create_commission_from_query_1(row)
                 inserted_docs.append(docname)
+
             except Exception:
                 frappe.db.rollback()
-                error_message = f"Query 1 row failed for foracid {row.get('foracid')}: {frappe.get_traceback()}"
+
+                error_message = (
+                    f"Query 1 row failed for foracid "
+                    f"{row.get('foracid')}: {frappe.get_traceback()}"
+                )
+
                 frappe.log_error(
-                    error_message, "Commission Import Query 1 Row Error")
+                    error_message,
+                    "Commission Import Query 1 Row Error",
+                )
+
                 errors.append(error_message)
 
         return {
             "status": "completed",
-            "query_1_count": len(query_1_rows),
-            "query_2_count": len(query_2_rows),
+            "query_1_fetched": len(query_1_rows),
+            "query_2_fetched": len(query_2_rows),
+            "query_1_created": sum(
+                1 for name in inserted_docs
+                if name
+            ),
+            "query_2_created": len(inserted_docs),
             "inserted_count": len(inserted_docs),
-            "inserted_docs": inserted_docs,
             "error_count": len(errors),
             "errors": errors,
         }
 
     except Exception:
         frappe.db.rollback()
-        frappe.log_error(frappe.get_traceback(), "Commission Import Failed")
+        frappe.log_error(
+            frappe.get_traceback(),
+            "Commission Import Failed",
+        )
         raise
+
     finally:
         if conn:
             conn.close()
@@ -436,9 +495,8 @@ def fetch_and_create_commission():
 @frappe.whitelist()
 def run_fetch_and_create_commission_with_progress(limit=None):
     """
-    Run both queries and create Commission documents with terminal progress bar.
-    Queries remain unchanged.
-    Each record is inserted and committed one by one.
+    Execute Query 1 and Query 2 with terminal progress.
+    Each document is inserted and committed individually.
     """
     frappe.only_for(("System Manager",))
 
@@ -449,6 +507,7 @@ def run_fetch_and_create_commission_with_progress(limit=None):
     try:
         if limit is not None and str(limit).strip():
             limit = int(limit)
+
             if limit <= 0:
                 frappe.throw(_("Limit must be greater than 0"))
         else:
@@ -460,15 +519,21 @@ def run_fetch_and_create_commission_with_progress(limit=None):
         query_2_rows = _run_query(conn, QUERY_2)
 
         total_available = len(query_1_rows) + len(query_2_rows)
-        total_to_process = min(
-            limit, total_available) if limit else total_available
+        total_to_process = (
+            min(limit, total_available)
+            if limit
+            else total_available
+        )
 
         created_count = 0
         query_1_created = 0
         query_2_created = 0
 
-        progress = tqdm(total=total_to_process,
-                        desc="Creating Commission Docs", unit="doc")
+        progress = tqdm(
+            total=total_to_process,
+            desc="Creating Commission Docs",
+            unit="doc",
+        )
 
         try:
             for row in query_1_rows:
@@ -477,15 +542,25 @@ def run_fetch_and_create_commission_with_progress(limit=None):
 
                 try:
                     docname = _create_commission_from_query_1(row)
+
                     inserted_docs.append(docname)
                     created_count += 1
                     query_1_created += 1
                     progress.update(1)
+
                 except Exception:
                     frappe.db.rollback()
-                    error_message = f"Query 1 row failed for foracid {row.get('foracid')}: {frappe.get_traceback()}"
+
+                    error_message = (
+                        f"Query 1 row failed for foracid "
+                        f"{row.get('foracid')}: {frappe.get_traceback()}"
+                    )
+
                     frappe.log_error(
-                        error_message, "Commission Import Query 1 Row Error")
+                        error_message,
+                        "Commission Import Query 1 Row Error",
+                    )
+
                     errors.append(error_message)
 
             for row in query_2_rows:
@@ -494,16 +569,27 @@ def run_fetch_and_create_commission_with_progress(limit=None):
 
                 try:
                     docname = _create_commission_from_query_2(row)
+
                     inserted_docs.append(docname)
                     created_count += 1
                     query_2_created += 1
                     progress.update(1)
+
                 except Exception:
                     frappe.db.rollback()
-                    error_message = f"Query 2 row failed for foracid {row.get('foracid')}: {frappe.get_traceback()}"
+
+                    error_message = (
+                        f"Query 2 row failed for foracid "
+                        f"{row.get('foracid')}: {frappe.get_traceback()}"
+                    )
+
                     frappe.log_error(
-                        error_message, "Commission Import Query 2 Row Error")
+                        error_message,
+                        "Commission Import Query 2 Row Error",
+                    )
+
                     errors.append(error_message)
+
         finally:
             progress.close()
 
@@ -518,20 +604,23 @@ def run_fetch_and_create_commission_with_progress(limit=None):
         return {
             "status": "completed",
             "limit": limit,
-            "query_1_count": len(query_1_rows),
-            "query_2_count": len(query_2_rows),
+            "query_1_fetched": len(query_1_rows),
+            "query_2_fetched": len(query_2_rows),
             "query_1_created": query_1_created,
             "query_2_created": query_2_created,
             "inserted_count": len(inserted_docs),
-            "inserted_docs": inserted_docs,
             "error_count": len(errors),
             "errors": errors,
         }
 
     except Exception:
         frappe.db.rollback()
-        frappe.log_error(frappe.get_traceback(), "Commission Import Failed")
+        frappe.log_error(
+            frappe.get_traceback(),
+            "Commission Import Failed",
+        )
         raise
+
     finally:
         if conn:
             conn.close()
@@ -542,6 +631,7 @@ def debug_fetch_commission_data():
     frappe.only_for(("System Manager",))
 
     conn = None
+
     try:
         conn = db_connection()
 
@@ -572,9 +662,12 @@ def debug_fetch_commission_data():
         }
 
     except Exception:
-        frappe.log_error(frappe.get_traceback(),
-                         "Commission Debug Fetch Failed")
+        frappe.log_error(
+            frappe.get_traceback(),
+            "Commission Debug Fetch Failed",
+        )
         raise
+
     finally:
         if conn:
             conn.close()
@@ -585,6 +678,7 @@ def debug_create_one_commission():
     frappe.only_for(("System Manager",))
 
     conn = None
+
     try:
         conn = db_connection()
         query_1_rows = _run_query(conn, QUERY_1)
@@ -598,57 +692,289 @@ def debug_create_one_commission():
         return {
             "status": "success",
             "docname": docname,
-            "sample_row": row
+            "sample_row": row,
         }
+
     except Exception:
-        frappe.log_error(frappe.get_traceback(),
-                         "Commission Debug Create One Failed")
+        frappe.log_error(
+            frappe.get_traceback(),
+            "Commission Debug Create One Failed",
+        )
         raise
+
     finally:
         if conn:
             conn.close()
 
 
+# @frappe.whitelist()
+# def calculate_commission_amount(docname):
+#     if not docname:
+#         frappe.throw(_("Commission document name is required"))
+
+#     commission_doc = frappe.get_doc("Commission", docname)
+
+#     if not commission_doc.scheme_code:
+#         frappe.throw(_("Scheme Code is required in Commission document"))
+
+#     if commission_doc.collection in (None, ""):
+#         frappe.throw(_("Collection value is required in Commission document"))
+
+#     product_name = str(commission_doc.scheme_code).strip()
+
+#     if not frappe.db.exists("Product", product_name):
+#         frappe.throw(
+#             _("No Product record found with ID / Name: {0}").format(
+#                 product_name
+#             )
+#         )
+
+#     commission_rate = frappe.db.get_value(
+#         "Product",
+#         product_name,
+#         "commission_rate",
+#     )
+
+#     if commission_rate in (None, ""):
+#         frappe.throw(
+#             _("Commission Rate is empty in Product: {0}").format(
+#                 product_name
+#             )
+#         )
+
+#     collection_amount = flt(commission_doc.collection)
+#     commission_rate = flt(commission_rate)
+
+#     commission_amount = (
+#         collection_amount * commission_rate
+#     ) / 100
+
+#     commission_doc.commission_amount = commission_amount
+#     commission_doc.save(ignore_permissions=True)
+#     frappe.db.commit()
+
+#     return {
+#         "docname": commission_doc.name,
+#         "scheme_code": commission_doc.scheme_code,
+#         "product_name": product_name,
+#         "collection": collection_amount,
+#         "commission_rate": commission_rate,
+#         "commission_amount": commission_amount,
+#     }
+
+
 @frappe.whitelist()
 def calculate_commission_amount(docname):
+    """
+    Calculate Commission.commission_amount based on the Product commission type.
+
+    Supported Product commission types:
+    1. Fixed Rate
+    2. Age Based
+    3. Eligible Amount Based
+    """
+
     if not docname:
         frappe.throw(_("Commission document name is required"))
 
     commission_doc = frappe.get_doc("Commission", docname)
 
     if not commission_doc.scheme_code:
-        frappe.throw(_("Scheme Code is required in Commission document"))
+        frappe.throw(
+            _("Scheme Code is required in Commission document")
+        )
 
-    if commission_doc.collection in (None, ""):
-        frappe.throw(_("Collection value is required in Commission document"))
+    if commission_doc.eligible_amount in (None, ""):
+        frappe.throw(
+            _("Eligible Amount is required in Commission document")
+        )
 
     product_name = str(commission_doc.scheme_code).strip()
 
-    if not frappe.db.exists("Product", product_name):
+    product = frappe.db.get_value(
+        "Product",
+        product_name,
+        [
+            "commission_type",
+            "commission_rate",
+            "commission_rate_upto_one_year",
+            "commission_rate_above_one_year",
+            "slab_1_limit",
+            "slab_1_rate",
+            "slab_2_limit",
+            "slab_2_rate",
+            "slab_3_rate",
+        ],
+        as_dict=True,
+    )
+
+    if not product:
         frappe.throw(
-            _("No Product record found with ID / Name: {0}").format(product_name))
+            _("No Product found with Product Code: {0}").format(
+                product_name
+            )
+        )
 
-    commission_rate = frappe.db.get_value(
-        "Product", product_name, "commission_rate")
-
-    if commission_rate in (None, ""):
+    if not product.commission_type:
         frappe.throw(
-            _("Commission Rate is empty in Product: {0}").format(product_name))
+            _("Commission Type is not configured in Product: {0}").format(
+                product_name
+            )
+        )
 
-    collection_amount = flt(commission_doc.collection)
-    commission_rate = flt(commission_rate)
+    commission_type = product.commission_type
+    eligible_amount = flt(commission_doc.eligible_amount)
 
-    commission_amount = (collection_amount * commission_rate) / 100
+    if eligible_amount < 0:
+        frappe.throw(
+            _("Eligible Amount cannot be negative")
+        )
+
+    rate = None
+
+    # ==========================================================
+    # PRODUCT TYPE 1: FIXED RATE
+    # ==========================================================
+    if commission_type == "Fixed Rate":
+        if product.commission_rate in (None, ""):
+            frappe.throw(
+                _("Commission Rate is required for Product: {0}").format(
+                    product_name
+                )
+            )
+
+        rate = flt(product.commission_rate)
+
+    # ==========================================================
+    # PRODUCT TYPE 2: AGE BASED
+    # ==========================================================
+    elif commission_type == "Age Based":
+        remarks = _safe_str(commission_doc.remarks).upper()
+
+        if remarks == "YES":
+            if product.commission_rate_upto_one_year in (None, ""):
+                frappe.throw(
+                    _(
+                        "Commission Rate Upto One Year is required "
+                        "for Product: {0}"
+                    ).format(product_name)
+                )
+
+            rate = flt(product.commission_rate_upto_one_year)
+
+        elif remarks == "NO":
+            if product.commission_rate_above_one_year in (None, ""):
+                frappe.throw(
+                    _(
+                        "Commission Rate Above One Year is required "
+                        "for Product: {0}"
+                    ).format(product_name)
+                )
+
+            rate = flt(product.commission_rate_above_one_year)
+
+        else:
+            frappe.throw(
+                _(
+                    "Remarks must be YES or NO for Age Based Product: {0}"
+                ).format(product_name)
+            )
+
+    # ==========================================================
+    # PRODUCT TYPE 3: ELIGIBLE AMOUNT BASED
+    # ==========================================================
+    elif commission_type == "Eligible Amount Based":
+        required_fields = {
+            "Slab 1 Limit": product.slab_1_limit,
+            "Slab 1 Rate": product.slab_1_rate,
+            "Slab 2 Limit": product.slab_2_limit,
+            "Slab 2 Rate": product.slab_2_rate,
+            "Slab 3 Rate": product.slab_3_rate,
+        }
+
+        for field_label, field_value in required_fields.items():
+            if field_value in (None, ""):
+                frappe.throw(
+                    _("{0} is required for Product: {1}").format(
+                        field_label,
+                        product_name,
+                    )
+                )
+
+        slab_1_limit = flt(product.slab_1_limit)
+        slab_2_limit = flt(product.slab_2_limit)
+
+        if slab_1_limit < 0:
+            frappe.throw(
+                _("Slab 1 Limit cannot be negative")
+            )
+
+        if slab_2_limit <= slab_1_limit:
+            frappe.throw(
+                _(
+                    "Slab 2 Limit must be greater than "
+                    "Slab 1 Limit for Product: {0}"
+                ).format(product_name)
+            )
+
+        if eligible_amount <= slab_1_limit:
+            rate = flt(product.slab_1_rate)
+
+        elif eligible_amount <= slab_2_limit:
+            rate = flt(product.slab_2_rate)
+
+        else:
+            rate = flt(product.slab_3_rate)
+
+    else:
+        frappe.throw(
+            _(
+                "Invalid Commission Type '{0}' in Product: {1}. "
+                "Allowed values are Fixed Rate, Age Based, "
+                "and Eligible Amount Based."
+            ).format(
+                commission_type,
+                product_name,
+            )
+        )
+
+    if rate is None:
+        frappe.throw(
+            _("Unable to determine commission rate for Product: {0}").format(
+                product_name
+            )
+        )
+
+    if rate < 0:
+        frappe.throw(
+            _("Commission rate cannot be negative")
+        )
+
+    # Apply the selected rate to the COMPLETE eligible amount.
+    commission_amount = (eligible_amount * rate) / 100
 
     commission_doc.commission_amount = commission_amount
+
+    # Optional audit field.
+    # Add this field to Commission if you want to store the applied rate.
+    if frappe.get_meta("Commission").has_field("applied_commission_rate"):
+        commission_doc.applied_commission_rate = rate
+
+    # Optional audit field.
+    # Add this field to Commission if you want to store the applied type.
+    if frappe.get_meta("Commission").has_field("commission_type_applied"):
+        commission_doc.commission_type_applied = commission_type
+
     commission_doc.save(ignore_permissions=True)
     frappe.db.commit()
 
     return {
+        "status": "success",
         "docname": commission_doc.name,
-        "scheme_code": commission_doc.scheme_code,
-        "product_name": product_name,
-        "collection": collection_amount,
-        "commission_rate": commission_rate,
+        "product_code": product_name,
+        "commission_type": commission_type,
+        "remarks": commission_doc.remarks,
+        "eligible_amount": eligible_amount,
+        "applied_rate": rate,
         "commission_amount": commission_amount,
     }
