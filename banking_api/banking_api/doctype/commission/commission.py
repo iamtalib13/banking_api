@@ -763,8 +763,227 @@ def debug_create_one_commission():
 #     }
 
 
+#################################################
+# new
+# @frappe.whitelist()
+# def calculate_commission_amount(docname):
+#     """
+#     Calculate Commission.commission_amount based on the Product commission type.
+
+#     Supported Product commission types:
+#     1. Fixed Rate
+#     2. Age Based
+#     3. Eligible Amount Based
+#     """
+
+#     if not docname:
+#         frappe.throw(_("Commission document name is required"))
+
+#     commission_doc = frappe.get_doc("Commission", docname)
+
+#     if not commission_doc.scheme_code:
+#         frappe.throw(
+#             _("Scheme Code is required in Commission document")
+#         )
+
+#     if commission_doc.eligible_amount in (None, ""):
+#         frappe.throw(
+#             _("Eligible Amount is required in Commission document")
+#         )
+
+#     product_name = str(commission_doc.scheme_code).strip()
+
+#     product = frappe.db.get_value(
+#         "Product",
+#         product_name,
+#         [
+#             "commission_type",
+#             "commission_rate",
+#             "commission_rate_upto_one_year",
+#             "commission_rate_above_one_year",
+#             "slab_1_limit",
+#             "slab_1_rate",
+#             "slab_2_limit",
+#             "slab_2_rate",
+#             "slab_3_rate",
+#         ],
+#         as_dict=True,
+#     )
+
+#     if not product:
+#         frappe.throw(
+#             _("No Product found with Product Code: {0}").format(
+#                 product_name
+#             )
+#         )
+
+#     if not product.commission_type:
+#         frappe.throw(
+#             _("Commission Type is not configured in Product: {0}").format(
+#                 product_name
+#             )
+#         )
+
+#     commission_type = product.commission_type
+#     eligible_amount = flt(commission_doc.eligible_amount)
+
+#     if eligible_amount < 0:
+#         frappe.throw(
+#             _("Eligible Amount cannot be negative")
+#         )
+
+#     rate = None
+
+#     # ==========================================================
+#     # PRODUCT TYPE 1: FIXED RATE
+#     # ==========================================================
+#     if commission_type == "Fixed Rate":
+#         if product.commission_rate in (None, ""):
+#             frappe.throw(
+#                 _("Commission Rate is required for Product: {0}").format(
+#                     product_name
+#                 )
+#             )
+
+#         rate = flt(product.commission_rate)
+
+#     # ==========================================================
+#     # PRODUCT TYPE 2: AGE BASED
+#     # ==========================================================
+#     elif commission_type == "Age Based":
+#         remarks = _safe_str(commission_doc.remarks).upper()
+
+#         if remarks == "YES":
+#             if product.commission_rate_upto_one_year in (None, ""):
+#                 frappe.throw(
+#                     _(
+#                         "Commission Rate Upto One Year is required "
+#                         "for Product: {0}"
+#                     ).format(product_name)
+#                 )
+
+#             rate = flt(product.commission_rate_upto_one_year)
+
+#         elif remarks == "NO":
+#             if product.commission_rate_above_one_year in (None, ""):
+#                 frappe.throw(
+#                     _(
+#                         "Commission Rate Above One Year is required "
+#                         "for Product: {0}"
+#                     ).format(product_name)
+#                 )
+
+#             rate = flt(product.commission_rate_above_one_year)
+
+#         else:
+#             frappe.throw(
+#                 _(
+#                     "Remarks must be YES or NO for Age Based Product: {0}"
+#                 ).format(product_name)
+#             )
+
+#     # ==========================================================
+#     # PRODUCT TYPE 3: ELIGIBLE AMOUNT BASED
+#     # ==========================================================
+#     elif commission_type == "Eligible Amount Based":
+#         required_fields = {
+#             "Slab 1 Limit": product.slab_1_limit,
+#             "Slab 1 Rate": product.slab_1_rate,
+#             "Slab 2 Limit": product.slab_2_limit,
+#             "Slab 2 Rate": product.slab_2_rate,
+#             "Slab 3 Rate": product.slab_3_rate,
+#         }
+
+#         for field_label, field_value in required_fields.items():
+#             if field_value in (None, ""):
+#                 frappe.throw(
+#                     _("{0} is required for Product: {1}").format(
+#                         field_label,
+#                         product_name,
+#                     )
+#                 )
+
+#         slab_1_limit = flt(product.slab_1_limit)
+#         slab_2_limit = flt(product.slab_2_limit)
+
+#         if slab_1_limit < 0:
+#             frappe.throw(
+#                 _("Slab 1 Limit cannot be negative")
+#             )
+
+#         if slab_2_limit <= slab_1_limit:
+#             frappe.throw(
+#                 _(
+#                     "Slab 2 Limit must be greater than "
+#                     "Slab 1 Limit for Product: {0}"
+#                 ).format(product_name)
+#             )
+
+#         if eligible_amount <= slab_1_limit:
+#             rate = flt(product.slab_1_rate)
+
+#         elif eligible_amount <= slab_2_limit:
+#             rate = flt(product.slab_2_rate)
+
+#         else:
+#             rate = flt(product.slab_3_rate)
+
+#     else:
+#         frappe.throw(
+#             _(
+#                 "Invalid Commission Type '{0}' in Product: {1}. "
+#                 "Allowed values are Fixed Rate, Age Based, "
+#                 "and Eligible Amount Based."
+#             ).format(
+#                 commission_type,
+#                 product_name,
+#             )
+#         )
+
+#     if rate is None:
+#         frappe.throw(
+#             _("Unable to determine commission rate for Product: {0}").format(
+#                 product_name
+#             )
+#         )
+
+#     if rate < 0:
+#         frappe.throw(
+#             _("Commission rate cannot be negative")
+#         )
+
+#     # Apply the selected rate to the COMPLETE eligible amount.
+#     commission_amount = (eligible_amount * rate) / 100
+
+#     commission_doc.commission_amount = commission_amount
+
+#     # Optional audit field.
+#     # Add this field to Commission if you want to store the applied rate.
+#     if frappe.get_meta("Commission").has_field("applied_commission_rate"):
+#         commission_doc.applied_commission_rate = rate
+
+#     # Optional audit field.
+#     # Add this field to Commission if you want to store the applied type.
+#     if frappe.get_meta("Commission").has_field("commission_type_applied"):
+#         commission_doc.commission_type_applied = commission_type
+
+#     commission_doc.save(ignore_permissions=True)
+#     frappe.db.commit()
+
+#     return {
+#         "status": "success",
+#         "docname": commission_doc.name,
+#         "product_code": product_name,
+#         "commission_type": commission_type,
+#         "remarks": commission_doc.remarks,
+#         "eligible_amount": eligible_amount,
+#         "applied_rate": rate,
+#         "commission_amount": commission_amount,
+#     }
+
+
 @frappe.whitelist()
-def calculate_commission_amount(docname):
+def calculate_commission_amounts(docname):
     """
     Calculate Commission.commission_amount based on the Product commission type.
 
@@ -772,6 +991,13 @@ def calculate_commission_amount(docname):
     1. Fixed Rate
     2. Age Based
     3. Eligible Amount Based
+
+    For Eligible Amount Based products:
+    - Consider only Commission records whose scheme_code points to a Product
+      with commission_type = 'Eligible Amount Based'.
+    - Slab selection is based on agent_total_eligible_collection (sum of
+      eligible_amount for those filtered records for the same agent).
+    - Commission is calculated on the document's own eligible_amount.
     """
 
     if not docname:
@@ -917,10 +1143,85 @@ def calculate_commission_amount(docname):
                 ).format(product_name)
             )
 
-        if eligible_amount <= slab_1_limit:
+        # ------------------------------------------------------
+        # Agent-level aggregation for Eligible Amount Based
+        # ------------------------------------------------------
+        if not commission_doc.agent_code:
+            frappe.throw(
+                _("Agent Code is required for Eligible Amount Based calculation")
+            )
+
+        agent_code = str(commission_doc.agent_code).strip()
+
+        # Get all Product IDs where commission_type = 'Eligible Amount Based'
+        eligible_products = frappe.get_all(
+            "Product",
+            filters={"commission_type": "Eligible Amount Based"},
+            pluck="name",
+        )
+
+        if not eligible_products:
+            frappe.throw(
+                _(
+                    "No Product found with commission_type = 'Eligible Amount Based'"
+                )
+            )
+
+        # Build safe IN clause for eligible_products
+        if len(eligible_products) == 1:
+            in_clause = "%s"
+            in_params = tuple(eligible_products)
+        else:
+            in_clause = ", ".join(["%s"] * len(eligible_products))
+            in_params = tuple(eligible_products)
+
+        # Sum eligible_amount for this agent, but only for Commission records
+        # whose scheme_code points to one of these Eligible-Amount-Based Products.
+        result = frappe.db.sql(
+            """
+            SELECT SUM(c.eligible_amount) AS total
+            FROM `tabCommission` c
+            WHERE c.agent_code = %s
+            AND c.docstatus < 2
+            AND c.scheme_code IN ({0})
+            """.format(in_clause),
+            tuple([agent_code] + list(in_params)),
+            as_dict=True,
+        )
+
+        agent_total = flt(result[0].total) if result and result[0].total else 0
+
+        if agent_total <= 0:
+            frappe.throw(
+                _(
+                    "Total eligible amount for Agent {0} (Eligible Amount Based products) "
+                    "is zero or invalid"
+                ).format(agent_code)
+            )
+
+        # Update all Commission records for this agent (for Eligible Amount Based products)
+        # with the aggregated total.
+        frappe.db.sql(
+            """
+            UPDATE `tabCommission` c
+            SET c.agent_total_eligible_collection = %s
+            WHERE c.agent_code = %s
+            AND c.docstatus < 2
+            AND c.scheme_code IN ({0})
+            """.format(in_clause),
+            tuple([agent_total, agent_code] + list(in_params)),
+        )
+
+        # Refresh the current document's value
+        commission_doc.agent_total_eligible_collection = agent_total
+
+        # ------------------------------------------------------
+        # Slab selection based on agent_total_eligible_collection
+        # ------------------------------------------------------
+        if agent_total <= slab_1_limit:
             rate = flt(product.slab_1_rate)
 
-        elif eligible_amount <= slab_2_limit:
+        elif agent_total <= slab_2_limit:
             rate = flt(product.slab_2_rate)
 
         else:
@@ -950,18 +1251,15 @@ def calculate_commission_amount(docname):
             _("Commission rate cannot be negative")
         )
 
-    # Apply the selected rate to the COMPLETE eligible amount.
+    # Apply the selected rate to the COMPLETE eligible_amount of this document.
     commission_amount = (eligible_amount * rate) / 100
 
     commission_doc.commission_amount = commission_amount
 
-    # Optional audit field.
-    # Add this field to Commission if you want to store the applied rate.
+    # Optional audit fields.
     if frappe.get_meta("Commission").has_field("applied_commission_rate"):
         commission_doc.applied_commission_rate = rate
 
-    # Optional audit field.
-    # Add this field to Commission if you want to store the applied type.
     if frappe.get_meta("Commission").has_field("commission_type_applied"):
         commission_doc.commission_type_applied = commission_type
 
@@ -975,6 +1273,317 @@ def calculate_commission_amount(docname):
         "commission_type": commission_type,
         "remarks": commission_doc.remarks,
         "eligible_amount": eligible_amount,
+        "agent_total_eligible_collection": (
+            flt(commission_doc.agent_total_eligible_collection)
+            if commission_type == "Eligible Amount Based"
+            else None
+        ),
         "applied_rate": rate,
         "commission_amount": commission_amount,
+    }
+
+
+@frappe.whitelist()
+def calculate_commission_amount(docname):
+    """
+    Calculate Commission.commission_amount based on the Product commission type.
+
+    Supported Product commission types:
+    1. Fixed Rate
+    2. Age Based
+    3. Eligible Amount Based
+
+    For Eligible Amount Based products:
+    - Consider only Commission records whose scheme_code points to a Product
+      with commission_type = 'Eligible Amount Based'.
+    - Slab selection is based on agent_total_eligible_collection (sum of
+      eligible_amount for those filtered records for the same agent).
+    - Commission is calculated on the document's own eligible_amount.
+    """
+
+    if not docname:
+        frappe.throw(_("Commission document name is required"))
+
+    commission_doc = frappe.get_doc("Commission", docname)
+
+    if not commission_doc.scheme_code:
+        frappe.throw(
+            _("Scheme Code is required in Commission document")
+        )
+
+    if commission_doc.eligible_amount in (None, ""):
+        frappe.throw(
+            _("Eligible Amount is required in Commission document")
+        )
+
+    product_name = str(commission_doc.scheme_code).strip()
+
+    product = frappe.db.get_value(
+        "Product",
+        product_name,
+        [
+            "commission_type",
+            "commission_rate",
+            "commission_rate_upto_one_year",
+            "commission_rate_above_one_year",
+            "slab_1_limit",
+            "slab_1_rate",
+            "slab_2_limit",
+            "slab_2_rate",
+            "slab_3_rate",
+        ],
+        as_dict=True,
+    )
+
+    if not product:
+        frappe.throw(
+            _("No Product found with Product Code: {0}").format(
+                product_name
+            )
+        )
+
+    if not product.commission_type:
+        frappe.throw(
+            _("Commission Type is not configured in Product: {0}").format(
+                product_name
+            )
+        )
+
+    commission_type = product.commission_type
+    eligible_amount = flt(commission_doc.eligible_amount)
+
+    if eligible_amount < 0:
+        frappe.throw(
+            _("Eligible Amount cannot be negative")
+        )
+
+    rate = None
+
+    # ==========================================================
+    # PRODUCT TYPE 1: FIXED RATE
+    # ==========================================================
+    if commission_type == "Fixed Rate":
+        if product.commission_rate in (None, ""):
+            frappe.throw(
+                _("Commission Rate is required for Product: {0}").format(
+                    product_name
+                )
+            )
+
+        rate = flt(product.commission_rate)
+
+    # ==========================================================
+    # PRODUCT TYPE 2: AGE BASED
+    # ==========================================================
+    elif commission_type == "Age Based":
+        remarks = _safe_str(commission_doc.remarks).upper()
+
+        if remarks == "YES":
+            if product.commission_rate_upto_one_year in (None, ""):
+                frappe.throw(
+                    _(
+                        "Commission Rate Upto One Year is required "
+                        "for Product: {0}"
+                    ).format(product_name)
+                )
+
+            rate = flt(product.commission_rate_upto_one_year)
+
+        elif remarks == "NO":
+            if product.commission_rate_above_one_year in (None, ""):
+                frappe.throw(
+                    _(
+                        "Commission Rate Above One Year is required "
+                        "for Product: {0}"
+                    ).format(product_name)
+                )
+
+            rate = flt(product.commission_rate_above_one_year)
+
+        else:
+            frappe.throw(
+                _(
+                    "Remarks must be YES or NO for Age Based Product: {0}"
+                ).format(product_name)
+            )
+
+    # ==========================================================
+    # PRODUCT TYPE 3: ELIGIBLE AMOUNT BASED
+    # ==========================================================
+    elif commission_type == "Eligible Amount Based":
+        required_fields = {
+            "Slab 1 Limit": product.slab_1_limit,
+            "Slab 1 Rate": product.slab_1_rate,
+            "Slab 2 Limit": product.slab_2_limit,
+            "Slab 2 Rate": product.slab_2_rate,
+            "Slab 3 Rate": product.slab_3_rate,
+        }
+
+        for field_label, field_value in required_fields.items():
+            if field_value in (None, ""):
+                frappe.throw(
+                    _("{0} is required for Product: {1}").format(
+                        field_label,
+                        product_name,
+                    )
+                )
+
+        slab_1_limit = flt(product.slab_1_limit)
+        slab_2_limit = flt(product.slab_2_limit)
+
+        if slab_1_limit < 0:
+            frappe.throw(
+                _("Slab 1 Limit cannot be negative")
+            )
+
+        if slab_2_limit <= slab_1_limit:
+            frappe.throw(
+                _(
+                    "Slab 2 Limit must be greater than "
+                    "Slab 1 Limit for Product: {0}"
+                ).format(product_name)
+            )
+
+        # ------------------------------------------------------
+        # Agent-level aggregation for Eligible Amount Based
+        # ------------------------------------------------------
+        if not commission_doc.agent_code:
+            frappe.throw(
+                _("Agent Code is required for Eligible Amount Based calculation")
+            )
+
+        agent_code = str(commission_doc.agent_code).strip()
+
+        eligible_products = frappe.get_all(
+            "Product",
+            filters={"commission_type": "Eligible Amount Based"},
+            pluck="name",
+        )
+
+        if not eligible_products:
+            frappe.throw(
+                _(
+                    "No Product found with commission_type = 'Eligible Amount Based'"
+                )
+            )
+
+        # Build safe IN clause for eligible_products
+        if len(eligible_products) == 1:
+            in_clause = "%s"
+            in_params = tuple(eligible_products)
+        else:
+            in_clause = ", ".join(["%s"] * len(eligible_products))
+            in_params = tuple(eligible_products)
+
+        result = frappe.db.sql(
+            """
+            SELECT SUM(c.eligible_amount) AS total
+            FROM `tabCommission` c
+            WHERE c.agent_code = %s
+            AND c.docstatus < 2
+            AND c.scheme_code IN ({0})
+            """.format(in_clause),
+            tuple([agent_code] + list(in_params)),
+            as_dict=True,
+        )
+
+        agent_total = flt(result[0].total) if result and result[0].total else 0
+
+        if agent_total <= 0:
+            frappe.throw(
+                _(
+                    "Total eligible amount for Agent {0} (Eligible Amount Based products) "
+                    "is zero or invalid"
+                ).format(agent_code)
+            )
+
+        frappe.db.sql(
+            """
+            UPDATE `tabCommission` c
+            SET c.agent_total_eligible_collection = %s
+            WHERE c.agent_code = %s
+            AND c.docstatus < 2
+            AND c.scheme_code IN ({0})
+            """.format(in_clause),
+            tuple([agent_total, agent_code] + list(in_params)),
+        )
+
+        commission_doc.agent_total_eligible_collection = agent_total
+
+        if agent_total <= slab_1_limit:
+            rate = flt(product.slab_1_rate)
+        elif agent_total <= slab_2_limit:
+            rate = flt(product.slab_2_rate)
+        else:
+            rate = flt(product.slab_3_rate)
+
+    else:
+        frappe.throw(
+            _(
+                "Invalid Commission Type '{0}' in Product: {1}. "
+                "Allowed values are Fixed Rate, Age Based, "
+                "and Eligible Amount Based."
+            ).format(
+                commission_type,
+                product_name,
+            )
+        )
+
+    if rate is None:
+        frappe.throw(
+            _("Unable to determine commission rate for Product: {0}").format(
+                product_name
+            )
+        )
+
+    if rate < 0:
+        frappe.throw(
+            _("Commission rate cannot be negative")
+        )
+
+    # ------------------------------------------------------
+    # Base commission on eligible_amount
+    # ------------------------------------------------------
+    commission_amount = (eligible_amount * rate) / 100
+    commission_doc.commission_amount = commission_amount
+
+    # ------------------------------------------------------
+    # New fields: TDS, Security Deposit, Netpay
+    # ------------------------------------------------------
+    tds = commission_amount * 0.02           # 2% TDS
+    security_deposit = commission_amount * 0.10  # 10% security deposit
+    netpay = commission_amount - (tds + security_deposit)
+
+    # Assuming Data fields; convert to string or change them to Currency/Float if needed
+    commission_doc.tds = tds
+    commission_doc.security_deposit = security_deposit
+    commission_doc.netpay = netpay
+
+    # Optional audit fields.
+    if frappe.get_meta("Commission").has_field("applied_commission_rate"):
+        commission_doc.applied_commission_rate = rate
+
+    if frappe.get_meta("Commission").has_field("commission_type_applied"):
+        commission_doc.commission_type_applied = commission_type
+
+    commission_doc.save(ignore_permissions=True)
+    frappe.db.commit()
+
+    return {
+        "status": "success",
+        "docname": commission_doc.name,
+        "product_code": product_name,
+        "commission_type": commission_type,
+        "remarks": commission_doc.remarks,
+        "eligible_amount": eligible_amount,
+        "agent_total_eligible_collection": (
+            flt(commission_doc.agent_total_eligible_collection)
+            if commission_type == "Eligible Amount Based"
+            else None
+        ),
+        "applied_rate": rate,
+        "commission_amount": commission_amount,
+        "tds": tds,
+        "security_deposit": security_deposit,
+        "netpay": netpay,
     }
