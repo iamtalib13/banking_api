@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_import": 1,
  "allow_rename": 1,
  "creation": "2026-07-27 16:25:41.544093",
  "doctype": "DocType",
@@ -14,6 +15,8 @@
   "pan_card",
   "remarks",
   "agent_total_eligible_collection",
+  "tds",
+  "netpay",
   "column_break_ajmr",
   "agent_name",
   "customer_account_number",
@@ -23,7 +26,8 @@
   "scheme_description",
   "collection",
   "eligible_amount",
-  "commission_amount"
+  "commission_amount",
+  "security_deposit"
  ],
  "fields": [
   {
@@ -132,12 +136,27 @@
    "fieldname": "agent_total_eligible_collection",
    "fieldtype": "Data",
    "label": "Agent Total Eligible Collection"
+  },
+  {
+   "fieldname": "tds",
+   "fieldtype": "Data",
+   "label": "TDS"
+  },
+  {
+   "fieldname": "security_deposit",
+   "fieldtype": "Data",
+   "label": "Security Deposit"
+  },
+  {
+   "fieldname": "netpay",
+   "fieldtype": "Data",
+   "label": "Netpay"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-11 15:20:46.827383",
+ "modified": "2026-08-12 11:06:54.358713",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Commission",
