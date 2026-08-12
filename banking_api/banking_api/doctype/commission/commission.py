@@ -1587,3 +1587,56 @@ def calculate_commission_amount(docname):
         "security_deposit": security_deposit,
         "netpay": netpay,
     }
+
+
+@frappe.whitelist()
+def calculate_commission_for_all():
+    """
+    Calculate commission on ALL Commission documents.
+    Calls calculate_commission_amount(docname) for each document.
+    """
+    frappe.only_for(("System Manager",))
+
+    # Get all Commission names
+    commission_names = frappe.get_all(
+        "Commission",
+        filters={"docstatus": ("<", 2)},  # ignore cancelled if any
+        pluck="name",
+    )
+
+    if not commission_names:
+        return {
+            "status": "completed",
+            "total_processed": 0,
+            "success_count": 0,
+            "error_count": 0,
+            "errors": [],
+        }
+
+    success_count = 0
+    error_count = 0
+    errors = []
+
+    for docname in commission_names:
+        try:
+            # Call existing method
+            calculate_commission_amount(docname)
+            success_count += 1
+        except Exception:
+            error_count += 1
+            errors.append(
+                f"{docname}: {frappe.get_traceback()}"
+            )
+            # Optionally log
+            frappe.log_error(
+                frappe.get_traceback(),
+                f"Commission Calculation Error - {docname}",
+            )
+
+    return {
+        "status": "completed",
+        "total_processed": len(commission_names),
+        "success_count": success_count,
+        "error_count": error_count,
+        "errors": errors,
+    }
