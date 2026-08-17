@@ -11,7 +11,9 @@
 </head>
 
 <body>
-    <div id="app" v-scope @vue:mounted="init()">
+    <!-- <div id="app" v-scope @vue:mounted="init()"> -->
+    <div id="app" v-scope>
+        <div v-effect="$el._i || ($el._i = 1, init())" style="display:none"></div>
         <div class="dashboard">
 
             <!-- Header -->
@@ -29,6 +31,9 @@
                 </button>
             </header>
 
+            <!-- Error banner -->
+            <div class="error-banner" v-if="errorMsg">⚠️ [[ errorMsg ]]</div>
+
             <!-- Stat cards -->
             <div class="stats-grid">
                 <div class="stat-card" v-for="(card, idx) in statCards" :key="card.key"
@@ -43,30 +48,109 @@
 
             <!-- Filters -->
             <div class="filters-bar">
-                <div class="filter-group">
+
+                <!-- SOL autocomplete -->
+                <div class="filter-group autocomplete-group">
                     <label>SOL</label>
-                    <select v-model="filters.sol_id">
-                        <option value="">All SOLs</option>
-                        <option v-for="opt in filterOptions.sol_list" :value="opt.value">[[ opt.label ]]</option>
-                    </select>
+                    <div class="autocomplete-wrap">
+                        <input type="text" v-model="autocomplete.sol_id.query" placeholder="Search SOL..."
+                            @input="onAutocompleteInput('sol_id')" @focus="onAutocompleteFocus('sol_id')"
+                            @blur="onAutocompleteBlur('sol_id')">
+                        <button v-if="autocomplete.sol_id.query" class="clear-btn"
+                            @mousedown.prevent="clearAutocomplete('sol_id')">×</button>
+
+                        <!-- <div class="autocomplete-dropdown" v-if="autocomplete.sol_id.open">
+                            <template v-if="getMatches('sol_id').length">
+                                <div class="autocomplete-item" v-for="opt in getMatches('sol_id')" :key="opt.value"
+                                    @mousedown.prevent="selectOption('sol_id', opt)">
+                                    [[ opt.label ]]
+                                </div>
+                            </template>
+                            <div class="autocomplete-empty" v-else>No matches</div>
+                        </div> -->
+                        <!-- SOL autocomplete dropdown -->
+                        <div class="autocomplete-dropdown" v-if="autocomplete.sol_id.open">
+                            <div class="autocomplete-item" v-for="opt in getMatches('sol_id')" :key="opt.value"
+                                @mousedown.prevent="selectOption('sol_id', opt)">
+                                [[ opt.label ]]
+                            </div>
+                            <div class="autocomplete-empty" v-if="getMatches('sol_id').length === 0">No matches</div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="filter-group">
+                <!-- Scheme Code autocomplete -->
+                <div class="filter-group autocomplete-group">
                     <label>Scheme Code</label>
-                    <select v-model="filters.scheme_code">
-                        <option value="">All Schemes</option>
-                        <option v-for="opt in filterOptions.scheme_list" :value="opt">[[ opt ]]</option>
-                    </select>
+                    <div class="autocomplete-wrap">
+                        <input type="text" v-model="autocomplete.scheme_code.query" placeholder="Search Scheme..."
+                            @input="onAutocompleteInput('scheme_code')" @focus="onAutocompleteFocus('scheme_code')"
+                            @blur="onAutocompleteBlur('scheme_code')">
+                        <button v-if="autocomplete.scheme_code.query" class="clear-btn"
+                            @mousedown.prevent="clearAutocomplete('scheme_code')">×</button>
+
+                        <!-- <div class="autocomplete-dropdown" v-if="autocomplete.scheme_code.open">
+                            <template v-if="getMatches('scheme_code').length">
+                                <div class="autocomplete-item" v-for="opt in getMatches('scheme_code')" :key="opt.value"
+                                    @mousedown.prevent="selectOption('scheme_code', opt)">
+                                    [[ opt.label ]]
+                                </div>
+                            </template>
+                            <div class="autocomplete-empty" v-else>No matches</div>
+                        </div> -->
+                        <!-- Scheme Code autocomplete dropdown -->
+                        <div class="autocomplete-dropdown" v-if="autocomplete.scheme_code.open">
+                            <div class="autocomplete-item" v-for="opt in getMatches('scheme_code')" :key="opt.value"
+                                @mousedown.prevent="selectOption('scheme_code', opt)">
+                                [[ opt.label ]]
+                            </div>
+                            <div class="autocomplete-empty" v-if="getMatches('scheme_code').length === 0">No matches
+                            </div>
+                        </div>
+                        <!-- Agent Code autocomplete dropdown -->
+                        <!-- <div class="autocomplete-dropdown" v-if="autocomplete.agent_code.open">
+                            <div class="autocomplete-item" v-for="opt in getMatches('agent_code')" :key="opt.value"
+                                @mousedown.prevent="selectOption('agent_code', opt)">
+                                [[ opt.label ]]
+                            </div>
+                            <div class="autocomplete-empty" v-if="getMatches('agent_code').length === 0">No matches
+                            </div>
+                        </div> -->
+                    </div>
                 </div>
 
-                <div class="filter-group">
+                <!-- Agent Code autocomplete -->
+                <div class="filter-group autocomplete-group">
                     <label>Agent Code</label>
-                    <select v-model="filters.agent_code">
-                        <option value="">All Agents</option>
-                        <option v-for="opt in filterOptions.agent_list" :value="opt">[[ opt ]]</option>
-                    </select>
+                    <div class="autocomplete-wrap">
+                        <input type="text" v-model="autocomplete.agent_code.query" placeholder="Search Agent..."
+                            @input="onAutocompleteInput('agent_code')" @focus="onAutocompleteFocus('agent_code')"
+                            @blur="onAutocompleteBlur('agent_code')">
+                        <button v-if="autocomplete.agent_code.query" class="clear-btn"
+                            @mousedown.prevent="clearAutocomplete('agent_code')">×</button>
+
+                        <!-- <div class="autocomplete-dropdown" v-if="autocomplete.agent_code.open">
+                            <template v-if="getMatches('agent_code').length">
+                                <div class="autocomplete-item" v-for="opt in getMatches('agent_code')" :key="opt.value"
+                                    @mousedown.prevent="selectOption('agent_code', opt)">
+                                    [[ opt.label ]]
+                                </div>
+                            </template>
+                            <div class="autocomplete-empty" v-else>No matches</div>
+                        </div> -->
+                        <!-- Agent Code autocomplete dropdown -->
+                        <div class="autocomplete-dropdown" v-if="autocomplete.agent_code.open">
+                            <div class="autocomplete-item" v-for="opt in getMatches('agent_code')" :key="opt.value"
+                                @mousedown.prevent="selectOption('agent_code', opt)">
+                                [[ opt.label ]]
+                            </div>
+                            <div class="autocomplete-empty" v-if="getMatches('agent_code').length === 0">No matches
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
+                <!-- Operative Account search -->
                 <div class="filter-group search-group">
                     <label>Operative Account</label>
                     <div class="search-input">
@@ -115,39 +199,39 @@
                                 <th class="num">Final Net Pay</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <template v-if="loading">
-                                <tr class="skeleton-row" v-for="n in 6">
-                                    <td colspan="11">
-                                        <div class="skeleton-bar"></div>
-                                    </td>
-                                </tr>
-                            </template>
+                        <tbody v-if="loading">
+                            <tr class="skeleton-row" v-for="n in 6" :key="n">
+                                <td colspan="11">
+                                    <div class="skeleton-bar"></div>
+                                </td>
+                            </tr>
+                        </tbody>
 
-                            <template v-else>
-                                <tr v-for="(row, idx) in records" :key="row.name"
-                                    :style="{ '--row-delay': idx * 35 + 'ms' }" class="data-row">
-                                    <td>[[ row.sol_id ]]</td>
-                                    <td>[[ row.sol_description || '—' ]]</td>
-                                    <td>[[ row.agent_code || '—' ]]</td>
-                                    <td><span class="chip" v-if="row.scheme_code">[[ row.scheme_code ]]</span><span
-                                            v-else>—</span></td>
-                                    <td class="num">[[ formatCurrency(row.eligible_amount) ]]</td>
-                                    <td class="num">[[ formatCurrency(row.commission_amount) ]]</td>
-                                    <td class="num">[[ formatCurrency(row.tds) ]]</td>
-                                    <td class="num">[[ formatCurrency(row.security_deposit) ]]</td>
-                                    <td class="num">[[ formatCurrency(row.netpay) ]]</td>
-                                    <td class="num muted">NA</td>
-                                    <td class="num strong muted">NA</td>
-                                </tr>
+                        <tbody v-if="!loading && records.length > 0">
+                            <tr v-for="(row, idx) in records" :key="row.name"
+                                :style="{ '--row-delay': idx * 35 + 'ms' }" class="data-row">
+                                <td>[[ row.sol_id ]]</td>
+                                <td>[[ row.sol_description || '—' ]]</td>
+                                <td>[[ row.agent_code || '—' ]]</td>
+                                <td><span class="chip" v-if="row.scheme_code">[[ row.scheme_code ]]</span><span
+                                        v-else>—</span></td>
+                                <td class="num">[[ formatCurrency(row.eligible_amount) ]]</td>
+                                <td class="num">[[ formatCurrency(row.commission_amount) ]]</td>
+                                <td class="num">[[ formatCurrency(row.tds) ]]</td>
+                                <td class="num">[[ formatCurrency(row.security_deposit) ]]</td>
+                                <td class="num">[[ formatCurrency(row.netpay) ]]</td>
+                                <td class="num muted">NA</td>
+                                <td class="num strong muted">NA</td>
+                            </tr>
+                        </tbody>
 
-                                <tr v-if="records.length === 0">
-                                    <td colspan="11" class="empty-state">
-                                        <div class="empty-icon">📄</div>
-                                        No commission records found for the selected filters.
-                                    </td>
-                                </tr>
-                            </template>
+                        <tbody v-if="!loading && records.length === 0">
+                            <tr>
+                                <td colspan="11" class="empty-state">
+                                    <div class="empty-icon">📄</div>
+                                    No commission records found for the selected filters.
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -196,8 +280,11 @@
         async function apiGet(path, params) {
             const qs = new URLSearchParams(params).toString();
             const res = await fetch(`${path}?${qs}`, { headers: apiHeaders(), credentials: 'same-origin' });
-            if (!res.ok) throw new Error(`API error ${res.status}`);
-            const json = await res.json();
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                const detail = json._server_messages || json.exc || json.message || res.statusText;
+                throw new Error(`${res.status}: ${detail}`);
+            }
             return json.message;
         }
 
@@ -206,10 +293,11 @@
             return isNaN(n) ? 0 : n;
         }
 
-        PetiteVue.createApp({
+        const app = PetiteVue.createApp({
             $delimiters: ['[[', ']]'],
 
             loading: false,
+            errorMsg: '',
             records: [],
 
             filters: {
@@ -219,10 +307,25 @@
                 agent_operative_account: ''
             },
 
+            // raw options fetched from server
             filterOptions: {
                 sol_list: [],
                 scheme_list: [],
                 agent_list: []
+            },
+
+            // normalized to [{value, label}] for uniform autocomplete handling
+            normalizedOptions: {
+                sol_id: [],
+                scheme_code: [],
+                agent_code: []
+            },
+
+            // autocomplete UI state per filter
+            autocomplete: {
+                sol_id: { query: '', open: false },
+                scheme_code: { query: '', open: false },
+                agent_code: { query: '', open: false }
             },
 
             pagination: { page: 1, pageSize: 10, total: 0 },
@@ -265,7 +368,7 @@
             get activeFilterChips() {
                 const chips = [];
                 if (this.filters.sol_id) {
-                    const opt = this.filterOptions.sol_list.find(o => String(o.value) === String(this.filters.sol_id));
+                    const opt = this.normalizedOptions.sol_id.find(o => String(o.value) === String(this.filters.sol_id));
                     chips.push({ key: 'sol_id', label: 'SOL: ' + (opt ? opt.label : this.filters.sol_id) });
                 }
                 if (this.filters.scheme_code) chips.push({ key: 'scheme_code', label: 'Scheme: ' + this.filters.scheme_code });
@@ -273,6 +376,48 @@
                 if (this.filters.agent_operative_account) chips.push({ key: 'agent_operative_account', label: 'Account: ' + this.filters.agent_operative_account });
                 return chips;
             },
+
+            // ---------- Autocomplete helpers ----------
+            getMatches(type) {
+                const q = (this.autocomplete[type].query || '').toLowerCase().trim();
+                const list = this.normalizedOptions[type] || [];
+                if (!q) return list.slice(0, 50);
+                return list.filter(o => String(o.label).toLowerCase().includes(q)).slice(0, 50);
+            },
+
+            onAutocompleteInput(type) {
+                this.autocomplete[type].open = true;
+                // typing invalidates a previous selection until user picks again
+                if (!this.autocomplete[type].query) {
+                    if (this.filters[type]) {
+                        this.filters[type] = '';
+                        this.fetchRecords(true);
+                    }
+                }
+            },
+
+            onAutocompleteFocus(type) {
+                this.autocomplete[type].open = true;
+            },
+
+            onAutocompleteBlur(type) {
+                setTimeout(() => { this.autocomplete[type].open = false; }, 150);
+            },
+
+            selectOption(type, opt) {
+                this.filters[type] = opt.value;
+                this.autocomplete[type].query = opt.label;
+                this.autocomplete[type].open = false;
+                this.fetchRecords(true);
+            },
+
+            clearAutocomplete(type) {
+                this.autocomplete[type].query = '';
+                this.filters[type] = '';
+                this.autocomplete[type].open = false;
+                this.fetchRecords(true);
+            },
+            // -------------------------------------------
 
             buildFilters() {
                 const f = [];
@@ -286,6 +431,7 @@
             async fetchRecords(resetPage) {
                 if (resetPage) this.pagination.page = 1;
                 this.loading = true;
+                this.errorMsg = '';
                 try {
                     const filters = this.buildFilters();
 
@@ -310,6 +456,7 @@
                     await this.fetchSummary(filters);
                 } catch (e) {
                     console.error('Failed to load commission data', e);
+                    this.errorMsg = e.message || 'Failed to load records.';
                     this.records = [];
                 } finally {
                     this.loading = false;
@@ -337,6 +484,11 @@
                 try {
                     const res = await apiGet(CONFIG.filterOptionsMethod, {});
                     this.filterOptions = Object.assign(this.filterOptions, res);
+
+                    // normalize for autocomplete
+                    this.normalizedOptions.sol_id = this.filterOptions.sol_list || [];
+                    this.normalizedOptions.scheme_code = (this.filterOptions.scheme_list || []).map(v => ({ value: v, label: String(v) }));
+                    this.normalizedOptions.agent_code = (this.filterOptions.agent_list || []).map(v => ({ value: v, label: String(v) }));
                 } catch (e) {
                     console.warn('Filter options API not available yet', e);
                 }
@@ -373,11 +525,13 @@
 
             clearFilter(key) {
                 this.filters[key] = '';
+                if (this.autocomplete[key]) this.autocomplete[key].query = '';
                 this.fetchRecords(true);
             },
 
             resetFilters() {
                 this.filters = { sol_id: '', scheme_code: '', agent_code: '', agent_operative_account: '' };
+                Object.keys(this.autocomplete).forEach(k => { this.autocomplete[k].query = ''; this.autocomplete[k].open = false; });
                 this.fetchRecords(true);
             },
 
@@ -399,7 +553,8 @@
                 this.fetchFilterOptions();
                 this.fetchRecords(true);
             }
-        }).mount('#app');
+            // }).mount('#app');
+        }); app.mount('#app');
     </script>
 </body>
 
