@@ -4,100 +4,362 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Test Petite-Vue</title>
+    <title>Commission Dashboard</title>
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <script src="/assets/sahayog/js/petite-vue.iife.js"></script>
-    <!-- <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #f5f5f5;
-            margin: 0;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            background: white;
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        }
-
-        .status-box {
-            background: #d1fae5;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 20px 0;
-        }
-
-        .counter {
-            font-size: 72px;
-            font-weight: bold;
-            color: #3b82f6;
-            text-align: center;
-            margin: 30px 0;
-        }
-
-        button {
-            width: 100%;
-            padding: 15px;
-            background: #3b82f6;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-
-        .success-box {
-            background: #10b981;
-            color: white;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 20px;
-            text-align: center;
-        }
-    </style> -->
     <link rel="stylesheet" href="./commission.css">
-
 </head>
 
 <body>
     <div id="app" v-scope @vue:mounted="init()">
-        <div class="container">
-            <h1>Petite-Vue Test</h1>
+        <div class="dashboard">
 
-            <div class="status-box">
-                <p><strong>Status:</strong> [[ status ]]</p>
+            <!-- Header -->
+            <header class="dash-header">
+                <div class="header-left">
+                    <h1>Commission Dashboard</h1>
+                    <p class="subtitle">Head Office · Agent Commission Overview</p>
+                </div>
+                <button class="btn-refresh" :class="{ spinning: loading }" @click="refreshAll()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 4v6h-6M1 20v-6h6" />
+                        <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+                    </svg>
+                    Refresh
+                </button>
+            </header>
+
+            <!-- Stat cards -->
+            <div class="stats-grid">
+                <div class="stat-card" v-for="card in statCards" :key="card.key">
+                    <div class="stat-icon" :style="{ background: card.color }">[[ card.icon ]]</div>
+                    <div class="stat-body">
+                        <div class="stat-label">[[ card.label ]]</div>
+                        <div class="stat-value">[[ card.prefix ]][[ formatNumber(displayValues[card.key]) ]]</div>
+                    </div>
+                </div>
             </div>
 
-            <div class="counter">[[ count ]]</div>
+            <!-- Filters -->
+            <div class="filters-bar">
+                <div class="filter-group">
+                    <label>SOL</label>
+                    <select v-model="filters.sol_id">
+                        <option value="">All SOLs</option>
+                        <option v-for="opt in filterOptions.sol_list" :value="opt.value">[[ opt.label ]]</option>
+                    </select>
+                </div>
 
-            <button @click="testVue()">Test Vue</button>
+                <div class="filter-group">
+                    <label>Scheme Code</label>
+                    <select v-model="filters.scheme_code">
+                        <option value="">All Schemes</option>
+                        <option v-for="opt in filterOptions.scheme_list" :value="opt">[[ opt ]]</option>
+                    </select>
+                </div>
 
-            <div v-if="working" class="success-box">
-                Petite-Vue is Working
+                <div class="filter-group">
+                    <label>Agent Code</label>
+                    <select v-model="filters.agent_code">
+                        <option value="">All Agents</option>
+                        <option v-for="opt in filterOptions.agent_list" :value="opt">[[ opt ]]</option>
+                    </select>
+                </div>
+
+                <div class="filter-group search-group">
+                    <label>Operative Account</label>
+                    <div class="search-input">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <circle cx="11" cy="11" r="8" />
+                            <path d="M21 21l-4.35-4.35" />
+                        </svg>
+                        <input type="text" v-model="filters.operative_account" placeholder="Search account no..."
+                            @input="onSearchInput()">
+                    </div>
+                </div>
+
+                <div class="filter-actions">
+                    <button class="btn-apply" @click="fetchRecords(true)">Apply</button>
+                    <button class="btn-reset" @click="resetFilters()">Reset</button>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="table-card">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>SOL ID</th>
+                                <th>SOL Name</th>
+                                <th>Agent Code</th>
+                                <th>Scheme Code</th>
+                                <th class="num">Eligible Amount</th>
+                                <th class="num">Commission Amount</th>
+                                <th class="num">TDS</th>
+                                <th class="num">Security Deposit</th>
+                                <th class="num">Net Pay</th>
+                                <th class="num">Deduction</th>
+                                <th class="num">Final Net Pay</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template v-if="loading">
+                                <tr class="skeleton-row" v-for="n in 6">
+                                    <td colspan="11">
+                                        <div class="skeleton-bar"></div>
+                                    </td>
+                                </tr>
+                            </template>
+
+                            <template v-else>
+                                <tr v-for="row in records" :key="row.name">
+                                    <td>[[ row.sol_id ]]</td>
+                                    <td>[[ row.sol_name ]]</td>
+                                    <td>[[ row.agent_code ]]</td>
+                                    <td><span class="chip">[[ row.scheme_code ]]</span></td>
+                                    <td class="num">[[ formatCurrency(row.eligible_amount) ]]</td>
+                                    <td class="num">[[ formatCurrency(row.commission_amount) ]]</td>
+                                    <td class="num">[[ formatCurrency(row.tds) ]]</td>
+                                    <td class="num">[[ formatCurrency(row.security_deposit) ]]</td>
+                                    <td class="num">[[ formatCurrency(row.net_pay) ]]</td>
+                                    <td class="num">[[ formatCurrency(row.deduction) ]]</td>
+                                    <td class="num strong">[[ formatCurrency(row.final_net_pay) ]]</td>
+                                </tr>
+
+                                <tr v-if="records.length === 0">
+                                    <td colspan="11" class="empty-state">
+                                        No commission records found for the selected filters.
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <div class="pagination" v-if="!loading && records.length > 0">
+                    <div class="page-info">
+                        Showing [[ pageStart ]]–[[ pageEnd ]] of [[ formatNumber(pagination.total) ]]
+                    </div>
+                    <div class="page-controls">
+                        <button :disabled="pagination.page === 1" @click="goToPage(pagination.page - 1)">‹ Prev</button>
+                        <span class="page-num">Page [[ pagination.page ]] / [[ totalPages ]]</span>
+                        <button :disabled="pagination.page >= totalPages" @click="goToPage(pagination.page + 1)">Next
+                            ›</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
+    <!-- <script src="./commission.js"></script> -->
     <script>
+        // ---- Adjust these to match your actual "Commission" doctype fieldnames ----
+        const CONFIG = {
+            doctype: 'Commission',
+            fields: [
+                'name', 'sol_id', 'sol_name', 'agent_code', 'scheme_code',
+                'operative_account', 'eligible_amount', 'commission_amount',
+                'tds', 'security_deposit', 'net_pay', 'deduction', 'final_net_pay'
+            ],
+            // module path derived from apps/banking_api/banking_api/www/commission.py
+            summaryMethod: '/api/method/banking_api.www.commission.get_commission_summary',
+            filterOptionsMethod: '/api/method/banking_api.www.commission.get_commission_filter_options'
+        };
+
+        const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+        function apiHeaders() {
+            return { 'X-Frappe-CSRF-Token': CSRF_TOKEN };
+        }
+
+        async function apiGet(path, params) {
+            const qs = new URLSearchParams(params).toString();
+            const res = await fetch(`${path}?${qs}`, { headers: apiHeaders(), credentials: 'same-origin' });
+            if (!res.ok) throw new Error(`API error ${res.status}`);
+            const json = await res.json();
+            return json.message;
+        }
+
         PetiteVue.createApp({
             $delimiters: ['[[', ']]'],
-            status: 'Ready to test',
-            count: 0,
-            working: false,
 
-            testVue() {
-                this.count++;
-                this.working = true;
-                this.status = 'Working! Clicked ' + this.count + ' times';
+            loading: false,
+            records: [],
+
+            filters: {
+                sol_id: '',
+                scheme_code: '',
+                agent_code: '',
+                operative_account: ''
+            },
+
+            filterOptions: {
+                sol_list: [],
+                scheme_list: [],
+                agent_list: []
+            },
+
+            pagination: { page: 1, pageSize: 10, total: 0 },
+
+            summary: {
+                total_records: 0,
+                total_eligible: 0,
+                total_commission: 0,
+                total_net_pay: 0,
+                total_final_net_pay: 0
+            },
+
+            // animated (count-up) values shown on the cards
+            displayValues: {
+                total_records: 0,
+                total_eligible: 0,
+                total_commission: 0,
+                total_net_pay: 0,
+                total_final_net_pay: 0
+            },
+
+            statCards: [
+                { key: 'total_records', label: 'Total Records', icon: '#', prefix: '', color: 'linear-gradient(135deg,#6366f1,#8b5cf6)' },
+                { key: 'total_eligible', label: 'Eligible Amount', icon: '₹', prefix: '₹', color: 'linear-gradient(135deg,#0ea5e9,#22d3ee)' },
+                { key: 'total_commission', label: 'Commission Amount', icon: '₹', prefix: '₹', color: 'linear-gradient(135deg,#f59e0b,#f97316)' },
+                { key: 'total_net_pay', label: 'Net Pay', icon: '₹', prefix: '₹', color: 'linear-gradient(135deg,#10b981,#14b8a6)' },
+                { key: 'total_final_net_pay', label: 'Final Net Pay', icon: '₹', prefix: '₹', color: 'linear-gradient(135deg,#ec4899,#f43f5e)' }
+            ],
+
+            searchTimer: null,
+
+            get totalPages() {
+                return Math.max(1, Math.ceil(this.pagination.total / this.pagination.pageSize));
+            },
+            get pageStart() {
+                return this.pagination.total === 0 ? 0 : (this.pagination.page - 1) * this.pagination.pageSize + 1;
+            },
+            get pageEnd() {
+                return Math.min(this.pagination.page * this.pagination.pageSize, this.pagination.total);
+            },
+
+            buildFilters() {
+                const f = [];
+                if (this.filters.sol_id) f.push(['sol_id', '=', this.filters.sol_id]);
+                if (this.filters.scheme_code) f.push(['scheme_code', '=', this.filters.scheme_code]);
+                if (this.filters.agent_code) f.push(['agent_code', '=', this.filters.agent_code]);
+                if (this.filters.operative_account) f.push(['operative_account', 'like', `%${this.filters.operative_account}%`]);
+                return f;
+            },
+
+            async fetchRecords(resetPage) {
+                if (resetPage) this.pagination.page = 1;
+                this.loading = true;
+                try {
+                    const filters = this.buildFilters();
+
+                    const [listRes, countRes] = await Promise.all([
+                        apiGet('/api/method/frappe.client.get_list', {
+                            doctype: CONFIG.doctype,
+                            fields: JSON.stringify(CONFIG.fields),
+                            filters: JSON.stringify(filters),
+                            order_by: 'modified desc',
+                            limit_page_length: this.pagination.pageSize,
+                            limit_start: (this.pagination.page - 1) * this.pagination.pageSize
+                        }),
+                        apiGet('/api/method/frappe.client.get_count', {
+                            doctype: CONFIG.doctype,
+                            filters: JSON.stringify(filters)
+                        })
+                    ]);
+
+                    this.records = listRes || [];
+                    this.pagination.total = countRes || 0;
+
+                    await this.fetchSummary(filters);
+                } catch (e) {
+                    console.error('Failed to load commission data', e);
+                    this.records = [];
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            async fetchSummary(filters) {
+                try {
+                    const res = await apiGet(CONFIG.summaryMethod, {
+                        filters: JSON.stringify(filters)
+                    });
+                    this.summary = Object.assign(this.summary, res);
+                } catch (e) {
+                    console.warn('Summary API not available, falling back to page-level totals', e);
+                    this.summary.total_records = this.pagination.total;
+                    this.summary.total_eligible = this.records.reduce((s, r) => s + (r.eligible_amount || 0), 0);
+                    this.summary.total_commission = this.records.reduce((s, r) => s + (r.commission_amount || 0), 0);
+                    this.summary.total_net_pay = this.records.reduce((s, r) => s + (r.net_pay || 0), 0);
+                    this.summary.total_final_net_pay = this.records.reduce((s, r) => s + (r.final_net_pay || 0), 0);
+                }
+                this.animateCounters();
+            },
+
+            async fetchFilterOptions() {
+                try {
+                    const res = await apiGet(CONFIG.filterOptionsMethod, {});
+                    this.filterOptions = Object.assign(this.filterOptions, res);
+                } catch (e) {
+                    console.warn('Filter options API not available yet', e);
+                }
+            },
+
+            animateCounters() {
+                const duration = 700;
+                const start = performance.now();
+                const from = Object.assign({}, this.displayValues);
+                const to = this.summary;
+
+                const step = (now) => {
+                    const progress = Math.min((now - start) / duration, 1);
+                    const eased = 1 - Math.pow(1 - progress, 3);
+                    Object.keys(to).forEach(key => {
+                        this.displayValues[key] = from[key] + (to[key] - from[key]) * eased;
+                    });
+                    if (progress < 1) requestAnimationFrame(step);
+                };
+                requestAnimationFrame(step);
+            },
+
+            onSearchInput() {
+                clearTimeout(this.searchTimer);
+                this.searchTimer = setTimeout(() => this.fetchRecords(true), 400);
+            },
+
+            goToPage(page) {
+                if (page < 1 || page > this.totalPages) return;
+                this.pagination.page = page;
+                this.fetchRecords(false);
+            },
+
+            resetFilters() {
+                this.filters = { sol_id: '', scheme_code: '', agent_code: '', operative_account: '' };
+                this.fetchRecords(true);
+            },
+
+            refreshAll() {
+                this.fetchFilterOptions();
+                this.fetchRecords(false);
+            },
+
+            formatNumber(val) {
+                return Math.round(val || 0).toLocaleString('en-IN');
+            },
+
+            formatCurrency(val) {
+                return '₹' + (val || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
             },
 
             init() {
-                console.log('Petite-Vue initialized');
+                this.fetchFilterOptions();
+                this.fetchRecords(true);
             }
-        }).mount('#app'); 
+        }).mount('#app');
     </script>
 </body>
 
