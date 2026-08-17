@@ -31,7 +31,8 @@
 
             <!-- Stat cards -->
             <div class="stats-grid">
-                <div class="stat-card" v-for="card in statCards" :key="card.key">
+                <div class="stat-card" v-for="(card, idx) in statCards" :key="card.key"
+                    :style="{ '--delay': idx * 60 + 'ms' }">
                     <div class="stat-icon" :style="{ background: card.color }">[[ card.icon ]]</div>
                     <div class="stat-body">
                         <div class="stat-label">[[ card.label ]]</div>
@@ -74,8 +75,10 @@
                             <circle cx="11" cy="11" r="8" />
                             <path d="M21 21l-4.35-4.35" />
                         </svg>
-                        <input type="text" v-model="filters.operative_account" placeholder="Search account no..."
+                        <input type="text" v-model="filters.agent_operative_account" placeholder="Search account no..."
                             @input="onSearchInput()">
+                        <button v-if="filters.agent_operative_account" class="clear-btn"
+                            @click="filters.agent_operative_account = ''; fetchRecords(true)">×</button>
                     </div>
                 </div>
 
@@ -83,6 +86,14 @@
                     <button class="btn-apply" @click="fetchRecords(true)">Apply</button>
                     <button class="btn-reset" @click="resetFilters()">Reset</button>
                 </div>
+            </div>
+
+            <!-- Active filter chips -->
+            <div class="active-chips" v-if="activeFilterChips.length">
+                <span class="chip-tag" v-for="chip in activeFilterChips" :key="chip.key">
+                    [[ chip.label ]]
+                    <button @click="clearFilter(chip.key)">×</button>
+                </span>
             </div>
 
             <!-- Table -->
@@ -114,22 +125,25 @@
                             </template>
 
                             <template v-else>
-                                <tr v-for="row in records" :key="row.name">
+                                <tr v-for="(row, idx) in records" :key="row.name"
+                                    :style="{ '--row-delay': idx * 35 + 'ms' }" class="data-row">
                                     <td>[[ row.sol_id ]]</td>
-                                    <td>[[ row.sol_name ]]</td>
-                                    <td>[[ row.agent_code ]]</td>
-                                    <td><span class="chip">[[ row.scheme_code ]]</span></td>
+                                    <td>[[ row.sol_description || '—' ]]</td>
+                                    <td>[[ row.agent_code || '—' ]]</td>
+                                    <td><span class="chip" v-if="row.scheme_code">[[ row.scheme_code ]]</span><span
+                                            v-else>—</span></td>
                                     <td class="num">[[ formatCurrency(row.eligible_amount) ]]</td>
                                     <td class="num">[[ formatCurrency(row.commission_amount) ]]</td>
                                     <td class="num">[[ formatCurrency(row.tds) ]]</td>
                                     <td class="num">[[ formatCurrency(row.security_deposit) ]]</td>
-                                    <td class="num">[[ formatCurrency(row.net_pay) ]]</td>
-                                    <td class="num">[[ formatCurrency(row.deduction) ]]</td>
-                                    <td class="num strong">[[ formatCurrency(row.final_net_pay) ]]</td>
+                                    <td class="num">[[ formatCurrency(row.netpay) ]]</td>
+                                    <td class="num muted">NA</td>
+                                    <td class="num strong muted">NA</td>
                                 </tr>
 
                                 <tr v-if="records.length === 0">
                                     <td colspan="11" class="empty-state">
+                                        <div class="empty-icon">📄</div>
                                         No commission records found for the selected filters.
                                     </td>
                                 </tr>
@@ -141,30 +155,34 @@
                 <!-- Pagination -->
                 <div class="pagination" v-if="!loading && records.length > 0">
                     <div class="page-info">
-                        Showing [[ pageStart ]]–[[ pageEnd ]] of [[ formatNumber(pagination.total) ]]
+                        Showing <strong>[[ pageStart ]]–[[ pageEnd ]]</strong> of <strong>[[
+                            formatNumber(pagination.total) ]]</strong> records
                     </div>
                     <div class="page-controls">
-                        <button :disabled="pagination.page === 1" @click="goToPage(pagination.page - 1)">‹ Prev</button>
-                        <span class="page-num">Page [[ pagination.page ]] / [[ totalPages ]]</span>
-                        <button :disabled="pagination.page >= totalPages" @click="goToPage(pagination.page + 1)">Next
-                            ›</button>
+                        <button class="page-btn" :disabled="pagination.page === 1"
+                            @click="goToPage(pagination.page - 1)">
+                            ‹ Prev
+                        </button>
+                        <span class="page-num">Page [[ pagination.page ]] of [[ totalPages ]]</span>
+                        <button class="page-btn" :disabled="pagination.page >= totalPages"
+                            @click="goToPage(pagination.page + 1)">
+                            Next ›
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- <script src="./commission.js"></script> -->
     <script>
-        // ---- Adjust these to match your actual "Commission" doctype fieldnames ----
+        // ---- Field mapping matches the "Commission" doctype exactly ----
         const CONFIG = {
             doctype: 'Commission',
             fields: [
-                'name', 'sol_id', 'sol_name', 'agent_code', 'scheme_code',
-                'operative_account', 'eligible_amount', 'commission_amount',
-                'tds', 'security_deposit', 'net_pay', 'deduction', 'final_net_pay'
+                'name', 'sol_id', 'sol_description', 'agent_code', 'agent_name', 'scheme_code',
+                'scheme_description', 'agent_operative_account', 'customer_account_number',
+                'eligible_amount', 'commission_amount', 'tds', 'security_deposit', 'netpay'
             ],
-            // module path derived from apps/banking_api/banking_api/www/commission.py
             summaryMethod: '/api/method/banking_api.www.commission.get_commission_summary',
             filterOptionsMethod: '/api/method/banking_api.www.commission.get_commission_filter_options'
         };
@@ -183,6 +201,11 @@
             return json.message;
         }
 
+        function toNumber(val) {
+            const n = parseFloat(val);
+            return isNaN(n) ? 0 : n;
+        }
+
         PetiteVue.createApp({
             $delimiters: ['[[', ']]'],
 
@@ -193,7 +216,7 @@
                 sol_id: '',
                 scheme_code: '',
                 agent_code: '',
-                operative_account: ''
+                agent_operative_account: ''
             },
 
             filterOptions: {
@@ -208,25 +231,24 @@
                 total_records: 0,
                 total_eligible: 0,
                 total_commission: 0,
-                total_net_pay: 0,
-                total_final_net_pay: 0
+                total_netpay: 0,
+                total_security_deposit: 0
             },
 
-            // animated (count-up) values shown on the cards
             displayValues: {
                 total_records: 0,
                 total_eligible: 0,
                 total_commission: 0,
-                total_net_pay: 0,
-                total_final_net_pay: 0
+                total_netpay: 0,
+                total_security_deposit: 0
             },
 
             statCards: [
                 { key: 'total_records', label: 'Total Records', icon: '#', prefix: '', color: 'linear-gradient(135deg,#6366f1,#8b5cf6)' },
                 { key: 'total_eligible', label: 'Eligible Amount', icon: '₹', prefix: '₹', color: 'linear-gradient(135deg,#0ea5e9,#22d3ee)' },
                 { key: 'total_commission', label: 'Commission Amount', icon: '₹', prefix: '₹', color: 'linear-gradient(135deg,#f59e0b,#f97316)' },
-                { key: 'total_net_pay', label: 'Net Pay', icon: '₹', prefix: '₹', color: 'linear-gradient(135deg,#10b981,#14b8a6)' },
-                { key: 'total_final_net_pay', label: 'Final Net Pay', icon: '₹', prefix: '₹', color: 'linear-gradient(135deg,#ec4899,#f43f5e)' }
+                { key: 'total_netpay', label: 'Net Pay', icon: '₹', prefix: '₹', color: 'linear-gradient(135deg,#10b981,#14b8a6)' },
+                { key: 'total_security_deposit', label: 'Security Deposit', icon: '₹', prefix: '₹', color: 'linear-gradient(135deg,#ec4899,#f43f5e)' }
             ],
 
             searchTimer: null,
@@ -240,13 +262,24 @@
             get pageEnd() {
                 return Math.min(this.pagination.page * this.pagination.pageSize, this.pagination.total);
             },
+            get activeFilterChips() {
+                const chips = [];
+                if (this.filters.sol_id) {
+                    const opt = this.filterOptions.sol_list.find(o => String(o.value) === String(this.filters.sol_id));
+                    chips.push({ key: 'sol_id', label: 'SOL: ' + (opt ? opt.label : this.filters.sol_id) });
+                }
+                if (this.filters.scheme_code) chips.push({ key: 'scheme_code', label: 'Scheme: ' + this.filters.scheme_code });
+                if (this.filters.agent_code) chips.push({ key: 'agent_code', label: 'Agent: ' + this.filters.agent_code });
+                if (this.filters.agent_operative_account) chips.push({ key: 'agent_operative_account', label: 'Account: ' + this.filters.agent_operative_account });
+                return chips;
+            },
 
             buildFilters() {
                 const f = [];
                 if (this.filters.sol_id) f.push(['sol_id', '=', this.filters.sol_id]);
                 if (this.filters.scheme_code) f.push(['scheme_code', '=', this.filters.scheme_code]);
                 if (this.filters.agent_code) f.push(['agent_code', '=', this.filters.agent_code]);
-                if (this.filters.operative_account) f.push(['operative_account', 'like', `%${this.filters.operative_account}%`]);
+                if (this.filters.agent_operative_account) f.push(['agent_operative_account', 'like', `%${this.filters.agent_operative_account}%`]);
                 return f;
             },
 
@@ -292,10 +325,10 @@
                 } catch (e) {
                     console.warn('Summary API not available, falling back to page-level totals', e);
                     this.summary.total_records = this.pagination.total;
-                    this.summary.total_eligible = this.records.reduce((s, r) => s + (r.eligible_amount || 0), 0);
-                    this.summary.total_commission = this.records.reduce((s, r) => s + (r.commission_amount || 0), 0);
-                    this.summary.total_net_pay = this.records.reduce((s, r) => s + (r.net_pay || 0), 0);
-                    this.summary.total_final_net_pay = this.records.reduce((s, r) => s + (r.final_net_pay || 0), 0);
+                    this.summary.total_eligible = this.records.reduce((s, r) => s + toNumber(r.eligible_amount), 0);
+                    this.summary.total_commission = this.records.reduce((s, r) => s + toNumber(r.commission_amount), 0);
+                    this.summary.total_netpay = this.records.reduce((s, r) => s + toNumber(r.netpay), 0);
+                    this.summary.total_security_deposit = this.records.reduce((s, r) => s + toNumber(r.security_deposit), 0);
                 }
                 this.animateCounters();
             },
@@ -335,10 +368,16 @@
                 if (page < 1 || page > this.totalPages) return;
                 this.pagination.page = page;
                 this.fetchRecords(false);
+                document.querySelector('.table-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            },
+
+            clearFilter(key) {
+                this.filters[key] = '';
+                this.fetchRecords(true);
             },
 
             resetFilters() {
-                this.filters = { sol_id: '', scheme_code: '', agent_code: '', operative_account: '' };
+                this.filters = { sol_id: '', scheme_code: '', agent_code: '', agent_operative_account: '' };
                 this.fetchRecords(true);
             },
 
@@ -352,7 +391,8 @@
             },
 
             formatCurrency(val) {
-                return '₹' + (val || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+                if (val === null || val === undefined || val === '') return '—';
+                return '₹' + toNumber(val).toLocaleString('en-IN', { maximumFractionDigits: 2 });
             },
 
             init() {
