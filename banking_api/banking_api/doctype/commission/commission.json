@@ -17,6 +17,7 @@
   "agent_total_eligible_collection",
   "tds",
   "netpay",
+  "pan_status",
   "column_break_ajmr",
   "agent_name",
   "customer_account_number",
@@ -163,12 +164,17 @@
    "fieldname": "agent_security_account",
    "fieldtype": "Data",
    "label": "Agent Security Account"
+  },
+  {
+   "fieldname": "pan_status",
+   "fieldtype": "Data",
+   "label": "PAN Status"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-17 16:47:09.996927",
+ "modified": "2026-08-17 16:50:34.604734",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Commission",
