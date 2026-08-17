@@ -27,7 +27,9 @@
   "collection",
   "eligible_amount",
   "commission_amount",
-  "security_deposit"
+  "security_deposit",
+  "cif",
+  "agent_security_account"
  ],
  "fields": [
   {
@@ -151,12 +153,22 @@
    "fieldname": "netpay",
    "fieldtype": "Data",
    "label": "Netpay"
+  },
+  {
+   "fieldname": "cif",
+   "fieldtype": "Data",
+   "label": "CIF"
+  },
+  {
+   "fieldname": "agent_security_account",
+   "fieldtype": "Data",
+   "label": "Agent Security Account"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-12 17:11:13.968593",
+ "modified": "2026-08-17 16:47:09.996927",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Commission",
