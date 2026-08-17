@@ -206,6 +206,7 @@
                                 <th>Agent Code</th>
                                 <th>Scheme Code</th>
                                 <th>PAN</th>
+                                <th>PAN Status</th>
                                 <th>CIF</th>
                                 <th>Security Account</th>
                                 <th>Operative Account</th>
@@ -257,6 +258,7 @@
                                 <td><span class="chip" v-if="row.scheme_code">[[ row.scheme_code ]]</span><span
                                         v-else>—</span></td>
                                 <td>[[ row.pan_card || '—' ]]</td>
+                                <td>[[ row.pan_status || '—' ]]</td>
                                 <td>[[ row.cif || '—' ]]</td>
                                 <td>[[ row.agent_security_account || '—' ]]</td>
                                 <td>[[ row.agent_operative_account || '—' ]]</td>
@@ -280,7 +282,7 @@
                         </tbody> -->
                         <tbody v-if="!loading && records.length === 0">
                             <tr>
-                                <td colspan="15" class="empty-state">
+                                <td colspan="16" class="empty-state">
                                     <div class="empty-icon">📄</div>
                                     No commission records found for the selected filters.
                                 </td>
@@ -330,7 +332,7 @@
                 'name', 'sol_id', 'sol_description', 'agent_code', 'agent_name', 'scheme_code',
                 'scheme_description', 'agent_operative_account', 'customer_account_number',
                 'eligible_amount', 'commission_amount', 'tds', 'security_deposit', 'netpay',
-                'pan_card', 'cif', 'agent_security_account', 'agent_operative_account'
+                'pan_card', 'pan_status', 'cif', 'agent_security_account', 'agent_operative_account'
             ],
             summaryMethod: '/api/method/banking_api.www.commission.get_commission_summary',
             filterOptionsMethod: '/api/method/banking_api.www.commission.get_commission_filter_options'
