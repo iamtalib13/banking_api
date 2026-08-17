@@ -184,7 +184,7 @@
             <div class="table-card">
                 <div class="table-wrap">
                     <table>
-                        <thead>
+                        <!-- <thead>
                             <tr>
                                 <th>SOL ID</th>
                                 <th>SOL Name</th>
@@ -198,17 +198,43 @@
                                 <th class="num">Deduction</th>
                                 <th class="num">Final Net Pay</th>
                             </tr>
+                        </thead> -->
+                        <thead>
+                            <tr>
+                                <th>SOL ID</th>
+                                <th>SOL Name</th>
+                                <th>Agent Code</th>
+                                <th>Scheme Code</th>
+                                <th>PAN</th>
+                                <th>CIF</th>
+                                <th>Security Account</th>
+                                <th>Operative Account</th>
+                                <th class="num">Eligible Amount</th>
+                                <th class="num">Commission Amount</th>
+                                <th class="num">TDS</th>
+                                <th class="num">Security Deposit</th>
+                                <th class="num">Net Pay</th>
+                                <th class="num">Deduction</th>
+                                <th class="num">Final Net Pay</th>
+                            </tr>
                         </thead>
-                        <tbody v-if="loading">
+                        <!-- <tbody v-if="loading">
                             <tr class="skeleton-row" v-for="n in 6" :key="n">
                                 <td colspan="11">
+                                    <div class="skeleton-bar"></div>
+                                </td>
+                            </tr>
+                        </tbody> -->
+                        <tbody v-if="loading">
+                            <tr class="skeleton-row" v-for="n in 6" :key="n">
+                                <td colspan="15">
                                     <div class="skeleton-bar"></div>
                                 </td>
                             </tr>
                         </tbody>
 
                         <tbody v-if="!loading && records.length > 0">
-                            <tr v-for="(row, idx) in records" :key="row.name"
+                            <!-- <tr v-for="(row, idx) in records" :key="row.name"
                                 :style="{ '--row-delay': idx * 35 + 'ms' }" class="data-row">
                                 <td>[[ row.sol_id ]]</td>
                                 <td>[[ row.sol_description || '—' ]]</td>
@@ -222,12 +248,39 @@
                                 <td class="num">[[ formatCurrency(row.netpay) ]]</td>
                                 <td class="num muted">NA</td>
                                 <td class="num strong muted">NA</td>
+                            </tr> -->
+                            <tr v-for="(row, idx) in records" :key="row.name"
+                                :style="{ '--row-delay': idx * 35 + 'ms' }" class="data-row">
+                                <td>[[ row.sol_id ]]</td>
+                                <td>[[ row.sol_description || '—' ]]</td>
+                                <td>[[ row.agent_code || '—' ]]</td>
+                                <td><span class="chip" v-if="row.scheme_code">[[ row.scheme_code ]]</span><span
+                                        v-else>—</span></td>
+                                <td>[[ row.pan_card || '—' ]]</td>
+                                <td>[[ row.cif || '—' ]]</td>
+                                <td>[[ row.agent_security_account || '—' ]]</td>
+                                <td>[[ row.agent_operative_account || '—' ]]</td>
+                                <td class="num">[[ formatCurrency(row.eligible_amount) ]]</td>
+                                <td class="num">[[ formatCurrency(row.commission_amount) ]]</td>
+                                <td class="num">[[ formatCurrency(row.tds) ]]</td>
+                                <td class="num">[[ formatCurrency(row.security_deposit) ]]</td>
+                                <td class="num">[[ formatCurrency(row.netpay) ]]</td>
+                                <td class="num muted">NA</td>
+                                <td class="num strong muted">NA</td>
                             </tr>
                         </tbody>
 
-                        <tbody v-if="!loading && records.length === 0">
+                        <!-- <tbody v-if="!loading && records.length === 0">
                             <tr>
                                 <td colspan="11" class="empty-state">
+                                    <div class="empty-icon">📄</div>
+                                    No commission records found for the selected filters.
+                                </td>
+                            </tr>
+                        </tbody> -->
+                        <tbody v-if="!loading && records.length === 0">
+                            <tr>
+                                <td colspan="15" class="empty-state">
                                     <div class="empty-icon">📄</div>
                                     No commission records found for the selected filters.
                                 </td>
@@ -260,12 +313,24 @@
 
     <script>
         // ---- Field mapping matches the "Commission" doctype exactly ----
+        // const CONFIG = {
+        //     doctype: 'Commission',
+        //     fields: [
+        //         'name', 'sol_id', 'sol_description', 'agent_code', 'agent_name', 'scheme_code',
+        //         'scheme_description', 'agent_operative_account', 'customer_account_number',
+        //         'eligible_amount', 'commission_amount', 'tds', 'security_deposit', 'netpay'
+        //     ],
+        //     summaryMethod: '/api/method/banking_api.www.commission.get_commission_summary',
+        //     filterOptionsMethod: '/api/method/banking_api.www.commission.get_commission_filter_options'
+        // };
+
         const CONFIG = {
             doctype: 'Commission',
             fields: [
                 'name', 'sol_id', 'sol_description', 'agent_code', 'agent_name', 'scheme_code',
                 'scheme_description', 'agent_operative_account', 'customer_account_number',
-                'eligible_amount', 'commission_amount', 'tds', 'security_deposit', 'netpay'
+                'eligible_amount', 'commission_amount', 'tds', 'security_deposit', 'netpay',
+                'pan_card', 'cif', 'agent_security_account', 'agent_operative_account'
             ],
             summaryMethod: '/api/method/banking_api.www.commission.get_commission_summary',
             filterOptionsMethod: '/api/method/banking_api.www.commission.get_commission_filter_options'
