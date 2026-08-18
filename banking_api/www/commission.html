@@ -228,7 +228,7 @@
                         </tbody> -->
                         <tbody v-if="loading">
                             <tr class="skeleton-row" v-for="n in 6" :key="n">
-                                <td colspan="15">
+                                <td colspan="16">
                                     <div class="skeleton-bar"></div>
                                 </td>
                             </tr>
@@ -250,7 +250,8 @@
                                 <td class="num muted">NA</td>
                                 <td class="num strong muted">NA</td>
                             </tr> -->
-                            <tr v-for="(row, idx) in records" :key="row.name"
+                            <!-- working new code -->
+                            <!-- <tr v-for="(row, idx) in records" :key="row.name"
                                 :style="{ '--row-delay': idx * 35 + 'ms' }" class="data-row">
                                 <td>[[ row.sol_id ]]</td>
                                 <td>[[ row.sol_description || '—' ]]</td>
@@ -262,6 +263,27 @@
                                 <td>[[ row.cif || '—' ]]</td>
                                 <td>[[ row.agent_security_account || '—' ]]</td>
                                 <td>[[ row.agent_operative_account || '—' ]]</td>
+                                <td class="num">[[ formatCurrency(row.eligible_amount) ]]</td>
+                                <td class="num">[[ formatCurrency(row.commission_amount) ]]</td>
+                                <td class="num">[[ formatCurrency(row.tds) ]]</td>
+                                <td class="num">[[ formatCurrency(row.security_deposit) ]]</td>
+                                <td class="num">[[ formatCurrency(row.netpay) ]]</td>
+                                <td class="num muted">NA</td>
+                                <td class="num strong muted">NA</td>
+                            </tr> -->
+
+                            <tr v-for="(row, idx) in records" :key="row.agent_code"
+                                :style="{ '--row-delay': idx * 35 + 'ms' }" class="data-row">
+                                <td>[[ row.sol_id ]]</td>
+                                <td>[[ row.sol_description || '—' ]]</td>
+                                <td>[[ row.agent_code || '—' ]]</td>
+                                <td><span class="chip" v-if="row.scheme_code">[[ row.scheme_code ]]</span><span
+                                        v-else>—</span></td>
+                                <td>[[ row.pan_card || '—' ]]</td>
+                                <td>[[ row.pan_status || '—' ]]</td>
+                                <td>[[ row.cif || '—' ]]</td>
+                                <td>[[ row.security_account || '—' ]]</td>
+                                <td>[[ row.operative_account || '—' ]]</td>
                                 <td class="num">[[ formatCurrency(row.eligible_amount) ]]</td>
                                 <td class="num">[[ formatCurrency(row.commission_amount) ]]</td>
                                 <td class="num">[[ formatCurrency(row.tds) ]]</td>
@@ -326,14 +348,20 @@
         //     filterOptionsMethod: '/api/method/banking_api.www.commission.get_commission_filter_options'
         // };
 
+        // const CONFIG = {
+        //     doctype: 'Commission',
+        //     fields: [
+        //         'name', 'sol_id', 'sol_description', 'agent_code', 'agent_name', 'scheme_code',
+        //         'scheme_description', 'agent_operative_account', 'customer_account_number',
+        //         'eligible_amount', 'commission_amount', 'tds', 'security_deposit', 'netpay',
+        //         'pan_card', 'pan_status', 'cif', 'agent_security_account', 'agent_operative_account'
+        //     ],
+        //     summaryMethod: '/api/method/banking_api.www.commission.get_commission_summary',
+        //     filterOptionsMethod: '/api/method/banking_api.www.commission.get_commission_filter_options'
+        // };
         const CONFIG = {
-            doctype: 'Commission',
-            fields: [
-                'name', 'sol_id', 'sol_description', 'agent_code', 'agent_name', 'scheme_code',
-                'scheme_description', 'agent_operative_account', 'customer_account_number',
-                'eligible_amount', 'commission_amount', 'tds', 'security_deposit', 'netpay',
-                'pan_card', 'pan_status', 'cif', 'agent_security_account', 'agent_operative_account'
-            ],
+            groupedMethod: '/api/method/banking_api.www.commission.get_commission_grouped',
+            groupedCountMethod: '/api/method/banking_api.www.commission.get_commission_grouped_count',
             summaryMethod: '/api/method/banking_api.www.commission.get_commission_summary',
             filterOptionsMethod: '/api/method/banking_api.www.commission.get_commission_filter_options'
         };
@@ -495,6 +523,42 @@
                 return f;
             },
 
+            // async fetchRecords(resetPage) {
+            //     if (resetPage) this.pagination.page = 1;
+            //     this.loading = true;
+            //     this.errorMsg = '';
+            //     try {
+            //         const filters = this.buildFilters();
+
+            //         const [listRes, countRes] = await Promise.all([
+            //             apiGet('/api/method/frappe.client.get_list', {
+            //                 doctype: CONFIG.doctype,
+            //                 fields: JSON.stringify(CONFIG.fields),
+            //                 filters: JSON.stringify(filters),
+            //                 order_by: 'modified desc',
+            //                 limit_page_length: this.pagination.pageSize,
+            //                 limit_start: (this.pagination.page - 1) * this.pagination.pageSize
+            //             }),
+            //             apiGet('/api/method/frappe.client.get_count', {
+            //                 doctype: CONFIG.doctype,
+            //                 filters: JSON.stringify(filters)
+            //             })
+            //         ]);
+
+            //         this.records = listRes || [];
+            //         this.pagination.total = countRes || 0;
+
+            //         await this.fetchSummary(filters);
+            //     } catch (e) {
+            //         console.error('Failed to load commission data', e);
+            //         this.errorMsg = e.message || 'Failed to load records.';
+            //         this.records = [];
+            //     } finally {
+            //         this.loading = false;
+            //     }
+            // },
+
+
             async fetchRecords(resetPage) {
                 if (resetPage) this.pagination.page = 1;
                 this.loading = true;
@@ -503,16 +567,12 @@
                     const filters = this.buildFilters();
 
                     const [listRes, countRes] = await Promise.all([
-                        apiGet('/api/method/frappe.client.get_list', {
-                            doctype: CONFIG.doctype,
-                            fields: JSON.stringify(CONFIG.fields),
+                        apiGet(CONFIG.groupedMethod, {
                             filters: JSON.stringify(filters),
-                            order_by: 'modified desc',
-                            limit_page_length: this.pagination.pageSize,
-                            limit_start: (this.pagination.page - 1) * this.pagination.pageSize
+                            limit_start: (this.pagination.page - 1) * this.pagination.pageSize,
+                            limit_page_length: this.pagination.pageSize
                         }),
-                        apiGet('/api/method/frappe.client.get_count', {
-                            doctype: CONFIG.doctype,
+                        apiGet(CONFIG.groupedCountMethod, {
                             filters: JSON.stringify(filters)
                         })
                     ]);
