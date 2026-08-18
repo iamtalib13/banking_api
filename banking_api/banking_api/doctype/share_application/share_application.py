@@ -582,7 +582,7 @@ def download_proceeding_form(account_opening_date):
             "account_opening_date": selected_date,
             "payment_status": "Success"
         },
-        fields=["name", "customer_name"],
+        fields=["name", "customer_name", "branch"],
         order_by="name asc"
     )
 
@@ -785,7 +785,7 @@ def download_proceeding_form(account_opening_date):
             str(idx),
             row.get("name") or "",
             row.get("customer_name") or "",
-            "",
+            row.get("branch") or "",
             "10",
             "10"
         ]
