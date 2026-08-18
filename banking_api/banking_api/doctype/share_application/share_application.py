@@ -607,7 +607,17 @@ def download_proceeding_form(account_opening_date):
             indicator="orange"
         )
         return
+
+    def to_devanagari_digits(number):
+        """
+        Convert an integer to Devanagari (Marathi) digits.
+        Example: 708 -> '७०८'
+        """
+        devanagari_digits = "०१२३४५६७८९"
+        return "".join(devanagari_digits[int(d)] for d in str(number))
+
     total_members = len(records)
+    total_members_dev = to_devanagari_digits(total_members)
     doc = DocxDocument()
 
     section = doc.sections[0]
@@ -736,7 +746,7 @@ def download_proceeding_form(account_opening_date):
     # )
     resolution_text = (
         f'"ठरविण्यात येते की, मल्टी स्टेट को-ऑपरेटिव्ह सोसायटीज अधिनियम, 2002, त्याअंतर्गत नियम व संस्थेच्या उपविधींमधील तरतुदींनुसार '
-        f'परिशिष्ट – अ मध्ये नमूद १ ते {total_members} अर्जदारांना संस्थेचे नियमित सभासद म्हणून प्रवेश देण्यास मंजुरी देण्यात येत आहे. '
+        f'परिशिष्ट – अ मध्ये नमूद १ ते {total_members_dev} अर्जदारांना संस्थेचे नियमित सभासद म्हणून प्रवेश देण्यास मंजुरी देण्यात येत आहे. '
         f'तसेच संबंधित अर्जदारांकडून विहित प्रवेश फी, भागभांडवल रक्कम व इतर आवश्यक औपचारिकता पूर्ण करून त्यांची सभासद म्हणून नोंद सदस्य नोंदवहीत करण्यात यावी '
         f'व नियमानुसार सभासदत्व/भाग प्रमाणपत्र निर्गमित करण्यात यावे. असे सर्व समंतीने ठरविण्यात आले. "'
     )
@@ -831,7 +841,7 @@ def download_proceeding_form(account_opening_date):
     #     bold=True
     # )
     add_left(
-        f"प्रमाणित करण्यात येते की, परिशिष्ट – अ मध्ये नमूद १ ते {total_members} अर्जदारांची यादी संचालक मंडळाच्या बैठकी क्र. _____ दिनांक _____ मध्ये मंजूर करण्यात आलेल्या ठराव क्र. _____ चा अविभाज्य भाग आहे.",
+        f"प्रमाणित करण्यात येते की, परिशिष्ट – अ मध्ये नमूद १ ते {total_members_dev} अर्जदारांची यादी संचालक मंडळाच्या बैठकी क्र. _____ दिनांक _____ मध्ये मंजूर करण्यात आलेल्या ठराव क्र. _____ चा अविभाज्य भाग आहे.",
         bold=True
     )
     add_left("")
