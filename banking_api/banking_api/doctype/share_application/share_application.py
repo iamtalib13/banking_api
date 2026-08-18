@@ -21,6 +21,7 @@ from docx.shared import Pt, Inches
 from docx.oxml.ns import qn
 from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+import random
 
 
 class ShareApplication(Document):
@@ -556,6 +557,15 @@ class ShareApplication(Document):
 #     frappe.response.type = "download"
 #     frappe.response.display_content_as = "attachment"
 
+# list of directors
+DIRECTORS = [
+    "जयेशचंद्र रमण रामादे",
+    "दत्तात्रय शायमराव सावंत",
+    "आशीष वासुदेव बाहेकर",
+    "जितेंद्र इंद्रराज रंगारी",
+    "शुभम गोपाल भिमटे"
+]
+
 
 @frappe.whitelist()
 def download_proceeding_form(account_opening_date):
@@ -727,8 +737,11 @@ def download_proceeding_form(account_opening_date):
     set_run_font(r3, bold=False, size=14)
 
     add_left("")
-    add_left("प्रस्तावक : _______________________", bold=True)
-    add_left("अनुमोदक : _______________________", bold=True)
+    proposer, approver = random.sample(DIRECTORS, 2)
+    add_left(f"प्रस्तावक : {proposer}", bold=True)
+    add_left(f"अनुमोदक : {approver}", bold=True)
+    # add_left("प्रस्तावक : _______________________", bold=True)
+    # add_left("अनुमोदक : _______________________", bold=True)
     add_left("ठराव सर्वानुमते मंजूर.", bold=True)
     add_left("")
     add_left("")
