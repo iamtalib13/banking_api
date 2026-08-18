@@ -28,6 +28,7 @@
   "customer_name",
   "scheme_type",
   "transaction_amount",
+  "branch",
   "column_break_ysjv",
   "address",
   "scheme_code",
@@ -116,8 +117,9 @@
   {
    "allow_on_submit": 1,
    "fieldname": "sol_id",
-   "fieldtype": "Data",
+   "fieldtype": "Link",
    "label": "SOL ID",
+   "options": "Sahayog Branch",
    "search_index": 1
   },
   {
@@ -212,13 +214,19 @@
    "label": "Amount",
    "read_only": 1,
    "search_index": 1
+  },
+  {
+   "fetch_from": "sol_id.branch",
+   "fieldname": "branch",
+   "fieldtype": "Data",
+   "label": "Branch"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-08-07 16:40:22.613516",
+ "modified": "2026-08-18 12:11:36.155891",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Share Application",
