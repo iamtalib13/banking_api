@@ -689,7 +689,7 @@ def download_proceeding_form(account_opening_date):
 
     add_left("बैठक क्र.: __________", bold=True, size=14)
     add_left(f"दिनांक: {formatted_date}", bold=True, size=14)
-    add_left("वेळ: ___________", bold=True, size=14)
+    add_left("वेळ: ____11:30____", bold=True, size=14)
     add_left("स्थळ: मुख्यालय, गोंदिया", bold=True, size=14)
     add_left("विषय क्र. ____: नवीन सभासदत्व मंजूर करण्याबाबत", bold=True, size=14)
 
