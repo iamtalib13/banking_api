@@ -791,13 +791,29 @@ def download_proceeding_form(account_opening_date):
     # add_left("अनुमोदक : _______________________", bold=True)
     add_left("ठराव सर्वानुमते मंजूर.", bold=True)
     add_left("")
-    add_left("")
-    # Jayesh Sir signature
-    add_image_paragraph(JAYESH_SIGN_PATH, width_inch=0.8)
-    # Wasnik Sir signature
-    add_image_paragraph(WASNIK_SIGN_PATH, width_inch=0.8)
+    # add_left("")
 
-    add_left("अध्यक्ष                                                      मुख्य कार्यकारी अधिकारी", bold=True)
+    # # Jayesh Sir signature
+    # add_image_paragraph(JAYESH_SIGN_PATH, width_inch=0.8)
+    # # Wasnik Sir signature
+    # add_image_paragraph(WASNIK_SIGN_PATH, width_inch=0.8)
+
+    # Single paragraph with both signatures side by side
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+    # Jayesh Sir signature
+    run1 = p.add_run()
+    run1.add_picture(JAYESH_SIGN_PATH, width=Inches(1.0))
+
+    # Space between signatures
+    p.add_run("                                                      ")
+
+    # Wasnik Sir signature
+    run2 = p.add_run()
+    run2.add_picture(WASNIK_SIGN_PATH, width=Inches(1.0))
+
+    add_left("अध्यक्ष                                                             मुख्य कार्यकारी अधिकारी", bold=True)
     add_left("सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.     सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.", bold=True)
     add_left(
         "मुख्यालय, गोंदिया                                           मुख्यालय, गोंदिया", bold=True)
