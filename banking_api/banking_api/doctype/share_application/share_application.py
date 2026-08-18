@@ -23,6 +23,8 @@ from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import random
 import os
+from docx.shared import Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 
 class ShareApplication(Document):
@@ -576,6 +578,14 @@ JAYESH_SIGN_PATH = os.path.join(IMAGES_PATH, "jayesh_sir_sign.png")
 WASNIK_SIGN_PATH = os.path.join(IMAGES_PATH, "wasnik_sir_sign.png")
 
 
+def add_centered_image(doc, image_path, width_inch=1.8):
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    run = p.add_run()
+    run.add_picture(image_path, width=Inches(width_inch))
+    return p
+
+
 @frappe.whitelist()
 def download_proceeding_form(account_opening_date):
     import io
@@ -905,17 +915,19 @@ def download_proceeding_form(account_opening_date):
 
     add_left("")
 
+    # add_left("")
+
     # Wasnik Sir sign
-    add_centered_image(WASNIK_SIGN_PATH, width_inch=1.8)
+    add_centered_image(doc, WASNIK_SIGN_PATH, width_inch=1.0)
 
     add_left("मुख्य कार्यकारी अधिकारी", bold=True)
     add_left("सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.", bold=True)
     add_left("मुख्यालय, गोंदिया", bold=True)
 
-    add_left("")
+    # add_left("")
 
     # Jayesh Sir sign
-    add_centered_image(JAYESH_SIGN_PATH, width_inch=1.8)
+    add_centered_image(doc, JAYESH_SIGN_PATH, width_inch=1.0)
 
     add_left("अध्यक्ष", bold=True)
     add_left("सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.", bold=True)
