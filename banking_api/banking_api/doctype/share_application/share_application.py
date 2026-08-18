@@ -618,6 +618,19 @@ def download_proceeding_form(account_opening_date):
 
     total_members = len(records)
     total_members_dev = to_devanagari_digits(total_members)
+
+    def to_devanagari_date(date_obj):
+        """
+        Convert a Python date object to Devanagari digits in dd/mm/yyyy format.
+        Example: 2026-08-18 -> '१८/०८/२०२६'
+        """
+        day = to_devanagari_digits(date_obj.day)
+        month = to_devanagari_digits(date_obj.month)
+        year = to_devanagari_digits(date_obj.year)
+        return f"{day}/{month}/{year}"
+
+    selected_date_dev = to_devanagari_date(selected_date)
+
     doc = DocxDocument()
 
     section = doc.sections[0]
@@ -841,7 +854,7 @@ def download_proceeding_form(account_opening_date):
     #     bold=True
     # )
     add_left(
-        f"प्रमाणित करण्यात येते की, परिशिष्ट – अ मध्ये नमूद १ ते {total_members_dev} अर्जदारांची यादी संचालक मंडळाच्या बैठकी क्र. _____ दिनांक _____ मध्ये मंजूर करण्यात आलेल्या ठराव क्र. _____ चा अविभाज्य भाग आहे.",
+        f"प्रमाणित करण्यात येते की, परिशिष्ट – अ मध्ये नमूद १ ते {total_members_dev} अर्जदारांची यादी संचालक मंडळाच्या बैठकी क्र. _____ दिनांक __{selected_date_dev}__ मध्ये मंजूर करण्यात आलेल्या ठराव क्र. _____ चा अविभाज्य भाग आहे.",
         bold=True
     )
     add_left("")
