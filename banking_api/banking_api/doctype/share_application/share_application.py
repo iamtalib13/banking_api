@@ -22,6 +22,7 @@ from docx.oxml.ns import qn
 from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import random
+import os
 
 
 class ShareApplication(Document):
@@ -557,6 +558,7 @@ class ShareApplication(Document):
 #     frappe.response.type = "download"
 #     frappe.response.display_content_as = "attachment"
 
+
 # list of directors
 DIRECTORS = [
     "जयेशचंद्र रमण रामादे",
@@ -565,6 +567,13 @@ DIRECTORS = [
     "जितेंद्र इंद्रराज रंगारी",
     "शुभम गोपाल भिमटे"
 ]
+
+
+APP_PATH = frappe.get_app_path("banking_api")
+IMAGES_PATH = os.path.join(APP_PATH, "public", "images")
+
+JAYESH_SIGN_PATH = os.path.join(IMAGES_PATH, "jayesh_sir_sign.png")
+WASNIK_SIGN_PATH = os.path.join(IMAGES_PATH, "wasnik_sir_sign.png")
 
 
 @frappe.whitelist()
@@ -630,6 +639,13 @@ def download_proceeding_form(account_opening_date):
         return f"{day}/{month}/{year}"
 
     selected_date_dev = to_devanagari_date(selected_date)
+
+    def add_image_paragraph(image_path, width_inch=0.5):
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = p.add_run()
+        run.add_picture(image_path, width=Inches(width_inch))
+        return p
 
     doc = DocxDocument()
 
@@ -776,6 +792,11 @@ def download_proceeding_form(account_opening_date):
     add_left("ठराव सर्वानुमते मंजूर.", bold=True)
     add_left("")
     add_left("")
+    # Jayesh Sir signature
+    add_image_paragraph(JAYESH_SIGN_PATH, width_inch=0.8)
+    # Wasnik Sir signature
+    add_image_paragraph(WASNIK_SIGN_PATH, width_inch=0.8)
+
     add_left("अध्यक्ष                                                      मुख्य कार्यकारी अधिकारी", bold=True)
     add_left("सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.     सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.", bold=True)
     add_left(
