@@ -894,11 +894,29 @@ def download_proceeding_form(account_opening_date):
         f"प्रमाणित करण्यात येते की, परिशिष्ट – अ मध्ये नमूद १ ते {total_members_dev} अर्जदारांची यादी संचालक मंडळाच्या बैठकी क्र. _____ दिनांक __{selected_date_dev}__ मध्ये मंजूर करण्यात आलेल्या ठराव क्र. _____ चा अविभाज्य भाग आहे.",
         bold=True
     )
+    # add_left("")
+    # add_left("मुख्य कार्यकारी अधिकारी", bold=True)
+    # add_left("सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.", bold=True)
+    # add_left("मुख्यालय, गोंदिया", bold=True)
+    # add_left("")
+    # add_left("अध्यक्ष", bold=True)
+    # add_left("सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.", bold=True)
+    # add_left("मुख्यालय, गोंदिया", bold=True)
+
     add_left("")
+
+    # Wasnik Sir sign
+    add_centered_image(WASNIK_SIGN_PATH, width_inch=1.8)
+
     add_left("मुख्य कार्यकारी अधिकारी", bold=True)
     add_left("सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.", bold=True)
     add_left("मुख्यालय, गोंदिया", bold=True)
+
     add_left("")
+
+    # Jayesh Sir sign
+    add_centered_image(JAYESH_SIGN_PATH, width_inch=1.8)
+
     add_left("अध्यक्ष", bold=True)
     add_left("सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.", bold=True)
     add_left("मुख्यालय, गोंदिया", bold=True)
