@@ -25,6 +25,10 @@ import random
 import os
 from docx.shared import Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.shared import Pt, Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 
 
 class ShareApplication(Document):
@@ -586,6 +590,44 @@ def add_centered_image(doc, image_path, width_inch=1.8):
     return p
 
 
+def add_page_number(paragraph):
+    """Insert an automatic PAGE field into the given paragraph."""
+    run = paragraph.add_run()
+    fld_char_begin = OxmlElement('w:fldChar')
+    fld_char_begin.set(qn('w:fldCharType'), 'begin')
+    run._r.append(fld_char_begin)
+
+    instr_text = OxmlElement('w:instrText')
+    instr_text.text = "PAGE"
+    run._r.append(instr_text)
+
+    fld_char_end = OxmlElement('w:fldChar')
+    fld_char_end.set(qn('w:fldCharType'), 'end')
+    run._r.append(fld_char_end)
+
+
+def add_footer_page_number(doc):
+    section = doc.sections[0]
+    footer = section.footer
+
+    # Use the first footer paragraph (or create one if needed)
+    if not footer.paragraphs:
+        footer_para = footer.add_paragraph()
+    else:
+        footer_para = footer.paragraphs[0]
+
+    footer_para.clear()  # remove any existing text
+    footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    # Optional label: "Page " + number
+    footer_para.text = "Page "
+    add_page_number(footer_para)
+
+    # Small font
+    for run in footer_para.runs:
+        run.font.size = Pt(8)
+
+
 @frappe.whitelist()
 def download_proceeding_form(account_opening_date):
     import io
@@ -934,6 +976,8 @@ def download_proceeding_form(account_opening_date):
     add_left("मुख्यालय, गोंदिया", bold=True)
 
     file_buffer = io.BytesIO()
+
+    add_footer_page_number(doc)
     doc.save(file_buffer)
     file_buffer.seek(0)
 
