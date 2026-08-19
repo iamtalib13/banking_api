@@ -628,6 +628,15 @@ def add_footer_page_number(doc):
         run.font.size = Pt(8)
 
 
+def normalize_branch_name(branch_name: str) -> str:
+    if not branch_name:
+        return branch_name
+
+    words = branch_name.split()
+    filtered = [w for w in words if w.lower() != "branch"]
+    return " ".join(filtered).strip()
+
+
 @frappe.whitelist()
 def download_proceeding_form(account_opening_date):
     import io
@@ -668,6 +677,10 @@ def download_proceeding_form(account_opening_date):
             indicator="orange"
         )
         return
+
+    # Get branch from first record
+    branch_name = (records[0].get("branch") or "").strip()
+    branch_name = normalize_branch_name(branch_name)
 
     def to_devanagari_digits(number):
         """
@@ -918,7 +931,7 @@ def download_proceeding_form(account_opening_date):
             str(idx),
             row.get("name") or "",
             row.get("customer_name") or "",
-            row.get("branch") or "",
+            branch_name,
             "10",
             "10"
         ]
