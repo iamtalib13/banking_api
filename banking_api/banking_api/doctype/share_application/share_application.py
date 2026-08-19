@@ -799,7 +799,7 @@ def download_proceeding_form(account_opening_date):
     add_center("")
     add_left("सभासद उपसमिती बैठकीची कार्यवाही", bold=True, size=14)
 
-    add_left("बैठक क्र.: __________", bold=True, size=14)
+    # add_left("बैठक क्र.: __________", bold=True, size=14)
     add_left(f"दिनांक: {formatted_date}", bold=True, size=14)
     add_left("वेळ: ____11:30____", bold=True, size=14)
     add_left("स्थळ: मुख्यालय, गोंदिया", bold=True, size=14)
@@ -854,7 +854,7 @@ def download_proceeding_form(account_opening_date):
     # add_left("अनुमोदक : _______________________", bold=True)
     add_left("ठराव सर्वानुमते मंजूर.", bold=True)
     # add_left("")
-    # add_left("")
+    add_left("")
 
     # # Jayesh Sir signature
     # add_image_paragraph(JAYESH_SIGN_PATH, width_inch=0.8)
