@@ -842,7 +842,7 @@ def download_proceeding_form(account_opening_date):
     # add_left("प्रस्तावक : _______________________", bold=True)
     # add_left("अनुमोदक : _______________________", bold=True)
     add_left("ठराव सर्वानुमते मंजूर.", bold=True)
-    add_left("")
+    # add_left("")
     # add_left("")
 
     # # Jayesh Sir signature
