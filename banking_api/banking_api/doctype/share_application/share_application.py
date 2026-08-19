@@ -631,10 +631,12 @@ def add_footer_page_number(doc):
 def normalize_branch_name(branch_name: str) -> str:
     if not branch_name:
         return branch_name
-
-    words = branch_name.split()
-    filtered = [w for w in words if w.lower() != "branch"]
-    return " ".join(filtered).strip()
+    if branch_name.lower() == "main branch":
+        return "Gondia"
+    else:
+        words = branch_name.split()
+        filtered = [w for w in words if w.lower() != "branch"]
+        return " ".join(filtered).strip()
 
 
 @frappe.whitelist()
