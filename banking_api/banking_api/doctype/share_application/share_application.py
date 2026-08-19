@@ -678,10 +678,6 @@ def download_proceeding_form(account_opening_date):
         )
         return
 
-    # Get branch from first record
-    branch_name = (records[0].get("branch") or "").strip()
-    branch_name = normalize_branch_name(branch_name)
-
     def to_devanagari_digits(number):
         """
         Convert an integer to Devanagari (Marathi) digits.
@@ -925,13 +921,40 @@ def download_proceeding_form(account_opening_date):
     set_table_col_widths(table, col_widths)
 
     # Add all data rows WITHOUT re-setting widths each time
+    # for idx, row in enumerate(records, start=1):
+    #     cells = table.add_row().cells
+    #     row_values = [
+    #         str(idx),
+    #         row.get("name") or "",
+    #         row.get("customer_name") or "",
+    #         branch_name,
+    #         row.get("branch") or "",
+    #         "10"
+    #     ]
+
+    #     for col_idx, value in enumerate(row_values):
+    #         paragraph = cells[col_idx].paragraphs[0]
+
+    #         if col_idx in (0, 4, 5):
+    #             format_cell_paragraph(paragraph, WD_ALIGN_PARAGRAPH.CENTER)
+    #         else:
+    #             format_cell_paragraph(paragraph, WD_ALIGN_PARAGRAPH.LEFT)
+
+    #         run = paragraph.add_run(value)
+    #         set_run_font(run, bold=False, size=14)
+
     for idx, row in enumerate(records, start=1):
         cells = table.add_row().cells
+
+        # Normalize this row's branch
+        branch_raw = (row.get("branch") or "").strip()
+        branch_value = normalize_branch_name(branch_raw)
+
         row_values = [
             str(idx),
             row.get("name") or "",
             row.get("customer_name") or "",
-            branch_name,
+            branch_value,  # per-row branch
             "10",
             "10"
         ]
