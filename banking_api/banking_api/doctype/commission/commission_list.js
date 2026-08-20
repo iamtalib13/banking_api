@@ -119,6 +119,9 @@ frappe.listview_settings["Commission"] = {
         listview.page.add_inner_button(__("Commission Dashboard (View Only)"), () => {
             window.open("http://shreyash.com:8000/commission", "_blank");
         }, action_label);
+        listview.page.add_inner_button(__("Commission Reports"), () => {
+            window.open("http://shreyash.com:8000/commission-report", "_blank");
+        }, action_label);
     },
 };
 
