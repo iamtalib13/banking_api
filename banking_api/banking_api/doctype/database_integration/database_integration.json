@@ -38,7 +38,7 @@
    "reqd": 1
   },
   {
-   "description": "SQL SELECT query. Column names returned can be used as named parameters in Destination Query (e.g. SELECT cif_id, pan_number AS pan FROM netwin_table).",
+   "description": "Write a SELECT query to fetch data. Column names (or AS aliases) serve as placeholders in Destination Query. Example: SELECT cust_id AS orgkey, new_pan_no AS pan FROM netwin_accounts;",
    "fieldname": "source_query",
    "fieldtype": "Code",
    "label": "Source Query",
@@ -49,7 +49,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "SQL UPDATE/INSERT query using named parameters like %(fieldname)s (e.g. UPDATE finprd_table SET pan = %(pan)s WHERE cif_id = %(cif_id)s).",
+   "description": "Write an UPDATE/INSERT query using %(column_name)s placeholders matching Source Query column names or aliases. Example: UPDATE crmuser.accounts SET pan = %(pan)s WHERE orgkey = %(orgkey)s AND entity_cre_flag = 'Y';",
    "fieldname": "destination_query",
    "fieldtype": "Code",
    "label": "Destination Query",
@@ -106,7 +106,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-20 18:17:00.000000",
+ "modified": "2026-08-20 18:21:30.000000",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Database Integration",
