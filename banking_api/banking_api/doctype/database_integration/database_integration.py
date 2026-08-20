@@ -158,3 +158,31 @@ class DatabaseIntegration(Document):
 					dest_conn.close()
 				except Exception:
 					pass
+
+
+def execute_scheduled_sync(frequency):
+	"""
+	Executes all active Database Integration data pipelines matching the given sync_frequency.
+	"""
+	integrations = frappe.get_all(
+		"Database Integration",
+		filters={"sync_frequency": frequency},
+		pluck="name"
+	)
+	for name in integrations:
+		try:
+			doc = frappe.get_doc("Database Integration", name)
+			doc.sync_data()
+		except Exception as e:
+			frappe.log_error(
+				title=f"Database Integration Scheduled Sync Failed for {name}",
+				message=frappe.get_traceback()
+			)
+
+
+def execute_hourly_sync():
+	execute_scheduled_sync("Hourly")
+
+
+def execute_daily_sync():
+	execute_scheduled_sync("Daily")

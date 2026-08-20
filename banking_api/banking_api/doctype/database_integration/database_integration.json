@@ -105,8 +105,14 @@
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
- "links": [],
- "modified": "2026-08-20 18:21:30.000000",
+ "links": [
+  {
+   "group": "Database Request",
+   "link_doctype": "Database Request",
+   "link_fieldname": "database_integration"
+  }
+ ],
+ "modified": "2026-08-20 19:34:33.022842",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Database Integration",
