@@ -184,16 +184,13 @@ doc_events = {
 # }
 
 scheduler_events = {
-    # "hourly": [
-    #     "banking_api.banking_api.doctype.share_application_settings.share_application_settings.hourly_share_application_sync"
-    # ],
-    # "daily": [
-    #     "banking_api.banking_api.doctype.share_application_settings.share_application_settings.daily_share_application_sync"
-    # ]
-
-    # run share application sync
+    # run share application sync and database integration hourly sync
     "hourly": [
-        "banking_api.banking_api.doctype.share_application_settings.share_application_settings.run_share_application_sync_manual"
+        "banking_api.banking_api.doctype.share_application_settings.share_application_settings.run_share_application_sync_manual",
+        "banking_api.banking_api.doctype.database_integration.database_integration.execute_hourly_sync"
+    ],
+    "daily": [
+        "banking_api.banking_api.doctype.database_integration.database_integration.execute_daily_sync"
     ],
 
     "cron": {
