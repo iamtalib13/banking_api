@@ -19,14 +19,15 @@ frappe.ui.form.on("Database Integration", {
 					doc: frm.doc,
 					method: "sync_data",
 					freeze: true,
-					freeze_message: __("Syncing data between databases..."),
+					freeze_message: __("Running DB to DB Data Pipeline Sync..."),
 					callback: function (r) {
 						if (!r.exc) {
 							frappe.msgprint({
-								title: __("Sync Successful"),
+								title: __("Pipeline Sync Successful"),
 								indicator: "green",
 								message: r.message || __("Data sync completed successfully."),
 							});
+							frm.reload_doc();
 						}
 					},
 				});
