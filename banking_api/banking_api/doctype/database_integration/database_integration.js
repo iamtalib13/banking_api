@@ -6,6 +6,10 @@ frappe.ui.form.on("Database Integration", {
 		frm.trigger("toggle_buttons");
 	},
 
+	is_active(frm) {
+		frm.trigger("toggle_buttons");
+	},
+
 	sync_frequency(frm) {
 		frm.trigger("toggle_buttons");
 	},
@@ -15,7 +19,7 @@ frappe.ui.form.on("Database Integration", {
 		frm.remove_custom_button(__("Preview Source Data"));
 
 		if (!frm.is_new()) {
-			// Add Preview Source Data button to quickly test & inspect top 10 records in a dialog
+			// Add Preview Source Data button
 			frm.add_custom_button(__("Preview Source Data"), function () {
 				frm.call({
 					doc: frm.doc,
@@ -75,7 +79,7 @@ frappe.ui.form.on("Database Integration", {
 				});
 			});
 
-			if (frm.doc.sync_frequency === "Manual") {
+			if (frm.doc.is_active && frm.doc.sync_frequency === "Manual") {
 				frm.add_custom_button(__("Sync"), function () {
 					frm.call({
 						doc: frm.doc,

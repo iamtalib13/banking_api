@@ -12,6 +12,7 @@
   "destination_database",
   "destination_query",
   "sync_details_section",
+  "is_active",
   "sync_frequency",
   "last_sync_section",
   "last_sync_on",
@@ -59,6 +60,13 @@
    "fieldname": "sync_details_section",
    "fieldtype": "Section Break",
    "label": "Sync Details"
+  },
+  {
+   "default": "1",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Is Active"
   },
   {
    "default": "Manual",
@@ -112,7 +120,7 @@
    "link_fieldname": "database_integration"
   }
  ],
- "modified": "2026-08-20 19:34:33.022842",
+ "modified": "2026-08-20 19:42:30.000000",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Database Integration",

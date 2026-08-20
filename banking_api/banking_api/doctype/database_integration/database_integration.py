@@ -45,6 +45,9 @@ class DatabaseIntegration(Document):
 		"""
 		Executes DB-to-DB data pipeline synchronization and logs audit request in Database Request.
 		"""
+		if not self.is_active:
+			frappe.throw(_("This Database Integration is inactive. Enable 'Is Active' to run synchronization."))
+
 		if not self.source_database:
 			frappe.throw(_("Please select a Source Database."))
 
@@ -166,7 +169,7 @@ def execute_scheduled_sync(frequency):
 	"""
 	integrations = frappe.get_all(
 		"Database Integration",
-		filters={"sync_frequency": frequency},
+		filters={"sync_frequency": frequency, "is_active": 1},
 		pluck="name"
 	)
 	for name in integrations:
