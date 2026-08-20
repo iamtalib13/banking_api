@@ -1,40 +1,95 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "DBR-.##",
  "creation": "2026-08-20 17:24:25.055329",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "cif_id",
-  "pan",
-  "status"
+  "database_integration",
+  "source_database",
+  "destination_database",
+  "column_break_info",
+  "status",
+  "execution_datetime",
+  "records_count",
+  "payload_section",
+  "synced_payload",
+  "error_log"
  ],
  "fields": [
   {
-   "fieldname": "cif_id",
-   "fieldtype": "Data",
-   "label": "CIF ID"
+   "fieldname": "database_integration",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Database Integration",
+   "options": "Database Integration",
+   "reqd": 1
   },
   {
-   "fieldname": "pan",
-   "fieldtype": "Data",
-   "label": "PAN"
+   "fieldname": "source_database",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Source Database",
+   "options": "Database Configuration"
+  },
+  {
+   "fieldname": "destination_database",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Destination Database",
+   "options": "Database Configuration"
+  },
+  {
+   "fieldname": "column_break_info",
+   "fieldtype": "Column Break"
   },
   {
    "default": "Pending",
    "fieldname": "status",
    "fieldtype": "Select",
+   "in_list_view": 1,
    "label": "Status",
-   "options": "\nPending\nFailed\nSuccess"
+   "options": "\nPending\nSuccess\nFailed"
+  },
+  {
+   "fieldname": "execution_datetime",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Execution Datetime"
+  },
+  {
+   "fieldname": "records_count",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Records Count"
+  },
+  {
+   "fieldname": "payload_section",
+   "fieldtype": "Section Break",
+   "label": "Sync Payload & Details"
+  },
+  {
+   "description": "JSON payload listing all synced records with Sr No.",
+   "fieldname": "synced_payload",
+   "fieldtype": "Code",
+   "label": "Synced Data Payload",
+   "options": "JSON"
+  },
+  {
+   "fieldname": "error_log",
+   "fieldtype": "Small Text",
+   "label": "Error Log / Message"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-20 17:29:12.497245",
+ "modified": "2026-08-20 18:30:00.000000",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Database Request",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {
