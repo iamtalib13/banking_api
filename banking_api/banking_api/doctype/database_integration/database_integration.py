@@ -12,6 +12,35 @@ from frappe.model.document import Document
 
 class DatabaseIntegration(Document):
 	@frappe.whitelist()
+	def preview_source_data(self):
+		"""
+		Fetches up to 10 sample records from Source Database using source_query for testing.
+		"""
+		if not self.source_database:
+			frappe.throw(_("Please select a Source Database."))
+
+		if not self.source_query:
+			frappe.throw(_("Please specify a Source Query."))
+
+		source_db_doc = frappe.get_doc("Database Configuration", self.source_database)
+		conn = None
+
+		try:
+			conn = source_db_doc.get_connection()
+			with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+				cursor.execute(self.source_query)
+				rows = cursor.fetchmany(10) if cursor.description else []
+				return [dict(row) for row in rows]
+		except Exception as e:
+			frappe.throw(_("Source DB Preview failed: {0}").format(str(e)))
+		finally:
+			if conn:
+				try:
+					conn.close()
+				except Exception:
+					pass
+
+	@frappe.whitelist()
 	def sync_data(self):
 		"""
 		Executes DB-to-DB data pipeline synchronization and logs audit request in Database Request.
