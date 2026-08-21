@@ -2,8 +2,15 @@
 # For license information, please see license.txt
 
 # import frappe
+
+import frappe
 from frappe.model.document import Document
+from frappe.utils import getdate
 
 
 class ShareProceedingLog(Document):
-    pass
+    def validate(self):
+        # Set document name = date (YYYY-MM-DD)
+        if self.date:
+            date_str = getdate(self.date).strftime("%Y-%m-%d")
+            self.name = date_str
