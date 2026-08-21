@@ -639,6 +639,57 @@ def normalize_branch_name(branch_name: str) -> str:
         return " ".join(filtered).strip()
 
 
+def get_proposer_approver(selected_date):
+    """
+    Get (or create) proposer & approver for a given date from Share Proceeding Log.
+    Returns: (proposer, approver)
+    """
+    date_obj = getdate(selected_date)
+    date_str = date_obj.strftime("%Y-%m-%d")
+
+    # Try to fetch existing record
+    existing_name = frappe.db.get_value(
+        "Share Proceeding Log",
+        {"date": date_obj},
+        "name"
+    )
+
+    if existing_name:
+        existing_doc = frappe.get_doc("Share Proceeding Log", existing_name)
+        if existing_doc.json:
+            schedule = existing_doc.json
+            return schedule["proposer"], schedule["approver"]
+
+    # No record found → create one with a new pair
+    DIRECTORS = [
+        "जयेशचंद्र रमण रामादे",
+        "दत्तात्रय शायमराव सावंत",
+        "आशीष वासुदेव बाहेकर",
+        "जितेंद्र इंद्रराज रंगारी",
+        "शुभम गोपाल भिमटे"
+    ]
+
+    # Deterministic per date
+    random.seed(date_str)
+    proposer, approver = random.sample(DIRECTORS, 2)
+    random.seed()  # reset
+
+    schedule = {
+        "proposer": proposer,
+        "approver": approver
+    }
+
+    doc = frappe.get_doc({
+        "doctype": "Share Proceeding Log",
+        "date": date_obj,
+        "json": schedule
+    })
+    doc.insert(ignore_permissions=True)
+    frappe.db.commit()
+
+    return proposer, approver
+
+
 @frappe.whitelist()
 def download_proceeding_form(account_opening_date):
     import io
@@ -847,7 +898,8 @@ def download_proceeding_form(account_opening_date):
     set_run_font(r3, bold=False, size=14)
 
     add_left("")
-    proposer, approver = random.sample(DIRECTORS, 2)
+    # proposer, ap0prover = random.sample(DIRECTORS, 2)
+    proposer, approver = get_proposer_approver(selected_date)
     add_left(f"प्रस्तावक : {proposer}", bold=True)
     add_left(f"अनुमोदक : {approver}", bold=True)
     # add_left("प्रस्तावक : _______________________", bold=True)
