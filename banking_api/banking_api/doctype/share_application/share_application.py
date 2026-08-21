@@ -639,15 +639,67 @@ def normalize_branch_name(branch_name: str) -> str:
         return " ".join(filtered).strip()
 
 
-def get_proposer_approver(selected_date):
+# def get_proposer_approver(selected_date):
+#     """
+#     Get (or create) proposer & approver for a given date from Share Proceeding Log.
+#     Returns: (proposer, approver)
+#     """
+#     date_obj = getdate(selected_date)
+#     date_str = date_obj.strftime("%Y-%m-%d")
+
+#     # Try to fetch existing record
+#     existing_name = frappe.db.get_value(
+#         "Share Proceeding Log",
+#         {"date": date_obj},
+#         "name"
+#     )
+
+#     if existing_name:
+#         existing_doc = frappe.get_doc("Share Proceeding Log", existing_name)
+#         if existing_doc.json:
+#             schedule = existing_doc.json
+#             return schedule["proposer"], schedule["approver"]
+
+#     # No record found → create one with a new pair
+#     DIRECTORS = [
+#         "जयेशचंद्र रमण रामादे",
+#         "दत्तात्रय शायमराव सावंत",
+#         "आशीष वासुदेव बाहेकर",
+#         "जितेंद्र इंद्रराज रंगारी",
+#         "शुभम गोपाल भिमटे"
+#     ]
+
+#     # Deterministic per date
+#     random.seed(date_str)
+#     proposer, approver = random.sample(DIRECTORS, 2)
+#     random.seed()  # reset
+
+#     schedule = {
+#         "proposer": proposer,
+#         "approver": approver
+#     }
+
+#     doc = frappe.get_doc({
+#         "doctype": "Share Proceeding Log",
+#         "date": date_obj,
+#         "json": schedule
+#     })
+#     doc.insert(ignore_permissions=True)
+#     frappe.db.commit()
+
+#     return proposer, approver
+
+
+def get_proceeding_data(selected_date):
     """
-    Get (or create) proposer & approver for a given date from Share Proceeding Log.
-    Returns: (proposer, approver)
+    Get (or create) proposer, approver, and meeting number for a given date
+    from Share Proceeding Log.
+    Returns: (proposer, approver, meeting_no)
     """
     date_obj = getdate(selected_date)
     date_str = date_obj.strftime("%Y-%m-%d")
 
-    # Try to fetch existing record
+    # Try to fetch existing record by date
     existing_name = frappe.db.get_value(
         "Share Proceeding Log",
         {"date": date_obj},
@@ -658,9 +710,13 @@ def get_proposer_approver(selected_date):
         existing_doc = frappe.get_doc("Share Proceeding Log", existing_name)
         if existing_doc.json:
             schedule = existing_doc.json
-            return schedule["proposer"], schedule["approver"]
+            return (
+                schedule["proposer"],
+                schedule["approver"],
+                schedule.get("meeting_no", 1)  # fallback if somehow missing
+            )
 
-    # No record found → create one with a new pair
+    # No record found → create one with new proposer, approver, and meeting_no
     DIRECTORS = [
         "जयेशचंद्र रमण रामादे",
         "दत्तात्रय शायमराव सावंत",
@@ -672,11 +728,13 @@ def get_proposer_approver(selected_date):
     # Deterministic per date
     random.seed(date_str)
     proposer, approver = random.sample(DIRECTORS, 2)
+    meeting_no = random.randint(1, 15)
     random.seed()  # reset
 
     schedule = {
         "proposer": proposer,
-        "approver": approver
+        "approver": approver,
+        "meeting_no": meeting_no
     }
 
     doc = frappe.get_doc({
@@ -687,7 +745,7 @@ def get_proposer_approver(selected_date):
     doc.insert(ignore_permissions=True)
     frappe.db.commit()
 
-    return proposer, approver
+    return proposer, approver, meeting_no
 
 
 @frappe.whitelist()
@@ -854,7 +912,8 @@ def download_proceeding_form(account_opening_date):
     add_left(f"दिनांक: {formatted_date}", bold=True, size=14)
     add_left("वेळ: ____11:30____", bold=True, size=14)
     add_left("स्थळ: मुख्यालय, गोंदिया", bold=True, size=14)
-    add_left("विषय क्र. ____: नवीन सभासदत्व मंजूर करण्याबाबत", bold=True, size=14)
+    add_left(
+        "विषय क्र. {meeting_no} : नवीन सभासदत्व मंजूर करण्याबाबत", bold=True, size=14)
 
     add_left_mixed([
         "मुख्य कार्यकारी अधिकारी यांनी सभेस अवगत केले की, संस्थेचे सभासदत्व प्राप्त करण्यासाठी विविध अर्जदारांकडून विहित नमुन्यात अर्ज प्राप्त झाले आहेत. सदर अर्जांची कार्यालयीन स्तरावर छाननी व पडताळणी करण्यात आली असून, अर्जदारांनी ",
@@ -869,7 +928,7 @@ def download_proceeding_form(account_opening_date):
     ], size=14)
 
     add_left("")
-    add_left("ठराव क्र. ______", bold=True)
+    add_left("ठराव क्र. {meeting_no}", bold=True)
 
     p = doc.add_paragraph()
     apply_paragraph_spacing(p, WD_ALIGN_PARAGRAPH.LEFT)
@@ -899,7 +958,7 @@ def download_proceeding_form(account_opening_date):
 
     add_left("")
     # proposer, ap0prover = random.sample(DIRECTORS, 2)
-    proposer, approver = get_proposer_approver(selected_date)
+    proposer, approver, meeting_no = get_proceeding_data(selected_date)
     add_left(f"प्रस्तावक : {proposer}", bold=True)
     add_left(f"अनुमोदक : {approver}", bold=True)
     # add_left("प्रस्तावक : _______________________", bold=True)
@@ -1033,7 +1092,7 @@ def download_proceeding_form(account_opening_date):
     #     bold=True
     # )
     add_left(
-        f"प्रमाणित करण्यात येते की, परिशिष्ट – अ मध्ये नमूद १ ते {total_members_dev} अर्जदारांची यादी संचालक मंडळाच्या बैठकी क्र. _____ दिनांक __{selected_date_dev}__ मध्ये मंजूर करण्यात आलेल्या ठराव क्र. _____ चा अविभाज्य भाग आहे.",
+        f"प्रमाणित करण्यात येते की, परिशिष्ट – अ मध्ये नमूद १ ते {total_members_dev} अर्जदारांची यादी संचालक मंडळाच्या बैठकी क्र. {meeting_no} दिनांक __{selected_date_dev}__ मध्ये मंजूर करण्यात आलेल्या ठराव क्र. {meeting_no} चा अविभाज्य भाग आहे.",
         bold=True
     )
     # add_left("")
