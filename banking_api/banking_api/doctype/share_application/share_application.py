@@ -29,6 +29,7 @@ from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
+import json
 
 
 class ShareApplication(Document):
@@ -689,7 +690,6 @@ def normalize_branch_name(branch_name: str) -> str:
 
 #     return proposer, approver
 
-
 def get_proceeding_data(selected_date):
     """
     Get (or create) proposer, approver, and meeting number for a given date
@@ -709,11 +709,15 @@ def get_proceeding_data(selected_date):
     if existing_name:
         existing_doc = frappe.get_doc("Share Proceeding Log", existing_name)
         if existing_doc.json:
+            # Parse JSON string to dict
             schedule = existing_doc.json
+            if isinstance(schedule, str):
+                schedule = json.loads(schedule)
+
             return (
                 schedule["proposer"],
                 schedule["approver"],
-                schedule.get("meeting_no", 1)  # fallback if somehow missing
+                schedule.get("meeting_no", 1)
             )
 
     # No record found → create one with new proposer, approver, and meeting_no
@@ -740,7 +744,7 @@ def get_proceeding_data(selected_date):
     doc = frappe.get_doc({
         "doctype": "Share Proceeding Log",
         "date": date_obj,
-        "json": schedule
+        "json": schedule  # Frappe will store this as JSON text
     })
     doc.insert(ignore_permissions=True)
     frappe.db.commit()
@@ -902,6 +906,9 @@ def download_proceeding_form(account_opening_date):
         return paragraph
 
     formatted_date = formatdate(selected_date, "dd / mm / yyyy")
+    proposer, approver, meeting_no = get_proceeding_data(selected_date)
+
+    meeting_no_dev = to_devanagari_digits(meeting_no)
 
     add_center("सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.",
                bold=True, size=24)
@@ -913,7 +920,7 @@ def download_proceeding_form(account_opening_date):
     add_left("वेळ: ____11:30____", bold=True, size=14)
     add_left("स्थळ: मुख्यालय, गोंदिया", bold=True, size=14)
     add_left(
-        "विषय क्र. {meeting_no} : नवीन सभासदत्व मंजूर करण्याबाबत", bold=True, size=14)
+        f"विषय क्र. {meeting_no_dev} : नवीन सभासदत्व मंजूर करण्याबाबत", bold=True, size=14)
 
     add_left_mixed([
         "मुख्य कार्यकारी अधिकारी यांनी सभेस अवगत केले की, संस्थेचे सभासदत्व प्राप्त करण्यासाठी विविध अर्जदारांकडून विहित नमुन्यात अर्ज प्राप्त झाले आहेत. सदर अर्जांची कार्यालयीन स्तरावर छाननी व पडताळणी करण्यात आली असून, अर्जदारांनी ",
@@ -928,7 +935,7 @@ def download_proceeding_form(account_opening_date):
     ], size=14)
 
     add_left("")
-    add_left("ठराव क्र. {meeting_no}", bold=True)
+    add_left(f"ठराव क्र. {meeting_no_dev}", bold=True)
 
     p = doc.add_paragraph()
     apply_paragraph_spacing(p, WD_ALIGN_PARAGRAPH.LEFT)
@@ -958,7 +965,7 @@ def download_proceeding_form(account_opening_date):
 
     add_left("")
     # proposer, ap0prover = random.sample(DIRECTORS, 2)
-    proposer, approver, meeting_no = get_proceeding_data(selected_date)
+    # proposer, approver, meeting_no = get_proceeding_data(selected_date)
     add_left(f"प्रस्तावक : {proposer}", bold=True)
     add_left(f"अनुमोदक : {approver}", bold=True)
     # add_left("प्रस्तावक : _______________________", bold=True)
@@ -1092,7 +1099,7 @@ def download_proceeding_form(account_opening_date):
     #     bold=True
     # )
     add_left(
-        f"प्रमाणित करण्यात येते की, परिशिष्ट – अ मध्ये नमूद १ ते {total_members_dev} अर्जदारांची यादी संचालक मंडळाच्या बैठकी क्र. {meeting_no} दिनांक __{selected_date_dev}__ मध्ये मंजूर करण्यात आलेल्या ठराव क्र. {meeting_no} चा अविभाज्य भाग आहे.",
+        f"प्रमाणित करण्यात येते की, परिशिष्ट – अ मध्ये नमूद १ ते {total_members_dev} अर्जदारांची यादी संचालक मंडळाच्या बैठकी क्र. {meeting_no_dev} दिनांक __{selected_date_dev}__ मध्ये मंजूर करण्यात आलेल्या ठराव क्र. {meeting_no_dev} चा अविभाज्य भाग आहे.",
         bold=True
     )
     # add_left("")
