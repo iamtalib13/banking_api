@@ -906,6 +906,7 @@ def download_proceeding_form(account_opening_date):
         return paragraph
 
     formatted_date = formatdate(selected_date, "dd / mm / yyyy")
+    formatted_date_dev = to_devanagari_date(selected_date)
     proposer, approver, meeting_no = get_proceeding_data(selected_date)
 
     meeting_no_dev = to_devanagari_digits(meeting_no)
@@ -916,11 +917,11 @@ def download_proceeding_form(account_opening_date):
     add_left("सभासद उपसमिती बैठकीची कार्यवाही", bold=True, size=14)
 
     # add_left("बैठक क्र.: __________", bold=True, size=14)
-    add_left(f"दिनांक: {formatted_date}", bold=True, size=14)
-    add_left("वेळ: ____11:30____", bold=True, size=14)
+    add_left(f"दिनांक: {formatted_date_dev}", bold=True, size=14)
+    add_left("वेळ: ____११:३०____", bold=True, size=14)
     add_left("स्थळ: मुख्यालय, गोंदिया", bold=True, size=14)
     add_left(
-        f"विषय क्र. {meeting_no_dev} : नवीन सभासदत्व मंजूर करण्याबाबत", bold=True, size=14)
+        f"विषय क्र. {meeting_no_dev}: नवीन सभासदत्व मंजूर करण्याबाबत", bold=True, size=14)
 
     add_left_mixed([
         "मुख्य कार्यकारी अधिकारी यांनी सभेस अवगत केले की, संस्थेचे सभासदत्व प्राप्त करण्यासाठी विविध अर्जदारांकडून विहित नमुन्यात अर्ज प्राप्त झाले आहेत. सदर अर्जांची कार्यालयीन स्तरावर छाननी व पडताळणी करण्यात आली असून, अर्जदारांनी ",
@@ -1005,7 +1006,7 @@ def download_proceeding_form(account_opening_date):
     add_center(
         "नवीन सभासदत्वासाठी मंजुरी देण्यात आलेल्या अर्जदारांची यादी", bold=True, size=14)
     add_left("बैठक क्र.: __________", bold=True)
-    add_left(f"दिनांक: {formatted_date}", bold=True)
+    add_left(f"दिनांक: {formatted_date_dev}", bold=True)
     add_left("")
 
     table = doc.add_table(rows=1, cols=6)
