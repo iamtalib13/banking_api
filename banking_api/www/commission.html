@@ -17,7 +17,7 @@
         <div class="dashboard">
 
             <!-- Header -->
-            <header class="dash-header">
+            <!-- <header class="dash-header">
                 <div class="header-left">
                     <h1>Commission Dashboard</h1>
                     <p class="subtitle">Head Office · Agent Commission Overview</p>
@@ -29,6 +29,31 @@
                     </svg>
                     Refresh
                 </button>
+            </header> -->
+
+            <header class="dash-header">
+                <div class="header-left">
+                    <h1>Commission Dashboard</h1>
+                    <p class="subtitle">Head Office · Agent Commission Overview</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn-pay" :disabled="selectedCount === 0" @click="openPayDialog()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <rect x="2" y="5" width="20" height="14" rx="2" />
+                            <path d="M2 10h20" />
+                        </svg>
+                        Pay Now [[ selectedCount > 0 ? '(' + selectedCount + ')' : '' ]]
+                    </button>
+                    <button class="btn-refresh" :class="{ spinning: loading }" @click="refreshAll()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M23 4v6h-6M1 20v-6h6" />
+                            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
             </header>
 
             <!-- Error banner -->
@@ -199,8 +224,31 @@
                                 <th class="num">Final Net Pay</th>
                             </tr>
                         </thead> -->
+                        <!-- <thead>
+                            <tr>
+                                <th>SOL ID</th>
+                                <th>SOL Name</th>
+                                <th>Agent Code</th>
+                                <th>Scheme Code</th>
+                                <th>PAN</th>
+                                <th>PAN Status</th>
+                                <th>CIF</th>
+                                <th>Security Account</th>
+                                <th>Operative Account</th>
+                                <th class="num">Eligible Amount</th>
+                                <th class="num">Commission Amount</th>
+                                <th class="num">TDS</th>
+                                <th class="num">Security Deposit</th>
+                                <th class="num">Net Pay</th>
+                                <th class="num">Deduction</th>
+                                <th class="num">Final Net Pay</th>
+                            </tr>
+                        </thead> -->
                         <thead>
                             <tr>
+                                <th class="checkbox-col">
+                                    <input type="checkbox" :checked="isPageAllSelected" @change="toggleSelectAllPage()">
+                                </th>
                                 <th>SOL ID</th>
                                 <th>SOL Name</th>
                                 <th>Agent Code</th>
@@ -272,8 +320,33 @@
                                 <td class="num strong muted">NA</td>
                             </tr> -->
 
-                            <tr v-for="(row, idx) in records" :key="row.agent_code"
+                            <!-- <tr v-for="(row, idx) in records" :key="row.agent_code"
                                 :style="{ '--row-delay': idx * 35 + 'ms' }" class="data-row">
+                                <td>[[ row.sol_id ]]</td>
+                                <td>[[ row.sol_description || '—' ]]</td>
+                                <td>[[ row.agent_code || '—' ]]</td>
+                                <td><span class="chip" v-if="row.scheme_code">[[ row.scheme_code ]]</span><span
+                                        v-else>—</span></td>
+                                <td>[[ row.pan_card || '—' ]]</td>
+                                <td>[[ row.pan_status || '—' ]]</td>
+                                <td>[[ row.cif || '—' ]]</td>
+                                <td>[[ row.security_account || '—' ]]</td>
+                                <td>[[ row.operative_account || '—' ]]</td>
+                                <td class="num">[[ formatCurrency(row.eligible_amount) ]]</td>
+                                <td class="num">[[ formatCurrency(row.commission_amount) ]]</td>
+                                <td class="num">[[ formatCurrency(row.tds) ]]</td>
+                                <td class="num">[[ formatCurrency(row.security_deposit) ]]</td>
+                                <td class="num">[[ formatCurrency(row.netpay) ]]</td>
+                                <td class="num muted">NA</td>
+                                <td class="num strong muted">NA</td>
+                            </tr> -->
+                            <tr v-for="(row, idx) in records" :key="row.agent_code"
+                                :style="{ '--row-delay': idx * 35 + 'ms' }" class="data-row"
+                                :class="{ 'row-selected': isRowSelected(row.agent_code) }">
+                                <td class="checkbox-col">
+                                    <input type="checkbox" :checked="isRowSelected(row.agent_code)"
+                                        @change="toggleRow(row)">
+                                </td>
                                 <td>[[ row.sol_id ]]</td>
                                 <td>[[ row.sol_description || '—' ]]</td>
                                 <td>[[ row.agent_code || '—' ]]</td>
@@ -330,6 +403,35 @@
                             Next ›
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-overlay" v-if="showPayDialog" @click.self="closePayDialog()">
+            <div class="modal-box">
+                <div class="modal-header">
+                    <h3>Confirm Payment Run</h3>
+                    <button class="modal-close" @click="closePayDialog()">×</button>
+                </div>
+                <div class="modal-body">
+                    <p>You are about to run payment for the selected agent-wise consolidated records below. Unselected
+                        records will be <strong>excluded</strong> from this payment run.</p>
+                    <div class="modal-stats">
+                        <div class="modal-stat">
+                            <div class="modal-stat-label">Selected Records</div>
+                            <div class="modal-stat-value">[[ selectedCount ]]</div>
+                        </div>
+                        <div class="modal-stat">
+                            <div class="modal-stat-label">Total Net Pay</div>
+                            <div class="modal-stat-value">₹[[ formatNumber(selectedTotalNetPay) ]]</div>
+                        </div>
+                    </div>
+                    <div class="modal-error" v-if="payError">⚠️ [[ payError ]]</div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-reset" @click="closePayDialog()" :disabled="payProcessing">Cancel</button>
+                    <button class="btn-apply" @click="confirmPayment()" :disabled="payProcessing">
+                        [[ payProcessing ? 'Processing...' : 'Confirm & Pay' ]]
+                    </button>
                 </div>
             </div>
         </div>
@@ -450,6 +552,88 @@
             ],
 
             searchTimer: null,
+
+            selectedRecords: {},   // { [agent_code]: rowObject } — persists across pagination
+            showPayDialog: false,
+            payProcessing: false,
+            payError: '',
+
+            get selectedCount() {
+                return Object.keys(this.selectedRecords).length;
+            },
+            get selectedTotalNetPay() {
+                return Object.values(this.selectedRecords).reduce((s, r) => s + toNumber(r.netpay), 0);
+            },
+            get isPageAllSelected() {
+                return this.records.length > 0 && this.records.every(r => !!this.selectedRecords[r.agent_code]);
+            },
+
+            isRowSelected(agentCode) {
+                return !!this.selectedRecords[agentCode];
+            },
+
+            toggleRow(row) {
+                const key = row.agent_code;
+                if (this.selectedRecords[key]) {
+                    delete this.selectedRecords[key];
+                } else {
+                    this.selectedRecords[key] = row;
+                }
+            },
+
+            toggleSelectAllPage() {
+                const allSelected = this.isPageAllSelected;
+                this.records.forEach(row => {
+                    if (allSelected) {
+                        delete this.selectedRecords[row.agent_code];
+                    } else {
+                        this.selectedRecords[row.agent_code] = row;
+                    }
+                });
+            },
+
+            openPayDialog() {
+                if (this.selectedCount === 0) return;
+                this.payError = '';
+                this.showPayDialog = true;
+            },
+
+            closePayDialog() {
+                if (this.payProcessing) return;
+                this.showPayDialog = false;
+            },
+
+            async confirmPayment() {
+                this.payProcessing = true;
+                this.payError = '';
+                try {
+                    const agentCodes = Object.keys(this.selectedRecords);
+                    const res = await fetch('/api/method/banking_api.www.commission.run_commission_payment', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', ...apiHeaders() },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({
+                            agent_codes: agentCodes,
+                            filters: this.buildFilters()
+                        })
+                    });
+                    const json = await res.json().catch(() => ({}));
+                    if (!res.ok) {
+                        const detail = json._server_messages || json.exc || json.message || res.statusText;
+                        throw new Error(detail);
+                    }
+
+                    this.showPayDialog = false;
+                    this.selectedRecords = {};
+                    this.errorMsg = '';
+                    await this.fetchRecords(false);
+                } catch (e) {
+                    console.error('Payment run failed', e);
+                    this.payError = e.message || 'Payment run failed. Please try again.';
+                } finally {
+                    this.payProcessing = false;
+                }
+            },
 
             get totalPages() {
                 return Math.max(1, Math.ceil(this.pagination.total / this.pagination.pageSize));
