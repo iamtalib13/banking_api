@@ -272,3 +272,46 @@ def get_commission_filter_options():
         "scheme_list": [s for s in scheme if s],
         "agent_list": [a for a in agent if a],
     }
+
+
+@frappe.whitelist(methods=["POST"])
+def run_commission_payment(agent_codes=None, filters=None):
+    agent_codes = frappe.parse_json(agent_codes) if isinstance(
+        agent_codes, str) else (agent_codes or [])
+    filters = frappe.parse_json(filters) if isinstance(
+        filters, str) else (filters or [])
+
+    if not agent_codes:
+        frappe.throw("No agent codes provided for payment run.")
+
+    # Exclude unselected agents: combine the incoming filters with an explicit
+    # "agent_code IN (...)" restriction so payment only runs for selected agents.
+    where_clause, values = _build_conditions(filters)
+
+    placeholders = ", ".join(
+        [f"%(agent_{i})s" for i in range(len(agent_codes))])
+    for i, code in enumerate(agent_codes):
+        values[f"agent_{i}"] = code
+
+    # TODO: Replace this SELECT with your actual payment execution logic —
+    # e.g. creating Payment Entry records, calling a bank disbursal API,
+    # updating a "payment_status" field on Commission rows, etc.
+    rows = frappe.db.sql(
+        f"""
+        SELECT agent_code,
+               COALESCE(SUM(CAST(NULLIF(TRIM(netpay), '') AS DECIMAL(18,2))), 0) AS netpay
+        FROM `tabCommission`
+        WHERE {where_clause} AND agent_code IN ({placeholders})
+        GROUP BY agent_code
+        """,
+        values,
+        as_dict=True,
+    )
+
+    # frappe.db.commit() if you make DB changes above
+
+    return {
+        "status": "success",
+        "paid_agents": [r.agent_code for r in rows],
+        "total_paid": sum(float(r.netpay or 0) for r in rows),
+    }
