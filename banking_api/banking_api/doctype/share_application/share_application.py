@@ -30,6 +30,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 import json
+from PIL import Image
 
 
 class ShareApplication(Document):
@@ -84,19 +85,11 @@ DIRECTORS = [
 ]
 
 
-APP_PATH = frappe.get_app_path("banking_api")
-IMAGES_PATH = os.path.join(APP_PATH, "public", "images")
+# APP_PATH = frappe.get_app_path("banking_api")
+# IMAGES_PATH = os.path.join(APP_PATH, "public", "images")
 
-JAYESH_SIGN_PATH = os.path.join(IMAGES_PATH, "jayesh_sir_sign.png")
-WASNIK_SIGN_PATH = os.path.join(IMAGES_PATH, "wasnik_sir_sign.png")
-
-
-def add_centered_image(doc, image_path, width_inch=1.8):
-    p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    run = p.add_run()
-    run.add_picture(image_path, width=Inches(width_inch))
-    return p
+# JAYESH_SIGN_PATH = os.path.join(IMAGES_PATH, "jayesh_sir_sign.png")
+# WASNIK_SIGN_PATH = os.path.join(IMAGES_PATH, "wasnik_sir_sign.png")
 
 
 def add_page_number(paragraph):
@@ -260,6 +253,84 @@ def get_proceeding_data(selected_date):
     return proposer, approver, meeting_no
 
 
+def get_signature_file_path(file_url, label):
+    """
+    Convert the Frappe attachment URL to a server filesystem path.
+    Validates that a signature is configured and its image file exists.
+    """
+    if not file_url:
+        frappe.throw(
+            f"{label} is not configured. "
+            "Please upload it in Share Application Setting."
+        )
+
+    # Reject remote URL files because python-docx needs a local path.
+    if file_url.startswith(("http://", "https://")):
+        frappe.throw(
+            f"{label} must be uploaded as a local image file, "
+            "not an external URL."
+        )
+
+    # Frappe attachment paths normally begin with /files/ or /private/files/
+    file_path = frappe.get_site_path(file_url.lstrip("/"))
+
+    if not os.path.exists(file_path):
+        frappe.throw(
+            f"{label} file was not found on the server: {file_url}. "
+            "Please upload the signature again in Share Application Setting."
+        )
+
+    allowed_extensions = {".png", ".jpg", ".jpeg", ".bmp", ".gif"}
+    extension = os.path.splitext(file_path)[1].lower()
+
+    if extension not in allowed_extensions:
+        frappe.throw(
+            f"{label} must be an image file. Allowed formats: "
+            "PNG, JPG, JPEG, BMP, GIF."
+        )
+    validate_image_file(file_path, label)
+    return file_path
+
+
+def get_proceeding_signatures():
+    """
+    Reads both signatures from the Share Application Setting Single DocType.
+    Returns local filesystem paths for python-docx.
+    """
+    settings = frappe.get_single("Share Application Settings")
+
+    chairman_signature_path = get_signature_file_path(
+        settings.chairman_signature,
+        "Chairman Signature"
+    )
+
+    ceo_signature_path = get_signature_file_path(
+        settings.ceo_signature,
+        "CEO Signature"
+    )
+
+    return chairman_signature_path, ceo_signature_path
+
+
+def add_centered_image(doc, image_path, width_inch=1.8):
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    run = p.add_run()
+    run.add_picture(image_path, width=Inches(width_inch))
+    return p
+
+
+def validate_image_file(file_path, label):
+    try:
+        with Image.open(file_path) as image:
+            image.verify()
+    except Exception:
+        frappe.throw(
+            f"{label} is not a valid image file. "
+            "Please upload a valid PNG or JPG signature image."
+        )
+
+
 @frappe.whitelist()
 def download_proceeding_form(account_opening_date):
     import io
@@ -417,6 +488,9 @@ def download_proceeding_form(account_opening_date):
     formatted_date_dev = to_devanagari_date(selected_date)
     proposer, approver, meeting_no = get_proceeding_data(selected_date)
 
+    # Read dynamic signatures from Share Application Setting
+    chairman_signature_path, ceo_signature_path = get_proceeding_signatures()
+
     meeting_no_dev = to_devanagari_digits(meeting_no)
 
     add_center("सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.",
@@ -494,14 +568,18 @@ def download_proceeding_form(account_opening_date):
 
     # Jayesh Sir signature
     run1 = p.add_run()
-    run1.add_picture(JAYESH_SIGN_PATH, width=Inches(1.0))
+    # run1.add_picture(JAYESH_SIGN_PATH, width=Inches(1.0))
+    # Chairman / Jayesh signature
+    run1.add_picture(chairman_signature_path, width=Inches(1.0))
 
     # Space between signatures
     p.add_run("                                                      ")
 
     # Wasnik Sir signature
     run2 = p.add_run()
-    run2.add_picture(WASNIK_SIGN_PATH, width=Inches(1.0))
+    # run2.add_picture(WASNIK_SIGN_PATH, width=Inches(1.0))
+    # CEO / Wasnik signature
+    run2.add_picture(ceo_signature_path, width=Inches(1.0))
 
     add_left("अध्यक्ष                                                             मुख्य कार्यकारी अधिकारी", bold=True)
     add_left("सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.     सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.", bold=True)
@@ -625,7 +703,8 @@ def download_proceeding_form(account_opening_date):
     # add_left("")
 
     # Wasnik Sir sign
-    add_centered_image(doc, WASNIK_SIGN_PATH, width_inch=1.0)
+    # add_centered_image(doc, WASNIK_SIGN_PATH, width_inch=1.0)
+    add_centered_image(doc, ceo_signature_path, width_inch=1.0)
 
     add_left("मुख्य कार्यकारी अधिकारी", bold=True)
     add_left("सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.", bold=True)
@@ -634,7 +713,8 @@ def download_proceeding_form(account_opening_date):
     # add_left("")
 
     # Jayesh Sir sign
-    add_centered_image(doc, JAYESH_SIGN_PATH, width_inch=1.0)
+    # add_centered_image(doc, JAYESH_SIGN_PATH, width_inch=1.0)
+    add_centered_image(doc, chairman_signature_path, width_inch=1.0)
 
     add_left("अध्यक्ष", bold=True)
     add_left("सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.", bold=True)
