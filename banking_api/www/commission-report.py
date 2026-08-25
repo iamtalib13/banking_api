@@ -1,274 +1,201 @@
-# import frappe
-
-
-# def _build_conditions(filters):
-#     """filters: list of [fieldname, operator, value]"""
-#     conditions = []
-#     values = {}
-#     for i, f in enumerate(filters or []):
-#         fieldname, operator, value = f[0], f[1], f[2]
-#         key = f"val{i}"
-#         if operator.lower() == "like":
-#             conditions.append(f"`{fieldname}` LIKE %({key})s")
-#             values[key] = f"%{value}%"
-#         else:
-#             conditions.append(f"`{fieldname}` = %({key})s")
-#             values[key] = value
-#     where_clause = " AND ".join(conditions) if conditions else "1=1"
-#     return where_clause, values
-
-
-# @frappe.whitelist()
-# def get_commission_summary(filters=None):
-#     filters = frappe.parse_json(filters) if filters else []
-#     where_clause, values = _build_conditions(filters)
-
-#     row = frappe.db.sql(
-#         f"""
-#         SELECT
-#             COUNT(name) AS total_records,
-#             COALESCE(SUM(CAST(NULLIF(TRIM(eligible_amount), '') AS DECIMAL(18,2))), 0) AS total_eligible,
-#             COALESCE(SUM(CAST(NULLIF(TRIM(commission_amount), '') AS DECIMAL(18,2))), 0) AS total_commission,
-#             COALESCE(SUM(CAST(NULLIF(TRIM(netpay), '') AS DECIMAL(18,2))), 0) AS total_netpay,
-#             COALESCE(SUM(CAST(NULLIF(TRIM(security_deposit), '') AS DECIMAL(18,2))), 0) AS total_security_deposit
-#         FROM `tabCommission`
-#         WHERE {where_clause}
-#         """,
-#         values,
-#         as_dict=True,
-#     )
-
-#     result = row[0] if row else {}
-#     return {
-#         "total_records": result.get("total_records") or 0,
-#         "total_eligible": float(result.get("total_eligible") or 0),
-#         "total_commission": float(result.get("total_commission") or 0),
-#         "total_netpay": float(result.get("total_netpay") or 0),
-#         "total_security_deposit": float(result.get("total_security_deposit") or 0),
-#     }
-
-
-# @frappe.whitelist()
-# def get_commission_filter_options():
-#     sol = frappe.db.get_list(
-#         "Commission",
-#         fields=["sol_id", "sol_description"],
-#         group_by="sol_id",
-#         order_by="sol_id",
-#     )
-#     scheme = frappe.db.get_list(
-#         "Commission",
-#         fields=["scheme_code"],
-#         group_by="scheme_code",
-#         order_by="scheme_code",
-#         pluck="scheme_code",
-#     )
-#     agent = frappe.db.get_list(
-#         "Commission",
-#         fields=["agent_code"],
-#         group_by="agent_code",
-#         order_by="agent_code",
-#         pluck="agent_code",
-#     )
-
-#     return {
-#         "sol_list": [
-#             {
-#                 "value": r.sol_id,
-#                 "label": f"{r.sol_id} - {r.sol_description}" if r.sol_description else str(r.sol_id),
-#             }
-#             for r in sol
-#             if r.sol_id
-#         ],
-#         "scheme_list": [s for s in scheme if s],
-#         "agent_list": [a for a in agent if a],
-#     }
-
+import csv
+import io
+from datetime import datetime
 
 import frappe
+from frappe import _
 
 
-def _build_conditions(filters):
-    """filters: list of [fieldname, operator, value]"""
-    conditions = []
-    values = {}
-    for i, f in enumerate(filters or []):
-        fieldname, operator, value = f[0], f[1], f[2]
-        key = f"val{i}"
-        if operator.lower() == "like":
-            conditions.append(f"`{fieldname}` LIKE %({key})s")
-            values[key] = f"%{value}%"
-        else:
-            conditions.append(f"`{fieldname}` = %({key})s")
-            values[key] = value
-    where_clause = " AND ".join(conditions) if conditions else "1=1"
-    return where_clause, values
+COMMISSION_DOCTYPE = "Commission"
 
 
-# @frappe.whitelist()
-# def get_commission_grouped(filters=None, limit_start=0, limit_page_length=10):
-#     """Returns one consolidated row per agent_code, with SUM'd amount fields."""
-#     filters = frappe.parse_json(filters) if filters else []
-#     limit_start = int(limit_start)
-#     limit_page_length = int(limit_page_length)
-
-#     where_clause, values = _build_conditions(filters)
-
-#     rows = frappe.db.sql(
-#         f"""
-#         SELECT
-#             agent_code,
-#             MAX(agent_name) AS agent_name,
-#             MAX(sol_id) AS sol_id,
-#             MAX(sol_description) AS sol_description,
-#             MAX(scheme_code) AS scheme_code,
-#             MAX(scheme_description) AS scheme_description,
-#             MAX(pan_card) AS pan_card,
-#             MAX(cif) AS cif,
-#             MAX(security_account) AS security_account,
-#             MAX(operative_account) AS operative_account,
-#             COUNT(name) AS record_count,
-#             COALESCE(SUM(CAST(NULLIF(TRIM(eligible_amount), '') AS DECIMAL(18,2))), 0) AS eligible_amount,
-#             COALESCE(SUM(CAST(NULLIF(TRIM(commission_amount), '') AS DECIMAL(18,2))), 0) AS commission_amount,
-#             COALESCE(SUM(CAST(NULLIF(TRIM(tds), '') AS DECIMAL(18,2))), 0) AS tds,
-#             COALESCE(SUM(CAST(NULLIF(TRIM(security_deposit), '') AS DECIMAL(18,2))), 0) AS security_deposit,
-#             COALESCE(SUM(CAST(NULLIF(TRIM(netpay), '') AS DECIMAL(18,2))), 0) AS netpay
-#         FROM `tabCommission`
-#         WHERE {where_clause}
-#         GROUP BY agent_code
-#         ORDER BY agent_code ASC
-#         LIMIT %(limit_page_length)s OFFSET %(limit_start)s
-#         """,
-#         {**values, "limit_start": limit_start,
-#             "limit_page_length": limit_page_length},
-#         as_dict=True,
-#     )
-#     return rows
+ALLOWED_EXPORT_FIELDS = [
+    "name",
+    "posting_date",
+    "sol_id",
+    "sol_description",
+    "agent_code",
+    "agent_name",
+    "scheme_code",
+    "scheme_description",
+    "pan_card",
+    "pan_status",
+    "cif",
+    "agent_security_account",
+    "agent_operative_account",
+    "eligible_amount",
+    "commission_amount",
+    "tds",
+    "security_deposit",
+    "netpay",
+]
 
 
-@frappe.whitelist()
-def get_commission_grouped(filters=None, limit_start=0, limit_page_length=10):
-    """Returns one consolidated row per agent_code, with SUM'd amount fields."""
-    filters = frappe.parse_json(filters) if filters else []
-    limit_start = int(limit_start)
-    limit_page_length = int(limit_page_length)
+def parse_date(value, field_label):
+    if not value:
+        frappe.throw(_("{0} is required.").format(field_label))
 
-    where_clause, values = _build_conditions(filters)
+    try:
+        return datetime.strptime(value.strip(), "%Y-%m-%d").date()
+    except ValueError:
+        frappe.throw(
+            _("{0} must be a valid date.").format(field_label)
+        )
+
+
+def parse_csv_values(value):
+    """Convert a comma-separated value string into a distinct cleaned list."""
+    if not value:
+        return []
+
+    values = []
+    seen = set()
+
+    for item in str(value).split(","):
+        item = item.strip()
+
+        if item and item not in seen:
+            values.append(item)
+            seen.add(item)
+
+    return values
+
+
+def get_report_filters(from_date, to_date, sol_id=None, agent_code=None, scheme_code=None):
+    """Build Commission filters using dates and optional multi-select values."""
+    from_date = parse_date(from_date, "From Date")
+    to_date = parse_date(to_date, "To Date")
+
+    if from_date > to_date:
+        frappe.throw(_("From Date cannot be greater than To Date."))
+
+    filters = {
+        "posting_date": ["between", [from_date, to_date]]
+    }
+
+    sol_ids = parse_csv_values(sol_id)
+    agent_codes = parse_csv_values(agent_code)
+    scheme_codes = parse_csv_values(scheme_code)
+
+    if sol_ids:
+        filters["sol_id"] = ["in", sol_ids]
+
+    if agent_codes:
+        filters["agent_code"] = ["in", agent_codes]
+
+    if scheme_codes:
+        filters["scheme_code"] = ["in", scheme_codes]
+
+    return filters
+
+
+def get_distinct_values(fieldname):
+    """Get cleaned, non-empty, distinct values from tabCommission."""
+    allowed_fields = {"sol_id", "agent_code", "scheme_code"}
+
+    if fieldname not in allowed_fields:
+        frappe.throw(_("Invalid filter field."))
 
     rows = frappe.db.sql(
         f"""
-            SELECT
-                agent_code,
-                MAX(agent_name) AS agent_name,
-                MAX(sol_id) AS sol_id,
-                MAX(sol_description) AS sol_description,
-                MAX(scheme_code) AS scheme_code,
-                MAX(scheme_description) AS scheme_description,
-                MAX(pan_card) AS pan_card,
-                MAX(pan_status) AS pan_status,
-                MAX(cif) AS cif,
-                MAX(agent_security_account) AS security_account,
-                MAX(agent_operative_account) AS operative_account,
-                COUNT(name) AS record_count,
-                COALESCE(SUM(CAST(NULLIF(TRIM(eligible_amount), '') AS DECIMAL(18,2))), 0) AS eligible_amount,
-                COALESCE(SUM(CAST(NULLIF(TRIM(commission_amount), '') AS DECIMAL(18,2))), 0) AS commission_amount,
-                COALESCE(SUM(CAST(NULLIF(TRIM(tds), '') AS DECIMAL(18,2))), 0) AS tds,
-                COALESCE(SUM(CAST(NULLIF(TRIM(security_deposit), '') AS DECIMAL(18,2))), 0) AS security_deposit,
-                COALESCE(SUM(CAST(NULLIF(TRIM(netpay), '') AS DECIMAL(18,2))), 0) AS netpay
-            FROM `tabCommission`
-            WHERE {where_clause}
-            GROUP BY agent_code
-            ORDER BY agent_code ASC
-            LIMIT %(limit_page_length)s OFFSET %(limit_start)s
+        SELECT DISTINCT `{fieldname}` AS value
+        FROM `tabCommission`
+        WHERE IFNULL(TRIM(`{fieldname}`), '') != ''
+        ORDER BY `{fieldname}` ASC
         """,
-        {**values, "limit_start": limit_start,
-            "limit_page_length": limit_page_length},
         as_dict=True,
     )
-    return rows
+
+    return [str(row.value).strip() for row in rows if row.value]
 
 
 @frappe.whitelist()
-def get_commission_grouped_count(filters=None):
-    """Count of distinct agent_code groups matching the filters."""
-    filters = frappe.parse_json(filters) if filters else []
-    where_clause, values = _build_conditions(filters)
-
-    row = frappe.db.sql(
-        f"""
-        SELECT COUNT(DISTINCT agent_code) AS total
-        FROM `tabCommission`
-        WHERE {where_clause}
-        """,
-        values,
-        as_dict=True,
-    )
-    return row[0].get("total") or 0 if row else 0
-
-
-@frappe.whitelist()
-def get_commission_summary(filters=None):
-    """Overall totals across ALL matching rows (not just current page) — used for stat cards."""
-    filters = frappe.parse_json(filters) if filters else []
-    where_clause, values = _build_conditions(filters)
-
-    row = frappe.db.sql(
-        f"""
-        SELECT
-            COUNT(DISTINCT agent_code) AS total_records,
-            COALESCE(SUM(CAST(NULLIF(TRIM(eligible_amount), '') AS DECIMAL(18,2))), 0) AS total_eligible,
-            COALESCE(SUM(CAST(NULLIF(TRIM(commission_amount), '') AS DECIMAL(18,2))), 0) AS total_commission,
-            COALESCE(SUM(CAST(NULLIF(TRIM(netpay), '') AS DECIMAL(18,2))), 0) AS total_netpay,
-            COALESCE(SUM(CAST(NULLIF(TRIM(security_deposit), '') AS DECIMAL(18,2))), 0) AS total_security_deposit
-        FROM `tabCommission`
-        WHERE {where_clause}
-        """,
-        values,
-        as_dict=True,
-    )
-
-    result = row[0] if row else {}
+def get_commission_report_options():
     return {
-        "total_records": result.get("total_records") or 0,
-        "total_eligible": float(result.get("total_eligible") or 0),
-        "total_commission": float(result.get("total_commission") or 0),
-        "total_netpay": float(result.get("total_netpay") or 0),
-        "total_security_deposit": float(result.get("total_security_deposit") or 0),
+        "sol_ids": get_distinct_values("sol_id"),
+        "agent_codes": get_distinct_values("agent_code"),
+        "scheme_codes": get_distinct_values("scheme_code"),
     }
 
 
 @frappe.whitelist()
-def get_commission_filter_options():
-    sol = frappe.db.get_list(
-        "Commission",
-        fields=["sol_id", "sol_description"],
-        group_by="sol_id",
-        order_by="sol_id",
-    )
-    scheme = frappe.db.get_list(
-        "Commission",
-        fields=["scheme_code"],
-        group_by="scheme_code",
-        order_by="scheme_code",
-        pluck="scheme_code",
-    )
-    agent = frappe.db.get_list(
-        "Commission",
-        fields=["agent_code"],
-        group_by="agent_code",
-        order_by="agent_code",
-        pluck="agent_code",
+def download_commission_report(
+    from_date,
+    to_date,
+    sol_id=None,
+    agent_code=None,
+    scheme_code=None,
+):
+    """Generate and download a CSV Commission report."""
+    filters = get_report_filters(
+        from_date=from_date,
+        to_date=to_date,
+        sol_id=sol_id,
+        agent_code=agent_code,
+        scheme_code=scheme_code,
     )
 
-    return {
-        "sol_list": [
-            {
-                "value": r.sol_id,
-                "label": f"{r.sol_id} - {r.sol_description}" if r.sol_description else str(r.sol_id),
-            }
-            for r in sol
-            if r.sol_id
-        ],
-        "scheme_list": [s for s in scheme if s],
-        "agent_list": [a for a in agent if a],
-    }
+    records = frappe.get_all(
+        COMMISSION_DOCTYPE,
+        filters=filters,
+        fields=ALLOWED_EXPORT_FIELDS,
+        order_by="posting_date asc, sol_id asc, agent_code asc, scheme_code asc",
+        limit_page_length=0,
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow([
+        "ID",
+        "Posting Date",
+        "SOL ID",
+        "SOL Description",
+        "Agent Code",
+        "Agent Name",
+        "Scheme Code",
+        "Scheme Description",
+        "PAN Card",
+        "PAN Status",
+        "CIF",
+        "Security Account",
+        "Operative Account",
+        "Eligible Amount",
+        "Commission Amount",
+        "TDS",
+        "Security Deposit",
+        "Net Pay",
+    ])
+
+    for row in records:
+        writer.writerow([
+            row.get("name") or "",
+            row.get("posting_date") or "",
+            row.get("sol_id") or "",
+            row.get("sol_description") or "",
+            row.get("agent_code") or "",
+            row.get("agent_name") or "",
+            row.get("scheme_code") or "",
+            row.get("scheme_description") or "",
+            row.get("pan_card") or "",
+            row.get("pan_status") or "",
+            row.get("cif") or "",
+            row.get("agent_security_account") or "",
+            row.get("agent_operative_account") or "",
+            row.get("eligible_amount") or 0,
+            row.get("commission_amount") or 0,
+            row.get("tds") or 0,
+            row.get("security_deposit") or 0,
+            row.get("netpay") or 0,
+        ])
+
+    safe_from_date = from_date.replace("-", "")
+    safe_to_date = to_date.replace("-", "")
+
+    frappe.local.response.filename = (
+        f"commission_report_{safe_from_date}_to_{safe_to_date}.csv"
+    )
+    frappe.local.response.filecontent = output.getvalue()
+    frappe.local.response.type = "download"
+
+    return None
