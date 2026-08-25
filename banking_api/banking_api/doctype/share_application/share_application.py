@@ -84,19 +84,78 @@ DIRECTORS = [
 ]
 
 
-APP_PATH = frappe.get_app_path("banking_api")
-IMAGES_PATH = os.path.join(APP_PATH, "public", "images")
+# APP_PATH = frappe.get_app_path("banking_api")
+# IMAGES_PATH = os.path.join(APP_PATH, "public", "images")
 
-JAYESH_SIGN_PATH = os.path.join(IMAGES_PATH, "jayesh_sir_sign.png")
-WASNIK_SIGN_PATH = os.path.join(IMAGES_PATH, "wasnik_sir_sign.png")
+# JAYESH_SIGN_PATH = os.path.join(IMAGES_PATH, "jayesh_sir_sign.png")
+# WASNIK_SIGN_PATH = os.path.join(IMAGES_PATH, "wasnik_sir_sign.png")
 
 
-def add_centered_image(doc, image_path, width_inch=1.8):
-    p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    run = p.add_run()
-    run.add_picture(image_path, width=Inches(width_inch))
-    return p
+# def add_centered_image(doc, image_path, width_inch=1.8):
+#     p = doc.add_paragraph()
+#     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+#     run = p.add_run()
+#     run.add_picture(image_path, width=Inches(width_inch))
+#     return p
+
+
+def get_signature_file_path(file_url, label):
+    """
+    Convert the Frappe attachment URL to a server filesystem path.
+    Validates that a signature is configured and its image file exists.
+    """
+    if not file_url:
+        frappe.throw(
+            f"{label} is not configured. "
+            "Please upload it in Share Application Setting."
+        )
+
+    # Reject remote URL files because python-docx needs a local path.
+    if file_url.startswith(("http://", "https://")):
+        frappe.throw(
+            f"{label} must be uploaded as a local image file, "
+            "not an external URL."
+        )
+
+    # Frappe attachment paths normally begin with /files/ or /private/files/
+    file_path = frappe.get_site_path(file_url.lstrip("/"))
+
+    if not os.path.exists(file_path):
+        frappe.throw(
+            f"{label} file was not found on the server: {file_url}. "
+            "Please upload the signature again in Share Application Setting."
+        )
+
+    allowed_extensions = {".png", ".jpg", ".jpeg", ".bmp", ".gif"}
+    extension = os.path.splitext(file_path)[1].lower()
+
+    if extension not in allowed_extensions:
+        frappe.throw(
+            f"{label} must be an image file. Allowed formats: "
+            "PNG, JPG, JPEG, BMP, GIF."
+        )
+
+    return file_path
+
+
+def get_proceeding_signatures():
+    """
+    Reads both signatures from the Share Application Setting Single DocType.
+    Returns local filesystem paths for python-docx.
+    """
+    settings = frappe.get_single("Share Application Setting")
+
+    chairman_signature_path = get_signature_file_path(
+        settings.chairman_signature,
+        "Chairman Signature"
+    )
+
+    ceo_signature_path = get_signature_file_path(
+        settings.ceo_signature,
+        "CEO Signature"
+    )
+
+    return chairman_signature_path, ceo_signature_path
 
 
 def add_page_number(paragraph):
