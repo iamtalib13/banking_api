@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import json
+import math
 import psycopg2
 from psycopg2.extras import RealDictCursor, execute_batch
 import frappe
@@ -11,10 +12,42 @@ from frappe.model.document import Document
 
 
 class DatabaseIntegration(Document):
-	@frappe.whitelist()
-	def preview_source_data(self):
+	def render_query(self, query_string: str, extra_context: dict = None) -> str:
 		"""
-		Fetches up to 10 sample records from Source Database using source_query for testing.
+		Renders dynamic Jinja expressions inside SQL queries.
+		Provides helpful context such as today, now, days_ago, add_days, add_months, frappe, and doc.
+		"""
+		if not query_string:
+			return ""
+
+		context = {
+			"frappe": frappe,
+			"doc": self,
+			"today": frappe.utils.today(),
+			"nowdate": frappe.utils.nowdate(),
+			"now": frappe.utils.now(),
+			"now_datetime": frappe.utils.now_datetime(),
+			"getdate": frappe.utils.getdate,
+			"add_days": frappe.utils.add_days,
+			"add_months": frappe.utils.add_months,
+			"add_years": frappe.utils.add_years,
+			"days_ago": lambda n: frappe.utils.add_days(frappe.utils.today(), -int(n)),
+			"days_ahead": lambda n: frappe.utils.add_days(frappe.utils.today(), int(n)),
+			"format_date": frappe.utils.format_date,
+		}
+
+		if extra_context:
+			context.update(extra_context)
+
+		try:
+			return frappe.render_template(query_string, context)
+		except Exception as e:
+			frappe.throw(_("Failed to render query template: {0}").format(str(e)))
+
+	@frappe.whitelist()
+	def preview_source_data(self, page: int = 1, page_len: int = 20):
+		"""
+		Fetches paginated sample records and total record count from Source Database using rendered source_query.
 		"""
 		if not self.source_database:
 			frappe.throw(_("Please select a Source Database."))
@@ -22,15 +55,45 @@ class DatabaseIntegration(Document):
 		if not self.source_query:
 			frappe.throw(_("Please specify a Source Query."))
 
+		page = max(1, int(page or 1))
+		page_len = min(500, max(5, int(page_len or 20)))
+		offset = (page - 1) * page_len
+
+		rendered_source_query = self.render_query(self.source_query)
+		clean_query = rendered_source_query.strip().rstrip(";")
+
 		source_db_doc = frappe.get_doc("Database Configuration", self.source_database)
 		conn = None
 
 		try:
 			conn = source_db_doc.get_connection()
+			total_records = 0
 			with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-				cursor.execute(self.source_query)
-				rows = cursor.fetchmany(10) if cursor.description else []
-				return [dict(row) for row in rows]
+				# 1. Fetch total count
+				count_query = f"SELECT COUNT(*) AS total_count FROM ({clean_query}) AS _preview_subquery"
+				try:
+					cursor.execute(count_query)
+					count_row = cursor.fetchone()
+					total_records = count_row["total_count"] if count_row else 0
+				except Exception:
+					if conn:
+						conn.rollback()
+
+				# 2. Fetch paginated records
+				paginated_query = f"SELECT * FROM ({clean_query}) AS _preview_subquery LIMIT {page_len} OFFSET {offset}"
+				cursor.execute(paginated_query)
+				rows = [dict(row) for row in cursor.fetchall()] if cursor.description else []
+
+				total_pages = max(1, math.ceil(total_records / page_len)) if total_records else 1
+
+				return {
+					"rows": rows,
+					"columns": list(rows[0].keys()) if rows else [],
+					"total_records": total_records,
+					"page": page,
+					"page_len": page_len,
+					"total_pages": total_pages,
+				}
 		except Exception as e:
 			frappe.throw(_("Source DB Preview failed: {0}").format(str(e)))
 		finally:
@@ -60,6 +123,9 @@ class DatabaseIntegration(Document):
 		if not self.destination_query:
 			frappe.throw(_("Please specify a Destination Query."))
 
+		rendered_source_query = self.render_query(self.source_query)
+		rendered_destination_query = self.render_query(self.destination_query)
+
 		source_db_doc = frappe.get_doc("Database Configuration", self.source_database)
 		dest_db_doc = frappe.get_doc("Database Configuration", self.destination_database)
 
@@ -73,15 +139,15 @@ class DatabaseIntegration(Document):
 			# 1. Fetch data from Source Database as dictionary records
 			source_conn = source_db_doc.get_connection()
 			with source_conn.cursor(cursor_factory=RealDictCursor) as source_cursor:
-				source_cursor.execute(self.source_query)
+				source_cursor.execute(rendered_source_query)
 				dict_rows = [dict(row) for row in source_cursor.fetchall()] if source_cursor.description else []
 				records_count = len(dict_rows)
 
 			# 2. Execute Destination Query in batch mode
-			if dict_rows and self.destination_query:
+			if dict_rows and rendered_destination_query:
 				dest_conn = dest_db_doc.get_connection()
 				with dest_conn.cursor() as dest_cursor:
-					execute_batch(dest_cursor, self.destination_query, dict_rows, page_size=100)
+					execute_batch(dest_cursor, rendered_destination_query, dict_rows, page_size=100)
 					dest_conn.commit()
 
 			log_message = _("Successfully processed {0} record(s).").format(records_count)

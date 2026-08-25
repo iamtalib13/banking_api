@@ -39,7 +39,7 @@
    "reqd": 1
   },
   {
-   "description": "Write a SELECT query to fetch data. Column names (or AS aliases) serve as placeholders in Destination Query. Example: SELECT cust_id AS orgkey, new_pan_no AS pan FROM netwin_accounts;",
+   "description": "Write a SELECT query to fetch data. Column names (or AS aliases) serve as placeholders in Destination Query. Supports dynamic Jinja templating (e.g. {{ days_ago(3) }}, {{ today }}, {{ add_days(today, -7) }}). Example: SELECT cust_id AS orgkey, new_pan_no AS pan FROM netwin_accounts WHERE created_on >= '{{ days_ago(3) }}';",
    "fieldname": "source_query",
    "fieldtype": "Code",
    "label": "Source Query",
