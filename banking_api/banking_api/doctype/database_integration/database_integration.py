@@ -44,6 +44,41 @@ class DatabaseIntegration(Document):
 		except Exception as e:
 			frappe.throw(_("Failed to render query template: {0}").format(str(e)))
 
+	def get_source_query_with_filters(self) -> tuple[str, str, str]:
+		"""
+		Returns (final_query, filter_from, filter_to).
+		Wraps rendered source query with dynamic date filter condition if enable_date_filter is active.
+		"""
+		rendered_query = self.render_query(self.source_query)
+		if not self.enable_date_filter or not self.date_filter_column:
+			return rendered_query, None, None
+
+		clean_query = rendered_query.strip().rstrip(";")
+		col = self.date_filter_column.strip()
+		mode = self.date_filter_mode or "Last N Days"
+		filter_from = None
+		filter_to = None
+
+		if mode == "Last N Days":
+			days = int(self.last_n_days or 3)
+			filter_from = frappe.utils.add_days(frappe.utils.today(), -days)
+			filter_to = frappe.utils.today()
+			wrapped_query = f"SELECT * FROM ({clean_query}) AS _src_filtered WHERE {col} >= '{filter_from}'"
+			return wrapped_query, str(filter_from), str(filter_to)
+
+		elif mode == "Today Only":
+			filter_from = frappe.utils.today()
+			filter_to = frappe.utils.today()
+			wrapped_query = f"SELECT * FROM ({clean_query}) AS _src_filtered WHERE {col} >= '{filter_from}'"
+			return wrapped_query, str(filter_from), str(filter_to)
+
+		elif mode == "Incremental (Sync From)":
+			filter_from = self.sync_from or frappe.utils.add_days(frappe.utils.today(), -3)
+			wrapped_query = f"SELECT * FROM ({clean_query}) AS _src_filtered WHERE {col} > '{filter_from}' ORDER BY {col} ASC"
+			return wrapped_query, str(filter_from), None
+
+		return rendered_query, None, None
+
 	@frappe.whitelist()
 	def preview_source_data(self, page: int = 1, page_len: int = 20):
 		"""
@@ -59,8 +94,8 @@ class DatabaseIntegration(Document):
 		page_len = min(500, max(5, int(page_len or 20)))
 		offset = (page - 1) * page_len
 
-		rendered_source_query = self.render_query(self.source_query)
-		clean_query = rendered_source_query.strip().rstrip(";")
+		source_query, _, _ = self.get_source_query_with_filters()
+		clean_query = source_query.strip().rstrip(";")
 
 		source_db_doc = frappe.get_doc("Database Configuration", self.source_database)
 		conn = None
@@ -123,7 +158,7 @@ class DatabaseIntegration(Document):
 		if not self.destination_query:
 			frappe.throw(_("Please specify a Destination Query."))
 
-		rendered_source_query = self.render_query(self.source_query)
+		source_query, filter_from, filter_to = self.get_source_query_with_filters()
 		rendered_destination_query = self.render_query(self.destination_query)
 
 		source_db_doc = frappe.get_doc("Database Configuration", self.source_database)
@@ -139,7 +174,7 @@ class DatabaseIntegration(Document):
 			# 1. Fetch data from Source Database as dictionary records
 			source_conn = source_db_doc.get_connection()
 			with source_conn.cursor(cursor_factory=RealDictCursor) as source_cursor:
-				source_cursor.execute(rendered_source_query)
+				source_cursor.execute(source_query)
 				dict_rows = [dict(row) for row in source_cursor.fetchall()] if source_cursor.description else []
 				records_count = len(dict_rows)
 
@@ -152,13 +187,24 @@ class DatabaseIntegration(Document):
 
 			log_message = _("Successfully processed {0} record(s).").format(records_count)
 
-			# 3. Format payload with Sr. No. for audit logging
+			# 3. Calculate new sync_to pointer if incremental
+			new_sync_to = filter_to
+			if self.enable_date_filter and self.date_filter_mode == "Incremental (Sync From)":
+				col = self.date_filter_column.strip() if self.date_filter_column else None
+				if dict_rows and col and col in dict_rows[0]:
+					vals = [r[col] for r in dict_rows if r.get(col) is not None]
+					if vals:
+						new_sync_to = str(max(vals))
+				elif not new_sync_to:
+					new_sync_to = str(filter_from)
+
+			# 4. Format payload with Sr. No. for audit logging
 			formatted_payload = [
 				{"sr_no": idx + 1, "values": row}
 				for idx, row in enumerate(dict_rows)
 			]
 
-			# 4. Create Database Request Document as Audit Log
+			# 5. Create Database Request Document as Audit Log
 			db_request = frappe.get_doc({
 				"doctype": "Database Request",
 				"database_integration": self.name,
@@ -166,17 +212,23 @@ class DatabaseIntegration(Document):
 				"destination_database": self.destination_database,
 				"execution_datetime": execution_time,
 				"records_count": records_count,
+				"sync_from": str(filter_from) if filter_from else None,
+				"sync_to": str(new_sync_to) if new_sync_to else None,
 				"status": "Success",
 				"synced_payload": json.dumps(formatted_payload, indent=2, default=str),
 				"error_log": log_message
 			})
 			db_request.insert(ignore_permissions=True)
 
-			# 5. Update execution metadata on Database Integration
+			# 6. Update execution metadata on Database Integration
 			self.db_set("last_sync_on", execution_time)
 			self.db_set("last_sync_status", "Success")
 			self.db_set("records_processed", records_count)
 			self.db_set("last_sync_log", log_message)
+			if new_sync_to:
+				self.db_set("sync_to", str(new_sync_to))
+				if self.enable_date_filter and self.date_filter_mode == "Incremental (Sync From)":
+					self.db_set("sync_from", str(new_sync_to))
 
 			return log_message
 

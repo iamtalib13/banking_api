@@ -13,6 +13,8 @@
   "status",
   "execution_datetime",
   "records_count",
+  "sync_from",
+  "sync_to",
   "payload_section",
   "synced_payload",
   "error_log"
@@ -63,6 +65,18 @@
    "fieldtype": "Int",
    "in_list_view": 1,
    "label": "Records Count"
+  },
+  {
+   "fieldname": "sync_from",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Sync From"
+  },
+  {
+   "fieldname": "sync_to",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Sync To"
   },
   {
    "fieldname": "payload_section",
