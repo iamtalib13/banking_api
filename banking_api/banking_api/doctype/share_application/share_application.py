@@ -1099,12 +1099,478 @@ def set_row_cant_split(table_row):
         tr_pr.append(cant_split)
 
 
+# @frappe.whitelist()
+# def download_loan_meeting_register(start_date=None, end_date=None):
+#     """
+#     Download Zone-wise Loan Meeting Register as a DOCX file.
+
+#     Data source: external Finacle PostgreSQL database.
+#     Output columns:
+#     Zone | Region | Branch | Customer Name | Scheme Name | Months |
+#     A/c No./CIF. | Req. Loan Amount
+#     """
+
+#     if not start_date:
+#         frappe.throw(_("Start Date is required."))
+
+#     if not end_date:
+#         frappe.throw(_("End Date is required."))
+
+#     try:
+#         start_date_obj = getdate(start_date)
+#         end_date_obj = getdate(end_date)
+#     except Exception:
+#         frappe.throw(_("Please select valid Start Date and End Date."))
+
+#     if start_date_obj > end_date_obj:
+#         frappe.throw(_("Start Date cannot be greater than End Date."))
+
+#     # PostgreSQL / Finacle query.
+#     # DISTINCT ON (acid) is valid here because execute_finacle_query()
+#     # runs this in Finacle PostgreSQL, not Frappe MariaDB.
+#     query = """
+#         SELECT
+#             g.cif_id,
+#             g.foracid AS ac_no,
+#             g.acct_name,
+#             g.acct_opn_date,
+#             g.acct_cls_date,
+#             g.sol_id,
+#             s.sol_desc,
+
+#             CASE
+#                 WHEN g.schm_type = 'LAA'
+#                 THEN l.dis_amt
+#                 ELSE lh.sanct_lim
+#             END AS dis_amt,
+
+#             lr.flow_amt,
+#             e.interest_rate,
+#             g.clr_bal_amt,
+#             g.cum_cr_amt AS total_amt_received,
+#             g.schm_code,
+#             g2.schm_desc,
+#             g.schm_type,
+
+#             CASE
+#                 WHEN g.schm_type = 'LAA'
+#                 THEN l.rep_perd_mths
+#                 ELSE NULL
+#             END AS rep_perd_mths,
+
+#             l2.lim_exp_date,
+
+#             CASE
+#                 WHEN g.schm_type = 'LAA'
+#                 THEN l.ei_perd_start_date
+#                 ELSE NULL
+#             END AS ei_perd_start_date,
+
+#             CASE
+#                 WHEN g.schm_type = 'LAA'
+#                 THEN l.ei_perd_end_date
+#                 ELSE NULL
+#             END AS ei_perd_end_date,
+
+#             g.acct_cls_flg,
+#             a.address_line1,
+#             a.address_line2,
+#             s.division_name,
+#             s.region_name,
+#             s.circle_office_name
+
+#         FROM tbaadm.gam g
+
+#         JOIN tbaadm.sol s
+#             ON g.sol_id = s.sol_id
+
+#         JOIN tbaadm.gsp g2
+#             ON g.schm_code = g2.schm_code
+
+#         LEFT JOIN crmuser.accounts a
+#             ON g.cif_id = a.orgkey
+
+#         LEFT JOIN tbaadm.lam l
+#             ON g.acid = l.acid
+
+#         LEFT JOIN tbaadm.eit e
+#             ON e.entity_id = g.acid
+
+#         LEFT JOIN tbaadm.lht l2
+#             ON l2.acid = g.acid
+
+#         LEFT JOIN (
+#             SELECT DISTINCT ON (acid)
+#                 acid,
+#                 sanct_lim
+#             FROM tbaadm.lht
+#             ORDER BY acid, applicable_date DESC
+#         ) lh
+#             ON lh.acid = g.acid
+
+#         LEFT JOIN (
+#             SELECT
+#                 acid,
+#                 MAX(flow_amt) AS flow_amt
+#             FROM tbaadm.lrs
+#             GROUP BY acid
+#         ) lr
+#             ON lr.acid = g.acid
+
+#         WHERE (
+#             g.schm_type = 'LAA'
+#             OR g.schm_code IN ('1301', '1302', '3028', '3047', '3050')
+#         )
+#         AND g.entity_cre_flg = 'Y'
+#         AND g.del_flg = 'N'
+#         AND g.acct_opn_date BETWEEN %(start_date)s AND %(end_date)s
+
+#         ORDER BY
+#             s.circle_office_name NULLS LAST,
+#             s.region_name NULLS LAST,
+#             s.sol_desc NULLS LAST,
+#             g.acct_name NULLS LAST,
+#             g.foracid NULLS LAST
+#     """
+
+#     params = {
+#         "start_date": start_date_obj,
+#         "end_date": end_date_obj
+#     }
+
+#     rows = execute_finacle_query(query, params)
+
+#     if not rows:
+#         frappe.msgprint(
+#             _("No loan records found for the selected date range."),
+#             title=_("No Records"),
+#             indicator="orange"
+#         )
+#         return
+
+#     # Normalize Zone names and group data zone-wise.
+#     zone_wise_rows = {}
+
+#     for row in rows:
+#         zone = (
+#             row.get("circle_office_name")
+#             or "Unassigned Zone"
+#         ).strip()
+
+#         zone_wise_rows.setdefault(zone, []).append(row)
+
+#     document = DocxDocument()
+
+#     section = document.sections[0]
+#     section.top_margin = Inches(0.45)
+#     section.bottom_margin = Inches(0.45)
+#     section.left_margin = Inches(0.35)
+#     section.right_margin = Inches(0.35)
+
+#     normal_style = document.styles["Normal"]
+#     normal_style.font.name = "Arial"
+#     normal_style.font.size = Pt(8)
+
+#     title = document.add_paragraph()
+#     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+#     title_run = title.add_run("LOAN MEETING REGISTER")
+#     title_run.bold = True
+#     title_run.font.name = "Arial"
+#     title_run.font.size = Pt(15)
+
+#     date_line = document.add_paragraph()
+#     date_line.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+#     date_run = date_line.add_run(
+#         "Account Opening Date: {0} To {1}".format(
+#             start_date_obj.strftime("%d-%m-%Y"),
+#             end_date_obj.strftime("%d-%m-%Y")
+#         )
+#     )
+#     date_run.bold = True
+#     date_run.font.name = "Arial"
+#     date_run.font.size = Pt(9)
+
+#     document.add_paragraph("")
+
+#     headers = [
+#         "Zone",
+#         "Region",
+#         "Branch",
+#         "Customer Name",
+#         "Scheme Name",
+#         "Months",
+#         "A/c No./CIF.",
+#         "Req. Loan Amount"
+#     ]
+
+#     table = document.add_table(rows=1, cols=len(headers))
+#     table.style = "Table Grid"
+#     table.autofit = False
+
+#     header_row = table.rows[0]
+
+#     for column_index, header in enumerate(headers):
+#         cell = header_row.cells[column_index]
+
+#         set_docx_cell_background(cell, "D9E1F2")
+
+#         set_docx_cell_text(
+#             cell,
+#             header,
+#             bold=True,
+#             alignment=WD_ALIGN_PARAGRAPH.CENTER,
+#             font_size=8
+#         )
+
+#     column_widths = [
+#         Inches(1.00),  # Zone
+#         Inches(1.00),  # Region
+#         Inches(1.10),  # Branch
+#         Inches(1.70),  # Customer Name
+#         Inches(1.20),  # Scheme Name
+#         Inches(0.65),  # Months
+#         Inches(1.25),  # A/c No./CIF.
+#         Inches(1.15),  # Req. Loan Amount
+#     ]
+
+#     for table_row in table.rows:
+#         for column_index, width in enumerate(column_widths):
+#             table_row.cells[column_index].width = width
+
+#     grand_total_records = 0
+#     grand_total_amount = 0.0
+
+#     for zone, zone_rows in sorted(
+#         zone_wise_rows.items(),
+#         key=lambda item: item[0].lower()
+#     ):
+#         zone_total_records = 0
+#         zone_total_amount = 0.0
+
+#         for row in zone_rows:
+#             record_row = table.add_row()
+
+#             for column_index, width in enumerate(column_widths):
+#                 record_row.cells[column_index].width = width
+
+#             cif_id = row.get("cif_id") or ""
+#             ac_no = row.get("ac_no") or ""
+
+#             # Requirement: cif_id as A/c No./CIF.
+#             # If CIF is blank, account number is used as fallback.
+#             account_or_cif = cif_id or ac_no
+
+#             requested_amount = safe_float(row.get("dis_amt"))
+
+#             values = [
+#                 zone,
+#                 row.get("region_name") or "",
+#                 row.get("sol_desc") or "",
+#                 row.get("acct_name") or "",
+#                 row.get("schm_desc") or "",
+#                 "APR",
+#                 account_or_cif,
+#                 format_amount(requested_amount),
+#             ]
+
+#             for column_index, value in enumerate(values):
+#                 alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+#                 if column_index in (5, 7):
+#                     alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+#                 set_docx_cell_text(
+#                     record_row.cells[column_index],
+#                     value,
+#                     bold=False,
+#                     alignment=alignment,
+#                     font_size=7
+#                 )
+
+#             zone_total_records += 1
+#             zone_total_amount += requested_amount
+#             grand_total_records += 1
+#             grand_total_amount += requested_amount
+
+#         # Zone subtotal row: background #63A4F7.
+#         # zone_total_row = table.add_row()
+
+#         # for column_index, width in enumerate(column_widths):
+#         #     zone_total_row.cells[column_index].width = width
+
+#         # for cell in zone_total_row.cells:
+#         #     set_docx_cell_background(cell, "63A4F7")
+
+#         # # Merge columns Zone through A/c No./CIF.
+#         # merged_cell = zone_total_row.cells[0].merge(zone_total_row.cells[6])
+
+#         # set_docx_cell_text(
+#         #     merged_cell,
+#         #     "{0} Total — Records: {1}".format(
+#         #         zone,
+#         #         zone_total_records
+#         #     ),
+#         #     bold=True,
+#         #     alignment=WD_ALIGN_PARAGRAPH.RIGHT,
+#         #     font_size=8
+#         # )
+
+#         # set_docx_cell_text(
+#         #     zone_total_row.cells[7],
+#         #     format_amount(zone_total_amount),
+#         #     bold=True,
+#         #     alignment=WD_ALIGN_PARAGRAPH.CENTER,
+#         #     font_size=8
+#         # )
+
+#         # Zone subtotal row: background #63A4F7.
+#         # Keep all columns separate; do not merge cells.
+#         zone_total_row = table.add_row()
+
+#         for column_index, width in enumerate(column_widths):
+#             zone_total_row.cells[column_index].width = width
+
+#         for cell in zone_total_row.cells:
+#             set_docx_cell_background(cell, "63A4F7")
+
+#         # Label only in Zone column.
+#         set_docx_cell_text(
+#             zone_total_row.cells[0],
+#             "{0} Total".format(zone),
+#             bold=True,
+#             alignment=WD_ALIGN_PARAGRAPH.LEFT,
+#             font_size=8
+#         )
+
+#         # Keep Region through A/c No./CIF. columns blank.
+#         for column_index in range(1, 7):
+#             set_docx_cell_text(
+#                 zone_total_row.cells[column_index],
+#                 "",
+#                 bold=True,
+#                 alignment=WD_ALIGN_PARAGRAPH.LEFT,
+#                 font_size=8
+#             )
+
+#         # Total only in Req. Loan Amount column.
+#         set_docx_cell_text(
+#             zone_total_row.cells[7],
+#             format_amount(zone_total_amount),
+#             bold=True,
+#             alignment=WD_ALIGN_PARAGRAPH.CENTER,
+#             font_size=8
+#         )
+
+#     # Grand total row: background #D9E1F2.
+#     # grand_total_row = table.add_row()
+
+#     # for column_index, width in enumerate(column_widths):
+#     #     grand_total_row.cells[column_index].width = width
+
+#     # for cell in grand_total_row.cells:
+#     #     set_docx_cell_background(cell, "D9E1F2")
+
+#     # grand_merged_cell = grand_total_row.cells[0].merge(
+#     #     grand_total_row.cells[6]
+#     # )
+
+#     # set_docx_cell_text(
+#     #     grand_merged_cell,
+#     #     "Grand Total — Records: {0}".format(grand_total_records),
+#     #     bold=True,
+#     #     alignment=WD_ALIGN_PARAGRAPH.RIGHT,
+#     #     font_size=9
+#     # )
+
+#     # set_docx_cell_text(
+#     #     grand_total_row.cells[7],
+#     #     format_amount(grand_total_amount),
+#     #     bold=True,
+#     #     alignment=WD_ALIGN_PARAGRAPH.CENTER,
+#     #     font_size=9
+#     # )
+
+#     # Grand total row: background #D9E1F2.
+#     # Keep all columns separate; do not merge cells.
+#     grand_total_row = table.add_row()
+
+#     for column_index, width in enumerate(column_widths):
+#         grand_total_row.cells[column_index].width = width
+
+#     for cell in grand_total_row.cells:
+#         set_docx_cell_background(cell, "D9E1F2")
+
+#     # Label only in Zone column.
+#     set_docx_cell_text(
+#         grand_total_row.cells[0],
+#         "Grand Total",
+#         bold=True,
+#         alignment=WD_ALIGN_PARAGRAPH.LEFT,
+#         font_size=9
+#     )
+
+#     # Keep Region through A/c No./CIF. columns blank.
+#     for column_index in range(1, 7):
+#         set_docx_cell_text(
+#             grand_total_row.cells[column_index],
+#             "",
+#             bold=True,
+#             alignment=WD_ALIGN_PARAGRAPH.LEFT,
+#             font_size=9
+#         )
+
+#     # Grand total amount only in Req. Loan Amount column.
+#     set_docx_cell_text(
+#         grand_total_row.cells[7],
+#         format_amount(grand_total_amount),
+#         bold=True,
+#         alignment=WD_ALIGN_PARAGRAPH.CENTER,
+#         font_size=9
+#     )
+
+#     document.add_paragraph("")
+
+#     summary = document.add_paragraph()
+#     summary.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+#     summary_run = summary.add_run(
+#         "Total Records: {0}    |    Total Requested Loan Amount: {1}".format(
+#             grand_total_records,
+#             format_amount(grand_total_amount)
+#         )
+#     )
+#     summary_run.bold = True
+#     summary_run.font.name = "Arial"
+#     summary_run.font.size = Pt(9)
+
+#     file_buffer = io.BytesIO()
+#     document.save(file_buffer)
+#     file_buffer.seek(0)
+
+#     frappe.response.filename = (
+#         "Loan_Meeting_Register_{0}_to_{1}.docx".format(
+#             start_date_obj.strftime("%Y-%m-%d"),
+#             end_date_obj.strftime("%Y-%m-%d")
+#         )
+#     )
+#     frappe.response.filecontent = file_buffer.getvalue()
+#     frappe.response.type = "download"
+#     frappe.response.display_content_as = "attachment"
+
+
 @frappe.whitelist()
 def download_loan_meeting_register(start_date=None, end_date=None):
     """
-    Download Zone-wise Loan Meeting Register as a DOCX file.
+    Generate and download a zone-wise Loan Meeting Register DOCX.
 
-    Data source: external Finacle PostgreSQL database.
+    Grouping order:
+    1. Zone
+    2. Region
+    3. Branch
+    4. Customer Name
+
     Output columns:
     Zone | Region | Branch | Customer Name | Scheme Name | Months |
     A/c No./CIF. | Req. Loan Amount
@@ -1125,9 +1591,6 @@ def download_loan_meeting_register(start_date=None, end_date=None):
     if start_date_obj > end_date_obj:
         frappe.throw(_("Start Date cannot be greater than End Date."))
 
-    # PostgreSQL / Finacle query.
-    # DISTINCT ON (acid) is valid here because execute_finacle_query()
-    # runs this in Finacle PostgreSQL, not Frappe MariaDB.
     query = """
         SELECT
             g.cif_id,
@@ -1238,6 +1701,7 @@ def download_loan_meeting_register(start_date=None, end_date=None):
         "end_date": end_date_obj
     }
 
+    # This executes the PostgreSQL query through Finacle connection.
     rows = execute_finacle_query(query, params)
 
     if not rows:
@@ -1248,24 +1712,104 @@ def download_loan_meeting_register(start_date=None, end_date=None):
         )
         return
 
-    # Normalize Zone names and group data zone-wise.
+    def normalize_group_value(value, default=""):
+        """
+        Prevent duplicate groups caused by whitespace differences.
+        Example:
+        ' Nagpur Zone ', 'Nagpur   Zone' -> 'Nagpur Zone'
+        """
+        value = " ".join(str(value or "").split()).strip()
+        return value if value else default
+
+    def safe_float(value, default=0.0):
+        """Safely convert Finacle amounts to float for summation."""
+        try:
+            if value in (None, ""):
+                return default
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
+    def format_amount(value):
+        """Format report amount without a currency sign."""
+        return "{:,.2f}".format(safe_float(value))
+
+    def set_cell_background(cell, hex_color):
+        """
+        Set background colour of one DOCX table cell.
+        Use hex color without #, e.g. D9E1F2.
+        """
+        tc_pr = cell._tc.get_or_add_tcPr()
+
+        shading = OxmlElement("w:shd")
+        shading.set(qn("w:fill"), hex_color.replace("#", ""))
+        shading.set(qn("w:val"), "clear")
+        tc_pr.append(shading)
+
+    def set_row_cant_split(table_row):
+        """
+        Do not split one table row across two pages.
+        If row does not fit, Word moves the row to the next page.
+        """
+        tr_pr = table_row._tr.get_or_add_trPr()
+
+        cant_split = OxmlElement("w:cantSplit")
+        cant_split.set(qn("w:val"), "true")
+        tr_pr.append(cant_split)
+
+    def set_cell_text(
+        cell,
+        value,
+        bold=False,
+        alignment=WD_ALIGN_PARAGRAPH.LEFT,
+        font_size=7
+    ):
+        """Apply standard text formatting to a DOCX table cell."""
+        cell.text = ""
+        cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+
+        paragraph = cell.paragraphs[0]
+        paragraph.alignment = alignment
+
+        paragraph.paragraph_format.space_before = Pt(0)
+        paragraph.paragraph_format.space_after = Pt(0)
+        paragraph.paragraph_format.line_spacing = 1
+
+        run = paragraph.add_run(str(value if value is not None else ""))
+        run.bold = bold
+        run.font.name = "Arial"
+        run.font.size = Pt(font_size)
+
+    # Group strictly by Zone; Region is only used for sorting/display.
     zone_wise_rows = {}
 
     for row in rows:
-        zone = (
-            row.get("circle_office_name")
-            or "Unassigned Zone"
-        ).strip()
+        zone = normalize_group_value(
+            row.get("circle_office_name"),
+            default="Unassigned Zone"
+        )
 
         zone_wise_rows.setdefault(zone, []).append(row)
+
+    # Ensure all records within each Zone are ordered by Region, Branch,
+    # Customer Name, then CIF ID.
+    for zone in zone_wise_rows:
+        zone_wise_rows[zone].sort(
+            key=lambda row: (
+                normalize_group_value(row.get("region_name"), default=""),
+                normalize_group_value(row.get("sol_desc"), default=""),
+                normalize_group_value(row.get("acct_name"), default=""),
+                normalize_group_value(row.get("cif_id"), default="")
+            )
+        )
 
     document = DocxDocument()
 
     section = document.sections[0]
     section.top_margin = Inches(0.45)
     section.bottom_margin = Inches(0.45)
-    section.left_margin = Inches(0.35)
-    section.right_margin = Inches(0.35)
+    section.left_margin = Inches(0.30)
+    section.right_margin = Inches(0.30)
 
     normal_style = document.styles["Normal"]
     normal_style.font.name = "Arial"
@@ -1309,39 +1853,38 @@ def download_loan_meeting_register(start_date=None, end_date=None):
     table.style = "Table Grid"
     table.autofit = False
 
+    column_widths = [
+        Inches(0.95),  # Zone
+        Inches(0.95),  # Region
+        Inches(1.10),  # Branch
+        Inches(1.70),  # Customer Name
+        Inches(1.20),  # Scheme Name
+        Inches(0.60),  # Months
+        Inches(1.20),  # A/c No./CIF.
+        Inches(1.10),  # Req. Loan Amount
+    ]
+
     header_row = table.rows[0]
+    set_row_cant_split(header_row)
 
     for column_index, header in enumerate(headers):
-        cell = header_row.cells[column_index]
+        header_cell = header_row.cells[column_index]
+        header_cell.width = column_widths[column_index]
 
-        set_docx_cell_background(cell, "D9E1F2")
+        set_cell_background(header_cell, "D9E1F2")
 
-        set_docx_cell_text(
-            cell,
+        set_cell_text(
+            header_cell,
             header,
             bold=True,
             alignment=WD_ALIGN_PARAGRAPH.CENTER,
             font_size=8
         )
 
-    column_widths = [
-        Inches(1.00),  # Zone
-        Inches(1.00),  # Region
-        Inches(1.10),  # Branch
-        Inches(1.70),  # Customer Name
-        Inches(1.20),  # Scheme Name
-        Inches(0.65),  # Months
-        Inches(1.25),  # A/c No./CIF.
-        Inches(1.15),  # Req. Loan Amount
-    ]
-
-    for table_row in table.rows:
-        for column_index, width in enumerate(column_widths):
-            table_row.cells[column_index].width = width
-
     grand_total_records = 0
     grand_total_amount = 0.0
 
+    # Zone 1 records -> Zone 1 Total -> Zone 2 records -> Zone 2 Total...
     for zone, zone_rows in sorted(
         zone_wise_rows.items(),
         key=lambda item: item[0].lower()
@@ -1349,30 +1892,32 @@ def download_loan_meeting_register(start_date=None, end_date=None):
         zone_total_records = 0
         zone_total_amount = 0.0
 
+        # All Regions under current Zone are included here.
         for row in zone_rows:
             record_row = table.add_row()
+            set_row_cant_split(record_row)
 
             for column_index, width in enumerate(column_widths):
                 record_row.cells[column_index].width = width
 
-            cif_id = row.get("cif_id") or ""
-            ac_no = row.get("ac_no") or ""
+            cif_id = str(row.get("cif_id") or "").strip()
+            ac_no = str(row.get("ac_no") or "").strip()
 
-            # Requirement: cif_id as A/c No./CIF.
-            # If CIF is blank, account number is used as fallback.
+            # Requirement says cif_id. Account number is fallback only
+            # if Finacle CIF is blank.
             account_or_cif = cif_id or ac_no
 
             requested_amount = safe_float(row.get("dis_amt"))
 
             values = [
                 zone,
-                row.get("region_name") or "",
-                row.get("sol_desc") or "",
-                row.get("acct_name") or "",
-                row.get("schm_desc") or "",
+                normalize_group_value(row.get("region_name"), default=""),
+                normalize_group_value(row.get("sol_desc"), default=""),
+                normalize_group_value(row.get("acct_name"), default=""),
+                normalize_group_value(row.get("schm_desc"), default=""),
                 "APR",
                 account_or_cif,
-                format_amount(requested_amount),
+                format_amount(requested_amount)
             ]
 
             for column_index, value in enumerate(values):
@@ -1381,7 +1926,7 @@ def download_loan_meeting_register(start_date=None, end_date=None):
                 if column_index in (5, 7):
                     alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-                set_docx_cell_text(
+                set_cell_text(
                     record_row.cells[column_index],
                     value,
                     bold=False,
@@ -1394,49 +1939,18 @@ def download_loan_meeting_register(start_date=None, end_date=None):
             grand_total_records += 1
             grand_total_amount += requested_amount
 
-        # Zone subtotal row: background #63A4F7.
-        # zone_total_row = table.add_row()
-
-        # for column_index, width in enumerate(column_widths):
-        #     zone_total_row.cells[column_index].width = width
-
-        # for cell in zone_total_row.cells:
-        #     set_docx_cell_background(cell, "63A4F7")
-
-        # # Merge columns Zone through A/c No./CIF.
-        # merged_cell = zone_total_row.cells[0].merge(zone_total_row.cells[6])
-
-        # set_docx_cell_text(
-        #     merged_cell,
-        #     "{0} Total — Records: {1}".format(
-        #         zone,
-        #         zone_total_records
-        #     ),
-        #     bold=True,
-        #     alignment=WD_ALIGN_PARAGRAPH.RIGHT,
-        #     font_size=8
-        # )
-
-        # set_docx_cell_text(
-        #     zone_total_row.cells[7],
-        #     format_amount(zone_total_amount),
-        #     bold=True,
-        #     alignment=WD_ALIGN_PARAGRAPH.CENTER,
-        #     font_size=8
-        # )
-
-        # Zone subtotal row: background #63A4F7.
-        # Keep all columns separate; do not merge cells.
+        # Exactly one total row for this Zone after all its Regions.
         zone_total_row = table.add_row()
+        set_row_cant_split(zone_total_row)
 
         for column_index, width in enumerate(column_widths):
             zone_total_row.cells[column_index].width = width
 
         for cell in zone_total_row.cells:
-            set_docx_cell_background(cell, "63A4F7")
+            set_cell_background(cell, "63A4F7")
 
-        # Label only in Zone column.
-        set_docx_cell_text(
+        # Total label only in Zone column. No merged cells.
+        set_cell_text(
             zone_total_row.cells[0],
             "{0} Total".format(zone),
             bold=True,
@@ -1444,9 +1958,9 @@ def download_loan_meeting_register(start_date=None, end_date=None):
             font_size=8
         )
 
-        # Keep Region through A/c No./CIF. columns blank.
+        # Region through A/c No./CIF. remain blank.
         for column_index in range(1, 7):
-            set_docx_cell_text(
+            set_cell_text(
                 zone_total_row.cells[column_index],
                 "",
                 bold=True,
@@ -1454,8 +1968,8 @@ def download_loan_meeting_register(start_date=None, end_date=None):
                 font_size=8
             )
 
-        # Total only in Req. Loan Amount column.
-        set_docx_cell_text(
+        # Zone amount only in final column.
+        set_cell_text(
             zone_total_row.cells[7],
             format_amount(zone_total_amount),
             bold=True,
@@ -1463,47 +1977,18 @@ def download_loan_meeting_register(start_date=None, end_date=None):
             font_size=8
         )
 
-    # Grand total row: background #D9E1F2.
-    # grand_total_row = table.add_row()
-
-    # for column_index, width in enumerate(column_widths):
-    #     grand_total_row.cells[column_index].width = width
-
-    # for cell in grand_total_row.cells:
-    #     set_docx_cell_background(cell, "D9E1F2")
-
-    # grand_merged_cell = grand_total_row.cells[0].merge(
-    #     grand_total_row.cells[6]
-    # )
-
-    # set_docx_cell_text(
-    #     grand_merged_cell,
-    #     "Grand Total — Records: {0}".format(grand_total_records),
-    #     bold=True,
-    #     alignment=WD_ALIGN_PARAGRAPH.RIGHT,
-    #     font_size=9
-    # )
-
-    # set_docx_cell_text(
-    #     grand_total_row.cells[7],
-    #     format_amount(grand_total_amount),
-    #     bold=True,
-    #     alignment=WD_ALIGN_PARAGRAPH.CENTER,
-    #     font_size=9
-    # )
-
-    # Grand total row: background #D9E1F2.
-    # Keep all columns separate; do not merge cells.
+    # One final Grand Total after all Zone groups.
     grand_total_row = table.add_row()
+    set_row_cant_split(grand_total_row)
 
     for column_index, width in enumerate(column_widths):
         grand_total_row.cells[column_index].width = width
 
     for cell in grand_total_row.cells:
-        set_docx_cell_background(cell, "D9E1F2")
+        set_cell_background(cell, "D9E1F2")
 
-    # Label only in Zone column.
-    set_docx_cell_text(
+    # Grand Total label only in Zone column. No merged cells.
+    set_cell_text(
         grand_total_row.cells[0],
         "Grand Total",
         bold=True,
@@ -1511,9 +1996,9 @@ def download_loan_meeting_register(start_date=None, end_date=None):
         font_size=9
     )
 
-    # Keep Region through A/c No./CIF. columns blank.
+    # Region through A/c No./CIF. remain blank.
     for column_index in range(1, 7):
-        set_docx_cell_text(
+        set_cell_text(
             grand_total_row.cells[column_index],
             "",
             bold=True,
@@ -1521,8 +2006,8 @@ def download_loan_meeting_register(start_date=None, end_date=None):
             font_size=9
         )
 
-    # Grand total amount only in Req. Loan Amount column.
-    set_docx_cell_text(
+    # Grand total amount only in final column.
+    set_cell_text(
         grand_total_row.cells[7],
         format_amount(grand_total_amount),
         bold=True,
@@ -1536,7 +2021,7 @@ def download_loan_meeting_register(start_date=None, end_date=None):
     summary.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
     summary_run = summary.add_run(
-        "Total Records: {0}    |    Total Requested Loan Amount: {1}".format(
+        "Total Records: {0} | Grand Total Requested Loan Amount: {1}".format(
             grand_total_records,
             format_amount(grand_total_amount)
         )
