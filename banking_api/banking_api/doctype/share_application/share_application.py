@@ -44,6 +44,27 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 
 
+def db_connection():
+    """Connect to external PostgreSQL (Finacle) using Finacle DB Credentials."""
+    try:
+        creds = frappe.get_single("Finacle DB Credentials")
+
+        port = int(creds.db_port) if creds.db_port else 5432
+
+        conn = psycopg2.connect(
+            host=creds.db_host,
+            port=port,
+            user=creds.db_user,
+            password=creds.get_password("db_password"),
+            database=creds.db_name
+        )
+        return conn
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(),
+                         "PostgreSQL Connection Failed")
+        frappe.throw(_("Database Connection Error: {0}").format(str(e)))
+
+
 def execute_finacle_query(query, params=None):
     """
     Execute a read-only query against Finacle PostgreSQL and return
