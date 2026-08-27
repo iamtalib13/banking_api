@@ -2393,92 +2393,92 @@ def download_loan_meeting_register(start_date=None, end_date=None):
         margin: 0;
         padding: 0;
         color: #000;
-        font-size: 13px;
+        font-size: 15px;
         font-family: "Noto Sans Devanagari", "Nirmala UI", "Kokila", sans-serif;
     }}
 
     .company-name {{
         text-align: center;
         font-weight: bold;
-        font-size: 19px;
-        margin: 0 0 4px;
+        font-size: 21px;
+        margin: 0 0 5px;
     }}
 
     .company-address {{
         text-align: center;
-        font-size: 13px;
-        margin: 0 0 9px;
+        font-size: 15px;
+        margin: 0 0 10px;
     }}
 
     .report-title {{
         text-align: center;
         font-weight: bold;
-        font-size: 18px;
-        margin: 4px 0;
+        font-size: 20px;
+        margin: 5px 0;
     }}
 
     .report-subtitle {{
         text-align: center;
         font-weight: bold;
-        font-size: 15px;
-        margin: 3px 0 10px;
+        font-size: 17px;
+        margin: 4px 0 12px;
     }}
 
     .content {{
-        font-size: 13px;
+        font-size: 15px;
         line-height: 1.45;
         text-align: justify;
-        margin: 7px 0;
+        margin: 8px 0;
     }}
 
     .content-bold {{
-        font-size: 13px;
+        font-size: 15px;
         font-weight: bold;
         line-height: 1.45;
-        margin: 7px 0;
+        margin: 8px 0;
     }}
 
     .right-content {{
-        font-size: 13px;
+        font-size: 15px;
         line-height: 1.40;
         text-align: right;
-        margin: 4px 0;
+        margin: 5px 0;
     }}
 
     .committee-table {{
         width: 94%;
-        margin: 10px auto;
+        margin: 12px auto;
         border-collapse: collapse;
-        font-size: 12px;
+        font-size: 14px;
     }}
 
     .committee-table th,
     .committee-table td {{
         border: 1px solid #000;
-        padding: 5px 6px;
+        padding: 6px 7px;
         vertical-align: middle;
     }}
 
     .committee-table th {{
         background-color: #D9E1F2;
         text-align: center;
-        font-size: 13px;
+        font-size: 15px;
         font-weight: bold;
     }}
 
     .loan-table {{
         width: 100%;
-        margin: 10px auto;
+        margin: 12px auto;
         border-collapse: collapse;
         table-layout: fixed;
         font-family: Arial, sans-serif;
-        font-size: 9.5px;
+        font-size: 11.5px;
     }}
 
     .loan-table th,
     .loan-table td {{
         border: 1px solid #000;
-        padding: 4px 3px;
+        padding: 5px 4px;
         vertical-align: middle;
         overflow-wrap: break-word;
         word-wrap: break-word;
@@ -2488,7 +2488,7 @@ def download_loan_meeting_register(start_date=None, end_date=None):
     .loan-table th {{
         background-color: #D9E1F2;
         text-align: center;
-        font-size: 10.5px;
+        font-size: 12.5px;
         font-weight: bold;
         line-height: 1.15;
     }}
@@ -2517,28 +2517,28 @@ def download_loan_meeting_register(start_date=None, end_date=None):
     .zone-total-row td {{
         background-color: #63A4F7;
         font-weight: bold;
-        font-size: 11.5px;
+        font-size: 13.5px;
         page-break-inside: avoid;
     }}
 
     .grand-total-row td {{
         background-color: #D9E1F2;
         font-weight: bold;
-        font-size: 12px;
+        font-size: 14px;
         page-break-inside: avoid;
     }}
 
     .signature-table {{
         width: 92%;
-        margin: 30px auto 0;
+        margin: 32px auto 0;
         border-collapse: collapse;
-        font-size: 14px;
+        font-size: 16px;
         font-weight: bold;
     }}
 
     .signature-table td {{
         width: 50%;
-        padding: 12px;
+        padding: 14px;
         text-align: center;
         vertical-align: top;
     }}
