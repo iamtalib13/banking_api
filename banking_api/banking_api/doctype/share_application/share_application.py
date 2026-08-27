@@ -1511,7 +1511,8 @@ def download_loan_meeting_register(start_date=None, end_date=None):
 
     add_unicode_paragraph(
         document,
-        "सदर सभेस खालील पदाधिकारी उपस्थित होते:",
+        "सदर सभेस खालील पदाधिकारी उपस्थित होते:"
+        "",
         bold=True,
         size=11,
         font_name="Kokila",
@@ -1521,6 +1522,7 @@ def download_loan_meeting_register(start_date=None, end_date=None):
     committee_table = document.add_table(rows=1, cols=3)
     committee_table.style = "Table Grid"
     committee_table.autofit = False
+    committee_table.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     committee_headers = [
         "अनु. क्र.",
@@ -1582,11 +1584,13 @@ def download_loan_meeting_register(start_date=None, end_date=None):
 
     add_unicode_paragraph(
         document,
-        "अध्यक्ष महोदयांच्या अनुमतीने सभेच्या कामकाजास प्रारंभ करण्यात आला.",
+        "अध्यक्ष महोदयांच्या अनुमतीने सभेच्या कामकाजास प्रारंभ करण्यात आला."
+        "",
         size=11,
-        alignment=WD_ALIGN_PARAGRAPH.JUSTIFY,
+        alignment=WD_ALIGN_PARAGRAPH.CENTER,
         font_name="Kokila",
-        space_before=5
+        space_before=5,
+        bold=True
     )
 
     add_unicode_paragraph(
@@ -1595,7 +1599,8 @@ def download_loan_meeting_register(start_date=None, end_date=None):
         bold=True,
         size=11,
         font_name="Kokila",
-        space_before=5
+        space_before=5,
+        alignment=WD_ALIGN_PARAGRAPH.JUSTIFY,
     )
 
     add_unicode_paragraph(
@@ -1613,18 +1618,20 @@ def download_loan_meeting_register(start_date=None, end_date=None):
     add_unicode_paragraph(
         document,
         "प्रस्तावक : मा. श्री. शुभम गोपाल भिमटे",
-        bold=True,
+        # bold=True,
         size=11,
         font_name="Kokila",
-        space_before=3
+        space_before=3,
+        alignment=WD_ALIGN_PARAGRAPH.RIGHT,
     )
 
     add_unicode_paragraph(
         document,
         "अनुमोदक : मा. श्री. दत्तात्रय श्यामराव सावंत",
-        bold=True,
+        # bold=True,
         size=11,
-        font_name="Kokila"
+        font_name="Kokila",
+        alignment=WD_ALIGN_PARAGRAPH.RIGHT,
     )
 
     add_unicode_paragraph(
@@ -1632,7 +1639,8 @@ def download_loan_meeting_register(start_date=None, end_date=None):
         "ठराव सर्व संमतीने मंजूर.",
         bold=True,
         size=11,
-        font_name="Kokila"
+        font_name="Kokila",
+        alignment=WD_ALIGN_PARAGRAPH.RIGHT,
     )
 
     add_unicode_paragraph(
@@ -1644,7 +1652,8 @@ def download_loan_meeting_register(start_date=None, end_date=None):
         bold=True,
         size=11,
         font_name="Kokila",
-        space_before=6
+        space_before=6,
+        alignment=WD_ALIGN_PARAGRAPH.JUSTIFY,
     )
 
     add_unicode_paragraph(
@@ -1728,12 +1737,12 @@ def download_loan_meeting_register(start_date=None, end_date=None):
     #     Inches(1.10),  # Req. Loan Amount
     # ]
     column_widths = [
-        Inches(0.48),  # Zone
-        Inches(0.52),  # Region
-        Inches(0.70),  # Branch
+        Inches(0.70),  # Zone
+        Inches(0.70),  # Region
+        Inches(0.98),  # Branch
         Inches(1.45),  # Customer Name
         Inches(1.45),  # Scheme Name
-        Inches(0.38),  # Months: APR
+        Inches(0.70),  # Months: APR
         Inches(0.82),  # A/c No./CIF.
         Inches(1.10),  # Req. Loan Amount
     ]
