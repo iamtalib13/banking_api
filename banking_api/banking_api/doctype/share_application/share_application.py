@@ -43,6 +43,7 @@ from docx.shared import Inches, Pt
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import re
+from docx.enum.text import WD_BREAK
 
 
 def db_connection():
@@ -1592,6 +1593,40 @@ def download_loan_meeting_register(start_date=None, end_date=None):
     if start_date_obj > end_date_obj:
         frappe.throw(_("Start Date cannot be greater than End Date."))
 
+    def add_unicode_paragraph(
+        document,
+        text="",
+        bold=False,
+        size=11,
+        alignment=WD_ALIGN_PARAGRAPH.LEFT,
+        font_name="Nirmala UI",
+        space_before=0,
+        space_after=0
+    ):
+        """
+        Add Hindi/Marathi Unicode text safely to a DOCX paragraph.
+        """
+        paragraph = document.add_paragraph()
+        paragraph.alignment = alignment
+
+        paragraph.paragraph_format.space_before = Pt(space_before)
+        paragraph.paragraph_format.space_after = Pt(space_after)
+        paragraph.paragraph_format.line_spacing = 1.15
+
+        run = paragraph.add_run(text)
+        run.bold = bold
+        run.font.name = font_name
+        run.font.size = Pt(size)
+
+        r_pr = run._element.get_or_add_rPr()
+        r_fonts = r_pr.rFonts
+        r_fonts.set(qn("w:ascii"), font_name)
+        r_fonts.set(qn("w:hAnsi"), font_name)
+        r_fonts.set(qn("w:cs"), font_name)
+        r_fonts.set(qn("w:eastAsia"), font_name)
+
+        return paragraph
+
     query = """
         SELECT
             g.cif_id,
@@ -1851,26 +1886,239 @@ def download_loan_meeting_register(start_date=None, end_date=None):
     normal_style.font.name = "Arial"
     normal_style.font.size = Pt(8)
 
-    title = document.add_paragraph()
-    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    meeting_date_text = start_date_obj.strftime("%d/%m/%Y")
 
-    title_run = title.add_run("LOAN MEETING REGISTER")
-    title_run.bold = True
-    title_run.font.name = "Arial"
-    title_run.font.size = Pt(15)
-
-    date_line = document.add_paragraph()
-    date_line.alignment = WD_ALIGN_PARAGRAPH.CENTER
-
-    date_run = date_line.add_run(
-        "Account Opening Date: {0} To {1}".format(
-            start_date_obj.strftime("%d-%m-%Y"),
-            end_date_obj.strftime("%d-%m-%Y")
-        )
+    add_unicode_paragraph(
+        document,
+        "सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि., गोंदिया",
+        bold=True,
+        size=15,
+        alignment=WD_ALIGN_PARAGRAPH.CENTER,
+        font_name="Kruti Dev 010"
     )
-    date_run.bold = True
-    date_run.font.name = "Arial"
-    date_run.font.size = Pt(9)
+
+    add_unicode_paragraph(
+        document,
+        "मुख्यालय: सहयोग हॉस्पिटल समोर, राणी अवंतीबाई चौक, रिंग रोड, गोंदिया",
+        bold=False,
+        size=10,
+        alignment=WD_ALIGN_PARAGRAPH.CENTER,
+        font_name="Kokila"
+    )
+
+    add_unicode_paragraph(
+        document,
+        "प्रोसिडिंग रजिस्टर",
+        bold=True,
+        size=14,
+        alignment=WD_ALIGN_PARAGRAPH.CENTER,
+        font_name="Kokila",
+        space_before=4
+    )
+
+    add_unicode_paragraph(
+        document,
+        "\"कर्ज समिती दैनिक सभा कार्यवृत्तांत\"",
+        bold=True,
+        size=12,
+        alignment=WD_ALIGN_PARAGRAPH.CENTER,
+        font_name="Kokila"
+    )
+
+    add_unicode_paragraph(
+        document,
+        (
+            f"आज दिनांक {meeting_date_text} रोजी सायंकाळी 05:00 वाजता "
+            "संस्थेच्या मुख्यालय, सहयोग हॉस्पिटल समोर, राणी अवंतीबाई चौक, "
+            "रिंग रोड, गोंदिया येथे कर्ज समितीची दैनिक सभा आयोजित करण्यात आली."
+        ),
+        size=11,
+        alignment=WD_ALIGN_PARAGRAPH.JUSTIFY,
+        font_name="Kokila",
+        space_before=5
+    )
+
+    add_unicode_paragraph(
+        document,
+        "सदर सभेस खालील पदाधिकारी उपस्थित होते:",
+        bold=True,
+        size=11,
+        font_name="Kokila",
+        space_before=4
+    )
+
+    committee_table = document.add_table(rows=1, cols=3)
+    committee_table.style = "Table Grid"
+    committee_table.autofit = False
+
+    committee_headers = [
+        "अनु. क्र.",
+        "पदाधिकारी / संचालक यांचे नाव",
+        "पद"
+    ]
+
+    committee_widths = [
+        Inches(0.65),
+        Inches(3.85),
+        Inches(2.40)
+    ]
+
+    for index, header in enumerate(committee_headers):
+        cell = committee_table.rows[0].cells[index]
+        cell.width = committee_widths[index]
+        set_cell_background(cell, "D9E1F2")
+        set_cell_text(
+            cell,
+            header,
+            bold=True,
+            alignment=WD_ALIGN_PARAGRAPH.CENTER,
+            font_size=9
+        )
+
+    committee_members = [
+        ("1", "श्री. जयेशचंद्र रमण रामादे", "अध्यक्ष"),
+        ("2", "श्री. दत्तात्रय श्यामराव सावंत", "उपाध्यक्ष"),
+        ("3", "श्री. शुभम गोपाल भिमटे", "संचालक"),
+        ("4", "श्री. विलास रामलाल वासनिक", "मुख्य कार्यकारी अधिकारी"),
+        ("5", "श्री. राजेश मनोहरलाल सोनी", "सहाय्यक क्षेत्रीय व्यवस्थापक"),
+    ]
+
+    for serial_no, member_name, designation in committee_members:
+        member_row = committee_table.add_row()
+        set_row_cant_split(member_row)
+
+        member_values = [
+            serial_no,
+            member_name,
+            designation
+        ]
+
+        for index, value in enumerate(member_values):
+            cell = member_row.cells[index]
+            cell.width = committee_widths[index]
+
+            set_cell_text(
+                cell,
+                value,
+                bold=False,
+                alignment=(
+                    WD_ALIGN_PARAGRAPH.CENTER
+                    if index in (0, 2)
+                    else WD_ALIGN_PARAGRAPH.LEFT
+                ),
+                font_size=9
+            )
+
+    add_unicode_paragraph(
+        document,
+        "अध्यक्ष महोदयांच्या अनुमतीने सभेच्या कामकाजास प्रारंभ करण्यात आला.",
+        size=11,
+        alignment=WD_ALIGN_PARAGRAPH.JUSTIFY,
+        font_name="Kokila",
+        space_before=5
+    )
+
+    add_unicode_paragraph(
+        document,
+        "विषय क्र. 1 : मागील सभेचे कार्यवृत्तांत वाचन करून कायम करणे.",
+        bold=True,
+        size=11,
+        font_name="Kokila",
+        space_before=5
+    )
+
+    add_unicode_paragraph(
+        document,
+        (
+            "ठराव क्र. 1 : मागील सभेचे कार्यवृत्तांत सभेसमोर वाचन करून सादर "
+            "करण्यात आले. सदर कार्यवृत्तांतावर सविस्तर साधक-बाधक चर्चा करून "
+            "ते सर्वानुमते मंजूर करण्यात आले."
+        ),
+        size=11,
+        alignment=WD_ALIGN_PARAGRAPH.JUSTIFY,
+        font_name="Kokila"
+    )
+
+    add_unicode_paragraph(
+        document,
+        "प्रस्तावक : मा. श्री. शुभम गोपाल भिमटे",
+        bold=True,
+        size=11,
+        font_name="Kokila",
+        space_before=3
+    )
+
+    add_unicode_paragraph(
+        document,
+        "अनुमोदक : मा. श्री. दत्तात्रय श्यामराव सावंत",
+        bold=True,
+        size=11,
+        font_name="Kokila"
+    )
+
+    add_unicode_paragraph(
+        document,
+        "ठराव सर्व संमतीने मंजूर.",
+        bold=True,
+        size=11,
+        font_name="Kokila"
+    )
+
+    add_unicode_paragraph(
+        document,
+        (
+            f"विषय क्र. 2 : दिनांक {meeting_date_text} रोजी मंजूर करण्यात "
+            "आलेल्या कर्ज प्रस्तावांना मान्यता देणे."
+        ),
+        bold=True,
+        size=11,
+        font_name="Kokila",
+        space_before=6
+    )
+
+    add_unicode_paragraph(
+        document,
+        (
+            f"ठराव क्र. 2 : दिनांक {meeting_date_text} रोजी प्राप्त झालेल्या "
+            "कर्ज अर्जांवर कार्यालयीन छाननी, परीक्षण व आवश्यक कार्यवाही पूर्ण करून "
+            "मंजुरीसाठी सभेसमोर सादर करण्यात आलेल्या कर्ज प्रस्तावांचा सविस्तर तपशील खालीलप्रमाणे आहे."
+        ),
+        size=11,
+        alignment=WD_ALIGN_PARAGRAPH.JUSTIFY,
+        font_name="Kokila"
+    )
+
+    add_unicode_paragraph(
+        document,
+        "झोननिहाय / शाखानिहाय / ग्राहक / सभासदनिहाय / योजनानिहाय कर्ज मंजुरीचा तपशील",
+        bold=True,
+        size=11,
+        alignment=WD_ALIGN_PARAGRAPH.CENTER,
+        font_name="Kokila",
+        space_before=6,
+        space_after=5
+    )
+
+    # title = document.add_paragraph()
+    # title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    # title_run = title.add_run("LOAN MEETING REGISTER")
+    # title_run.bold = True
+    # title_run.font.name = "Arial"
+    # title_run.font.size = Pt(15)
+
+    # date_line = document.add_paragraph()
+    # date_line.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    # date_run = date_line.add_run(
+    #     "Account Opening Date: {0} To {1}".format(
+    #         start_date_obj.strftime("%d-%m-%Y"),
+    #         end_date_obj.strftime("%d-%m-%Y")
+    #     )
+    # )
+    # date_run.bold = True
+    # date_run.font.name = "Arial"
+    # date_run.font.size = Pt(9)
 
     document.add_paragraph("")
 
@@ -2079,20 +2327,94 @@ def download_loan_meeting_register(start_date=None, end_date=None):
         font_size=9
     )
 
-    document.add_paragraph("")
+    # document.add_paragraph("")
 
-    summary = document.add_paragraph()
-    summary.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    # summary = document.add_paragraph()
+    # summary.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
-    summary_run = summary.add_run(
-        "Total Records: {0} | Grand Total Requested Loan Amount: {1}".format(
-            grand_total_records,
-            format_amount(grand_total_amount)
-        )
+    # summary_run = summary.add_run(
+    #     "Total Records: {0} | Grand Total Requested Loan Amount: {1}".format(
+    #         grand_total_records,
+    #         format_amount(grand_total_amount)
+    #     )
+    # )
+    # summary_run.bold = True
+    # summary_run.font.name = "Arial"
+    # summary_run.font.size = Pt(9)
+
+    add_unicode_paragraph(
+        document,
+        (
+            "यामध्ये डेली डिपॉझिट योजना, डेली डिपॉझिट तारण कर्ज, आरडी / एसएमबीजी "
+            "तारण कर्ज, मुदत ठेवीवरील कर्ज, वैयक्तिक कर्ज, कर्मचारी वैयक्तिक कर्ज, "
+            "वाहन कर्ज, वापरलेले वाहन कर्ज, सहयोग महिला उद्योजिका सक्षमीकरण योजना कर्ज, "
+            "संयुक्त दायित्व कर्ज, हॉस्पिटल व स्कूल कर्मचारी कर्ज तसेच इतर विविध कर्ज योजनांचा समावेश आहे."
+        ),
+        size=11,
+        alignment=WD_ALIGN_PARAGRAPH.JUSTIFY,
+        font_name="Kokila",
+        space_before=8
     )
-    summary_run.bold = True
-    summary_run.font.name = "Arial"
-    summary_run.font.size = Pt(9)
+
+    add_unicode_paragraph(
+        document,
+        (
+            "सदर सर्व कर्ज प्रस्तावांवर समितीच्या सभेत सविस्तर साधक-बाधक चर्चा करण्यात आली. "
+            "चर्चेनंतर कर्ज समितीने सदर सर्व कर्ज प्रस्तावांना सर्वानुमते मान्यता देण्यात आली."
+        ),
+        size=11,
+        alignment=WD_ALIGN_PARAGRAPH.JUSTIFY,
+        font_name="kruti Dev 010",
+        space_before=5
+    )
+
+    add_unicode_paragraph(
+        document,
+        (
+            f"त्यानुसार, कर्ज समितीच्या दिनांक {meeting_date_text} रोजीच्या "
+            "सभेचे कार्यवृत्त सर्वानुमते मंजूर करण्यात आले."
+        ),
+        bold=True,
+        size=11,
+        alignment=WD_ALIGN_PARAGRAPH.JUSTIFY,
+        font_name="Kokila",
+        space_before=5
+    )
+
+    add_unicode_paragraph(
+        document,
+        "",
+        size=11,
+        font_name="Kokila",
+        space_before=14
+    )
+
+    signature_table = document.add_table(rows=1, cols=2)
+    signature_table.autofit = False
+
+    signature_widths = [
+        Inches(3.40),
+        Inches(3.40)
+    ]
+
+    for index, width in enumerate(signature_widths):
+        signature_table.rows[0].cells[index].width = width
+
+    set_cell_text(
+        signature_table.rows[0].cells[0],
+        "मुख्य कार्यकारी अधिकारी\n\nसहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.\nमुख्यालय, गोंदिया",
+        bold=True,
+        alignment=WD_ALIGN_PARAGRAPH.CENTER,
+        font_size=10
+    )
+
+    set_cell_text(
+        signature_table.rows[0].cells[1],
+        "अध्यक्ष\n\nसहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.\nमुख्यालय, गोंदिया",
+        bold=True,
+        alignment=WD_ALIGN_PARAGRAPH.CENTER,
+        font_size=10
+    )
 
     file_buffer = io.BytesIO()
     document.save(file_buffer)
