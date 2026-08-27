@@ -1074,6 +1074,31 @@ def get_share_application_status_counts():
     return counts
 
 
+def normalize_group_value(value, default="Unassigned Zone"):
+    """
+    Normalize group values so 'Zone 1', ' Zone 1 ', and 'zone 1'
+    are treated as one group.
+    """
+    value = " ".join(str(value or "").split()).strip()
+    return value if value else default
+
+
+def set_row_cant_split(table_row):
+    """
+    Prevent one DOCX table row from breaking across pages.
+
+    If the row does not fit in the remaining page area, Word moves
+    the complete row to the next page.
+    """
+    tr_pr = table_row._tr.get_or_add_trPr()
+
+    cant_split = tr_pr.find(qn("w:cantSplit"))
+    if cant_split is None:
+        cant_split = OxmlElement("w:cantSplit")
+        cant_split.set(qn("w:val"), "true")
+        tr_pr.append(cant_split)
+
+
 @frappe.whitelist()
 def download_loan_meeting_register(start_date=None, end_date=None):
     """
