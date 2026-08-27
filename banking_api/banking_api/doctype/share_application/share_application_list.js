@@ -158,6 +158,10 @@ frappe.listview_settings["Share Application"] = {
         listview.page.add_inner_button(__("Proceeding Form"), () => {
             open_proceeding_form_dialog();
         }, action_label);
+
+        listview.page.add_inner_button(__("Loan Meeting Register"), () => {
+            open_loan_meeting_register_dialog();
+        }, action_label);
     }
 };
 
