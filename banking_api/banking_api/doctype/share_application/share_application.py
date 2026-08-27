@@ -1101,6 +1101,19 @@ def set_row_cant_split(table_row):
         tr_pr.append(cant_split)
 
 
+def normalize_branch_name(branch_name: str) -> str:
+    if not branch_name:
+        return branch_name
+
+    if branch_name.lower() == "main branch":
+        return "Gondia"
+
+    words = branch_name.split()
+    filtered = [w for w in words if w.lower() != "branch"]
+
+    return " ".join(filtered).strip()
+
+
 @frappe.whitelist()
 def download_loan_meeting_register(start_date=None, end_date=None):
     """
@@ -1407,7 +1420,10 @@ def download_loan_meeting_register(start_date=None, end_date=None):
         zone_wise_rows[zone].sort(
             key=lambda row: (
                 normalize_group_value(row.get("region_name"), default=""),
-                normalize_group_value(row.get("sol_desc"), default=""),
+                # normalize_group_value(row.get("sol_desc"), default=""),
+                normalize_branch_name(
+                    normalize_group_value(row.get("sol_desc"), default="")
+                ),
                 normalize_group_value(row.get("acct_name"), default=""),
                 normalize_group_value(row.get("cif_id"), default="")
             )
@@ -1763,7 +1779,10 @@ def download_loan_meeting_register(start_date=None, end_date=None):
             values = [
                 zone,
                 normalize_group_value(row.get("region_name"), default=""),
-                normalize_group_value(row.get("sol_desc"), default=""),
+                # normalize_group_value(row.get("sol_desc"), default=""),
+                normalize_branch_name(
+                    normalize_group_value(row.get("sol_desc"), default="")
+                ),
                 normalize_group_value(row.get("acct_name"), default=""),
                 normalize_group_value(row.get("schm_desc"), default=""),
                 "APR",
