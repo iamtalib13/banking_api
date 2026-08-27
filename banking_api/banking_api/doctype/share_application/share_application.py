@@ -1370,6 +1370,38 @@ def download_loan_meeting_register(start_date=None, end_date=None):
             grand_total_amount += requested_amount
 
         # Zone subtotal row: background #63A4F7.
+        # zone_total_row = table.add_row()
+
+        # for column_index, width in enumerate(column_widths):
+        #     zone_total_row.cells[column_index].width = width
+
+        # for cell in zone_total_row.cells:
+        #     set_docx_cell_background(cell, "63A4F7")
+
+        # # Merge columns Zone through A/c No./CIF.
+        # merged_cell = zone_total_row.cells[0].merge(zone_total_row.cells[6])
+
+        # set_docx_cell_text(
+        #     merged_cell,
+        #     "{0} Total — Records: {1}".format(
+        #         zone,
+        #         zone_total_records
+        #     ),
+        #     bold=True,
+        #     alignment=WD_ALIGN_PARAGRAPH.RIGHT,
+        #     font_size=8
+        # )
+
+        # set_docx_cell_text(
+        #     zone_total_row.cells[7],
+        #     format_amount(zone_total_amount),
+        #     bold=True,
+        #     alignment=WD_ALIGN_PARAGRAPH.CENTER,
+        #     font_size=8
+        # )
+
+        # Zone subtotal row: background #63A4F7.
+        # Keep all columns separate; do not merge cells.
         zone_total_row = table.add_row()
 
         for column_index, width in enumerate(column_widths):
@@ -1378,20 +1410,26 @@ def download_loan_meeting_register(start_date=None, end_date=None):
         for cell in zone_total_row.cells:
             set_docx_cell_background(cell, "63A4F7")
 
-        # Merge columns Zone through A/c No./CIF.
-        merged_cell = zone_total_row.cells[0].merge(zone_total_row.cells[6])
-
+        # Label only in Zone column.
         set_docx_cell_text(
-            merged_cell,
-            "{0} Total — Records: {1}".format(
-                zone,
-                zone_total_records
-            ),
+            zone_total_row.cells[0],
+            "{0} Total".format(zone),
             bold=True,
-            alignment=WD_ALIGN_PARAGRAPH.RIGHT,
+            alignment=WD_ALIGN_PARAGRAPH.LEFT,
             font_size=8
         )
 
+        # Keep Region through A/c No./CIF. columns blank.
+        for column_index in range(1, 7):
+            set_docx_cell_text(
+                zone_total_row.cells[column_index],
+                "",
+                bold=True,
+                alignment=WD_ALIGN_PARAGRAPH.LEFT,
+                font_size=8
+            )
+
+        # Total only in Req. Loan Amount column.
         set_docx_cell_text(
             zone_total_row.cells[7],
             format_amount(zone_total_amount),
@@ -1401,6 +1439,36 @@ def download_loan_meeting_register(start_date=None, end_date=None):
         )
 
     # Grand total row: background #D9E1F2.
+    # grand_total_row = table.add_row()
+
+    # for column_index, width in enumerate(column_widths):
+    #     grand_total_row.cells[column_index].width = width
+
+    # for cell in grand_total_row.cells:
+    #     set_docx_cell_background(cell, "D9E1F2")
+
+    # grand_merged_cell = grand_total_row.cells[0].merge(
+    #     grand_total_row.cells[6]
+    # )
+
+    # set_docx_cell_text(
+    #     grand_merged_cell,
+    #     "Grand Total — Records: {0}".format(grand_total_records),
+    #     bold=True,
+    #     alignment=WD_ALIGN_PARAGRAPH.RIGHT,
+    #     font_size=9
+    # )
+
+    # set_docx_cell_text(
+    #     grand_total_row.cells[7],
+    #     format_amount(grand_total_amount),
+    #     bold=True,
+    #     alignment=WD_ALIGN_PARAGRAPH.CENTER,
+    #     font_size=9
+    # )
+
+    # Grand total row: background #D9E1F2.
+    # Keep all columns separate; do not merge cells.
     grand_total_row = table.add_row()
 
     for column_index, width in enumerate(column_widths):
@@ -1409,18 +1477,26 @@ def download_loan_meeting_register(start_date=None, end_date=None):
     for cell in grand_total_row.cells:
         set_docx_cell_background(cell, "D9E1F2")
 
-    grand_merged_cell = grand_total_row.cells[0].merge(
-        grand_total_row.cells[6]
-    )
-
+    # Label only in Zone column.
     set_docx_cell_text(
-        grand_merged_cell,
-        "Grand Total — Records: {0}".format(grand_total_records),
+        grand_total_row.cells[0],
+        "Grand Total",
         bold=True,
-        alignment=WD_ALIGN_PARAGRAPH.RIGHT,
+        alignment=WD_ALIGN_PARAGRAPH.LEFT,
         font_size=9
     )
 
+    # Keep Region through A/c No./CIF. columns blank.
+    for column_index in range(1, 7):
+        set_docx_cell_text(
+            grand_total_row.cells[column_index],
+            "",
+            bold=True,
+            alignment=WD_ALIGN_PARAGRAPH.LEFT,
+            font_size=9
+        )
+
+    # Grand total amount only in Req. Loan Amount column.
     set_docx_cell_text(
         grand_total_row.cells[7],
         format_amount(grand_total_amount),
