@@ -158,6 +158,10 @@ frappe.listview_settings["Share Application"] = {
         listview.page.add_inner_button(__("Proceeding Form"), () => {
             open_proceeding_form_dialog();
         }, action_label);
+
+        listview.page.add_inner_button(__("Loan Meeting Register"), () => {
+            open_proceeding_form_dialog();
+        }, action_label);
     }
 };
 
@@ -605,4 +609,103 @@ function fix_share_application_header_layout(listview) {
         padding: "0",
         border: "0"
     });
+}
+
+
+// function open_loan_meeting_register_dialog() {
+//     const d = new frappe.ui.Dialog({
+//         title: __("Download Loan Meeting Register"),
+//         fields: [
+//             {
+//                 fieldname: "from_date",
+//                 label: __("From Date"),
+//                 fieldtype: "Date",
+//                 reqd: 1
+//             },
+//             {
+//                 fieldname: "to_date",
+//                 label: __("To Date"),
+//                 fieldtype: "Date",
+//                 reqd: 1
+//             }
+//         ],
+//         primary_action_label: __("Download"),
+//         primary_action(values) {
+//             if (!values.from_date || !values.to_date) {
+//                 frappe.msgprint(__("Please select both From Date and To Date."));
+//                 return;
+//             }
+
+//             if (values.from_date > values.to_date) {
+//                 frappe.msgprint(__("From Date cannot be greater than To Date."));
+//                 return;
+//             }
+
+//             const endpoint =
+//                 "/api/method/banking_api.banking_api.doctype.share_application.share_application.download_loan_meeting_register";
+
+//             const query_string = new URLSearchParams({
+//                 from_date: values.from_date,
+//                 to_date: values.to_date
+//             });
+
+//             window.open(`${endpoint}?${query_string.toString()}`, "_blank");
+
+//             d.hide();
+//         }
+//     });
+
+//     d.show();
+// }
+
+
+function open_proceeding_form_dialog() {
+    const d = new frappe.ui.Dialog({
+        title: __("Generate Loan Meeting Register"),
+        fields: [
+            {
+                fieldname: "start_date",
+                label: __("Start Date"),
+                fieldtype: "Date",
+                reqd: 1
+            },
+            {
+                fieldname: "end_date",
+                label: __("End Date"),
+                fieldtype: "Date",
+                reqd: 1
+            }
+        ],
+        primary_action_label: __("Download"),
+        primary_action(values) {
+            if (!values.start_date) {
+                frappe.msgprint(__("Please select Start Date."));
+                return;
+            }
+
+            if (!values.end_date) {
+                frappe.msgprint(__("Please select End Date."));
+                return;
+            }
+
+            if (values.start_date > values.end_date) {
+                frappe.msgprint(__("Start Date cannot be greater than End Date."));
+                return;
+            }
+
+            const method =
+                "banking_api.banking_api.doctype.share_application.share_application.download_loan_meeting_register";
+
+            const url =
+                `/api/method/${method}` +
+                `?start_date=${encodeURIComponent(values.start_date)}` +
+                `&end_date=${encodeURIComponent(values.end_date)}`;
+
+            window.open(url, "_blank");
+
+            d.hide();
+        }
+    });
+
+    d.show();
 }

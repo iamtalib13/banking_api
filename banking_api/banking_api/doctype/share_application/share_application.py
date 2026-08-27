@@ -31,6 +31,143 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 import json
 from PIL import Image
+from collections import defaultdict
+from decimal import Decimal, InvalidOperation
+
+from docx import Document as DocxDocument
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from docx.shared import Inches, Pt
+import psycopg2
+from psycopg2.extras import RealDictCursor
+import re
+from docx.enum.text import WD_BREAK
+from docx.enum.section import WD_ORIENT
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
+import html
+import re
+
+from frappe.utils.pdf import get_pdf
+
+
+def db_connection():
+    """Connect to external PostgreSQL (Finacle) using Finacle DB Credentials."""
+    try:
+        creds = frappe.get_single("Finacle DB Credentials")
+
+        port = int(creds.db_port) if creds.db_port else 5432
+
+        conn = psycopg2.connect(
+            host=creds.db_host,
+            port=port,
+            user=creds.db_user,
+            password=creds.get_password("db_password"),
+            database=creds.db_name
+        )
+        return conn
+
+    except Exception as e:
+        frappe.log_error(
+            frappe.get_traceback(),
+            "PostgreSQL Connection Failed"
+        )
+        frappe.throw(
+            _("Database Connection Error: {0}").format(str(e))
+        )
+
+
+def cint_safe(value, default=0):
+    try:
+        return int(value)
+    except Exception:
+        return default
+
+
+def execute_finacle_query(query, params=None):
+    """
+    Execute a read-only query against Finacle PostgreSQL and return
+    records as Frappe-style dictionaries.
+    """
+    conn = None
+    cursor = None
+
+    try:
+        conn = db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        cursor.execute(query, params or ())
+        rows = cursor.fetchall()
+
+        return [dict(row) for row in rows]
+
+    except Exception:
+        frappe.log_error(
+            frappe.get_traceback(),
+            "Finacle PostgreSQL Query Failed"
+        )
+        frappe.throw(_("Unable to fetch data from Finacle database."))
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
+
+
+def set_docx_cell_background(cell, hex_color):
+    """
+    Apply Word table-cell background colour.
+    Pass colour without '#', e.g. 'D9E1F2'.
+    """
+    tc_pr = cell._tc.get_or_add_tcPr()
+
+    shading = OxmlElement("w:shd")
+    shading.set(qn("w:fill"), hex_color.replace("#", ""))
+    shading.set(qn("w:val"), "clear")
+    tc_pr.append(shading)
+
+
+def set_docx_cell_text(
+    cell,
+    value,
+    *,
+    bold=False,
+    alignment=WD_ALIGN_PARAGRAPH.LEFT,
+    font_size=8
+):
+    """Set one formatted paragraph in a DOCX table cell."""
+    cell.text = ""
+    cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+
+    paragraph = cell.paragraphs[0]
+    paragraph.alignment = alignment
+
+    paragraph_format = paragraph.paragraph_format
+    paragraph_format.space_before = Pt(0)
+    paragraph_format.space_after = Pt(0)
+
+    run = paragraph.add_run(str(value if value is not None else ""))
+    run.bold = bold
+    run.font.name = "Arial"
+    run.font.size = Pt(font_size)
+
+
+def safe_float(value, default=0.0):
+    """Convert Finacle numeric values safely for totals."""
+    try:
+        if value in (None, ""):
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def format_amount(value):
+    """Format a numeric loan amount without currency symbol."""
+    return "{:,.2f}".format(safe_float(value))
 
 
 class ShareApplication(Document):
@@ -943,3 +1080,1651 @@ def get_share_application_status_counts():
             counts[status] = row.get("count", 0)
 
     return counts
+
+
+# def normalize_group_value(value, default="Unassigned Zone"):
+#     """
+#     Normalize group values so 'Zone 1', ' Zone 1 ', and 'zone 1'
+#     are treated as one group.
+#     """
+#     value = " ".join(str(value or "").split()).strip()
+#     return value if value else default
+
+
+def set_row_cant_split(table_row):
+    """
+    Prevent one DOCX table row from breaking across pages.
+
+    If the row does not fit in the remaining page area, Word moves
+    the complete row to the next page.
+    """
+    tr_pr = table_row._tr.get_or_add_trPr()
+
+    cant_split = tr_pr.find(qn("w:cantSplit"))
+    if cant_split is None:
+        cant_split = OxmlElement("w:cantSplit")
+        cant_split.set(qn("w:val"), "true")
+        tr_pr.append(cant_split)
+
+
+def normalize_branch_name(branch_name: str) -> str:
+    if not branch_name:
+        return branch_name
+
+    if branch_name.lower() == "main branch":
+        return "Gondia"
+
+    words = branch_name.split()
+    filtered = [w for w in words if w.lower() != "branch"]
+
+    return " ".join(filtered).strip()
+
+
+# @frappe.whitelist()
+# def download_loan_meeting_register(start_date=None, end_date=None):
+#     """
+#     Generate and download a zone-wise Loan Meeting Register DOCX.
+
+#     Grouping order:
+#     1. Zone
+#     2. Region
+#     3. Branch
+#     4. Customer Name
+
+#     Output columns:
+#     Zone | Region | Branch | Customer Name | Scheme Name | Months |
+#     A/c No./CIF. | Req. Loan Amount
+#     """
+
+#     if not start_date:
+#         frappe.throw(_("Start Date is required."))
+
+#     if not end_date:
+#         frappe.throw(_("End Date is required."))
+
+#     try:
+#         start_date_obj = getdate(start_date)
+#         end_date_obj = getdate(end_date)
+#     except Exception:
+#         frappe.throw(_("Please select valid Start Date and End Date."))
+
+#     if start_date_obj > end_date_obj:
+#         frappe.throw(_("Start Date cannot be greater than End Date."))
+
+#     def add_unicode_paragraph(
+#         document,
+#         text="",
+#         bold=False,
+#         size=11,
+#         alignment=WD_ALIGN_PARAGRAPH.LEFT,
+#         font_name="Nirmala UI",
+#         space_before=0,
+#         space_after=0
+#     ):
+#         """
+#         Add Hindi/Marathi Unicode text safely to a DOCX paragraph.
+#         """
+#         paragraph = document.add_paragraph()
+#         paragraph.alignment = alignment
+
+#         paragraph.paragraph_format.space_before = Pt(space_before)
+#         paragraph.paragraph_format.space_after = Pt(space_after)
+#         paragraph.paragraph_format.line_spacing = 1.15
+
+#         run = paragraph.add_run(text)
+#         run.bold = bold
+#         run.font.name = font_name
+#         run.font.size = Pt(size)
+
+#         r_pr = run._element.get_or_add_rPr()
+#         r_fonts = r_pr.rFonts
+#         r_fonts.set(qn("w:ascii"), font_name)
+#         r_fonts.set(qn("w:hAnsi"), font_name)
+#         r_fonts.set(qn("w:cs"), font_name)
+#         r_fonts.set(qn("w:eastAsia"), font_name)
+
+#         return paragraph
+
+#     query = """
+#         SELECT
+#             g.cif_id,
+#             g.foracid AS ac_no,
+#             g.acct_name,
+#             g.acct_opn_date,
+#             g.acct_cls_date,
+#             g.sol_id,
+#             s.sol_desc,
+
+#             CASE
+#                 WHEN g.schm_type = 'LAA'
+#                 THEN l.dis_amt
+#                 ELSE lh.sanct_lim
+#             END AS dis_amt,
+
+#             lr.flow_amt,
+#             e.interest_rate,
+#             g.clr_bal_amt,
+#             g.cum_cr_amt AS total_amt_received,
+#             g.schm_code,
+#             g2.schm_desc,
+#             g.schm_type,
+
+#             CASE
+#                 WHEN g.schm_type = 'LAA'
+#                 THEN l.rep_perd_mths
+#                 ELSE NULL
+#             END AS rep_perd_mths,
+
+#             l2.lim_exp_date,
+
+#             CASE
+#                 WHEN g.schm_type = 'LAA'
+#                 THEN l.ei_perd_start_date
+#                 ELSE NULL
+#             END AS ei_perd_start_date,
+
+#             CASE
+#                 WHEN g.schm_type = 'LAA'
+#                 THEN l.ei_perd_end_date
+#                 ELSE NULL
+#             END AS ei_perd_end_date,
+
+#             g.acct_cls_flg,
+#             a.address_line1,
+#             a.address_line2,
+#             s.division_name,
+#             s.region_name,
+#             s.circle_office_name
+
+#         FROM tbaadm.gam g
+
+#         JOIN tbaadm.sol s
+#             ON g.sol_id = s.sol_id
+
+#         JOIN tbaadm.gsp g2
+#             ON g.schm_code = g2.schm_code
+
+#         LEFT JOIN crmuser.accounts a
+#             ON g.cif_id = a.orgkey
+
+#         LEFT JOIN tbaadm.lam l
+#             ON g.acid = l.acid
+
+#         LEFT JOIN tbaadm.eit e
+#             ON e.entity_id = g.acid
+
+#         LEFT JOIN tbaadm.lht l2
+#             ON l2.acid = g.acid
+
+#         LEFT JOIN (
+#             SELECT DISTINCT ON (acid)
+#                 acid,
+#                 sanct_lim
+#             FROM tbaadm.lht
+#             ORDER BY acid, applicable_date DESC
+#         ) lh
+#             ON lh.acid = g.acid
+
+#         LEFT JOIN (
+#             SELECT
+#                 acid,
+#                 MAX(flow_amt) AS flow_amt
+#             FROM tbaadm.lrs
+#             GROUP BY acid
+#         ) lr
+#             ON lr.acid = g.acid
+
+#         WHERE (
+#             g.schm_type = 'LAA'
+#             OR g.schm_code IN ('1301', '1302', '3028', '3047', '3050')
+#         )
+#         AND g.entity_cre_flg = 'Y'
+#         AND g.del_flg = 'N'
+#         AND g.acct_opn_date BETWEEN %(start_date)s AND %(end_date)s
+
+#         ORDER BY
+#             s.circle_office_name NULLS LAST,
+#             s.region_name NULLS LAST,
+#             s.sol_desc NULLS LAST,
+#             g.acct_name NULLS LAST,
+#             g.foracid NULLS LAST
+#     """
+
+#     params = {
+#         "start_date": start_date_obj,
+#         "end_date": end_date_obj
+#     }
+
+#     # This executes the PostgreSQL query through Finacle connection.
+#     rows = execute_finacle_query(query, params)
+
+#     if not rows:
+#         frappe.msgprint(
+#             _("No loan records found for the selected date range."),
+#             title=_("No Records"),
+#             indicator="orange"
+#         )
+#         return
+
+#     # def normalize_group_value(value, default=""):
+#     #     """
+#     #     Prevent duplicate groups caused by whitespace differences.
+#     #     Example:
+#     #     ' Nagpur Zone ', 'Nagpur   Zone' -> 'Nagpur Zone'
+#     #     """
+#     #     value = " ".join(str(value or "").split()).strip()
+#     #     return value if value else default
+#     def normalize_group_value(value, default=""):
+#         """
+#         Basic cleanup for Region, Branch, Customer and other display values.
+#         """
+#         value = " ".join(str(value or "").split()).strip()
+#         return value if value else default
+
+#     def normalize_zone_name(value):
+#         """
+#         Convert multiple Finacle zone formats to one canonical key.
+
+#         Examples:
+#         ZONE 1  -> Zone 1
+#         Zone-1  -> Zone 1
+#         zone_1  -> Zone 1
+#         ZONE-01 -> Zone 1
+#         """
+#         raw_value = normalize_group_value(value, default="")
+
+#         if not raw_value:
+#             return "Unassigned Zone"
+
+#         normalized = raw_value.upper()
+#         normalized = normalized.replace("_", " ")
+#         normalized = normalized.replace("-", " ")
+#         normalized = " ".join(normalized.split())
+
+#         # Normalise numbered zone values.
+#         # ZONE 1 / ZONE 01 / ZONE-1 become Zone 1.
+#         match = re.fullmatch(r"ZONE\s*0*(\d+)", normalized)
+#         if match:
+#             return "Zone {0}".format(int(match.group(1)))
+
+#         # For nonstandard zone values, preserve a readable title style.
+#         return raw_value.title()
+
+#     def safe_float(value, default=0.0):
+#         """Safely convert Finacle amounts to float for summation."""
+#         try:
+#             if value in (None, ""):
+#                 return default
+#             return float(value)
+#         except (TypeError, ValueError):
+#             return default
+
+#     def format_amount(value):
+#         """Format report amount without a currency sign."""
+#         return "{:,.2f}".format(safe_float(value))
+
+#     def set_cell_background(cell, hex_color):
+#         """
+#         Set background colour of one DOCX table cell.
+#         Use hex color without #, e.g. D9E1F2.
+#         """
+#         tc_pr = cell._tc.get_or_add_tcPr()
+
+#         shading = OxmlElement("w:shd")
+#         shading.set(qn("w:fill"), hex_color.replace("#", ""))
+#         shading.set(qn("w:val"), "clear")
+#         tc_pr.append(shading)
+
+#     def set_row_cant_split(table_row):
+#         """
+#         Do not split one table row across two pages.
+#         If row does not fit, Word moves the row to the next page.
+#         """
+#         tr_pr = table_row._tr.get_or_add_trPr()
+
+#         cant_split = OxmlElement("w:cantSplit")
+#         cant_split.set(qn("w:val"), "true")
+#         tr_pr.append(cant_split)
+
+#     def set_cell_text(
+#         cell,
+#         value,
+#         bold=False,
+#         alignment=WD_ALIGN_PARAGRAPH.LEFT,
+#         font_size=7
+#     ):
+#         """Apply standard text formatting to a DOCX table cell."""
+#         cell.text = ""
+#         cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+
+#         paragraph = cell.paragraphs[0]
+#         paragraph.alignment = alignment
+
+#         paragraph.paragraph_format.space_before = Pt(0)
+#         paragraph.paragraph_format.space_after = Pt(0)
+#         paragraph.paragraph_format.line_spacing = 1
+
+#         run = paragraph.add_run(str(value if value is not None else ""))
+#         run.bold = bold
+#         run.font.name = "Arial"
+#         run.font.size = Pt(font_size)
+
+#     # Group only by canonical Zone value.
+#     # Thus Zone-1, ZONE 1, and Zone 1 become the same Zone 1 group.
+#     zone_wise_rows = {}
+
+#     for row in rows:
+#         zone = normalize_zone_name(
+#             row.get("circle_office_name")
+#         )
+
+#         zone_wise_rows.setdefault(zone, []).append(row)
+
+#     # Ensure all records within each Zone are ordered by Region, Branch,
+#     # Customer Name, then CIF ID.
+#     for zone in zone_wise_rows:
+#         zone_wise_rows[zone].sort(
+#             key=lambda row: (
+#                 normalize_group_value(row.get("region_name"), default=""),
+#                 # normalize_group_value(row.get("sol_desc"), default=""),
+#                 normalize_branch_name(
+#                     normalize_group_value(row.get("sol_desc"), default="")
+#                 ),
+#                 normalize_group_value(row.get("acct_name"), default=""),
+#                 normalize_group_value(row.get("cif_id"), default="")
+#             )
+#         )
+
+#     document = DocxDocument()
+
+#     # section = document.sections[0]
+#     # section.top_margin = Inches(0.45)
+#     # section.bottom_margin = Inches(0.45)
+#     # section.left_margin = Inches(0.30)
+#     # section.right_margin = Inches(0.30)
+
+#     # normal_style = document.styles["Normal"]
+#     # normal_style.font.name = "Arial"
+#     # normal_style.font.size = Pt(8)
+
+#     section = document.sections[0]
+
+#     # A4 Portrait
+#     section.page_width = Inches(8.27)
+#     section.page_height = Inches(11.69)
+
+#     section.top_margin = Inches(0.50)
+#     section.bottom_margin = Inches(0.50)
+#     section.left_margin = Inches(0.35)
+#     section.right_margin = Inches(0.35)
+
+#     section.header_distance = Inches(0.15)
+#     section.footer_distance = Inches(0.15)
+
+#     meeting_date_text = start_date_obj.strftime("%d/%m/%Y")
+
+#     add_unicode_paragraph(
+#         document,
+#         "सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि., गोंदिया",
+#         bold=True,
+#         size=15,
+#         alignment=WD_ALIGN_PARAGRAPH.CENTER,
+#         font_name="Kruti Dev 010"
+#     )
+
+#     add_unicode_paragraph(
+#         document,
+#         "मुख्यालय: सहयोग हॉस्पिटल समोर, राणी अवंतीबाई चौक, रिंग रोड, गोंदिया",
+#         bold=False,
+#         size=10,
+#         alignment=WD_ALIGN_PARAGRAPH.CENTER,
+#         font_name="Kokila"
+#     )
+
+#     add_unicode_paragraph(
+#         document,
+#         "प्रोसिडिंग रजिस्टर",
+#         bold=True,
+#         size=14,
+#         alignment=WD_ALIGN_PARAGRAPH.CENTER,
+#         font_name="Kokila",
+#         space_before=4
+#     )
+
+#     add_unicode_paragraph(
+#         document,
+#         "\"कर्ज समिती दैनिक सभा कार्यवृत्तांत\"",
+#         bold=True,
+#         size=12,
+#         alignment=WD_ALIGN_PARAGRAPH.CENTER,
+#         font_name="Kokila"
+#     )
+
+#     add_unicode_paragraph(
+#         document,
+#         (
+#             f"आज दिनांक {meeting_date_text} रोजी सायंकाळी 05:00 वाजता "
+#             "संस्थेच्या मुख्यालय, सहयोग हॉस्पिटल समोर, राणी अवंतीबाई चौक, "
+#             "रिंग रोड, गोंदिया येथे कर्ज समितीची दैनिक सभा आयोजित करण्यात आली."
+#         ),
+#         size=11,
+#         alignment=WD_ALIGN_PARAGRAPH.JUSTIFY,
+#         font_name="Kokila",
+#         space_before=5
+#     )
+
+#     add_unicode_paragraph(
+#         document,
+#         "सदर सभेस खालील पदाधिकारी उपस्थित होते:"
+#         "",
+#         bold=True,
+#         size=11,
+#         font_name="Kokila",
+#         space_before=4
+#     )
+
+#     add_unicode_paragraph(
+#         document,
+#         "",
+#         size=11,
+#         font_name="Kokila",
+#         space_before=14
+#     )
+
+#     committee_table = document.add_table(rows=1, cols=3)
+#     committee_table.style = "Table Grid"
+#     committee_table.autofit = False
+#     committee_table.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+#     committee_headers = [
+#         "अनु. क्र.",
+#         "पदाधिकारी / संचालक यांचे नाव",
+#         "पद"
+#     ]
+
+#     committee_widths = [
+#         Inches(0.65),
+#         Inches(3.85),
+#         Inches(2.40)
+#     ]
+
+#     for index, header in enumerate(committee_headers):
+#         cell = committee_table.rows[0].cells[index]
+#         cell.width = committee_widths[index]
+#         set_cell_background(cell, "D9E1F2")
+#         set_cell_text(
+#             cell,
+#             header,
+#             bold=True,
+#             alignment=WD_ALIGN_PARAGRAPH.CENTER,
+#             font_size=9
+#         )
+
+#     committee_members = [
+#         ("1", "श्री. जयेशचंद्र रमण रामादे", "अध्यक्ष"),
+#         ("2", "श्री. दत्तात्रय श्यामराव सावंत", "उपाध्यक्ष"),
+#         ("3", "श्री. शुभम गोपाल भिमटे", "संचालक"),
+#         ("4", "श्री. विलास रामलाल वासनिक", "मुख्य कार्यकारी अधिकारी"),
+#         ("5", "श्री. राजेश मनोहरलाल सोनी", "सहाय्यक क्षेत्रीय व्यवस्थापक"),
+#     ]
+
+#     for serial_no, member_name, designation in committee_members:
+#         member_row = committee_table.add_row()
+#         set_row_cant_split(member_row)
+
+#         member_values = [
+#             serial_no,
+#             member_name,
+#             designation
+#         ]
+
+#         for index, value in enumerate(member_values):
+#             cell = member_row.cells[index]
+#             cell.width = committee_widths[index]
+
+#             set_cell_text(
+#                 cell,
+#                 value,
+#                 bold=False,
+#                 alignment=(
+#                     WD_ALIGN_PARAGRAPH.CENTER
+#                     if index in (0, 2)
+#                     else WD_ALIGN_PARAGRAPH.LEFT
+#                 ),
+#                 font_size=9
+#             )
+
+#     add_unicode_paragraph(
+#         document,
+#         "अध्यक्ष महोदयांच्या अनुमतीने सभेच्या कामकाजास प्रारंभ करण्यात आला."
+#         "",
+#         size=11,
+#         alignment=WD_ALIGN_PARAGRAPH.CENTER,
+#         font_name="Kokila",
+#         space_before=5,
+#         bold=True
+#     )
+
+#     add_unicode_paragraph(
+#         document,
+#         "विषय क्र. 1 : मागील सभेचे कार्यवृत्तांत वाचन करून कायम करणे.",
+#         bold=True,
+#         size=11,
+#         font_name="Kokila",
+#         space_before=5,
+#         alignment=WD_ALIGN_PARAGRAPH.JUSTIFY,
+#     )
+
+#     add_unicode_paragraph(
+#         document,
+#         (
+#             "ठराव क्र. 1 : मागील सभेचे कार्यवृत्तांत सभेसमोर वाचन करून सादर "
+#             "करण्यात आले. सदर कार्यवृत्तांतावर सविस्तर साधक-बाधक चर्चा करून "
+#             "ते सर्वानुमते मंजूर करण्यात आले."
+#         ),
+#         size=11,
+#         alignment=WD_ALIGN_PARAGRAPH.JUSTIFY,
+#         font_name="Kokila"
+#     )
+
+#     add_unicode_paragraph(
+#         document,
+#         "प्रस्तावक : मा. श्री. शुभम गोपाल भिमटे",
+#         # bold=True,
+#         size=11,
+#         font_name="Kokila",
+#         space_before=3,
+#         alignment=WD_ALIGN_PARAGRAPH.RIGHT,
+#     )
+
+#     add_unicode_paragraph(
+#         document,
+#         "अनुमोदक : मा. श्री. दत्तात्रय श्यामराव सावंत",
+#         # bold=True,
+#         size=11,
+#         font_name="Kokila",
+#         alignment=WD_ALIGN_PARAGRAPH.RIGHT,
+#     )
+
+#     add_unicode_paragraph(
+#         document,
+#         "ठराव सर्व संमतीने मंजूर.",
+#         bold=True,
+#         size=11,
+#         font_name="Kokila",
+#         alignment=WD_ALIGN_PARAGRAPH.RIGHT,
+#     )
+
+#     add_unicode_paragraph(
+#         document,
+#         (
+#             f"विषय क्र. 2 : दिनांक {meeting_date_text} रोजी मंजूर करण्यात "
+#             "आलेल्या कर्ज प्रस्तावांना मान्यता देणे."
+#         ),
+#         bold=True,
+#         size=11,
+#         font_name="Kokila",
+#         space_before=6,
+#         alignment=WD_ALIGN_PARAGRAPH.JUSTIFY,
+#     )
+
+#     add_unicode_paragraph(
+#         document,
+#         (
+#             f"ठराव क्र. 2 : दिनांक {meeting_date_text} रोजी प्राप्त झालेल्या "
+#             "कर्ज अर्जांवर कार्यालयीन छाननी, परीक्षण व आवश्यक कार्यवाही पूर्ण करून "
+#             "मंजुरीसाठी सभेसमोर सादर करण्यात आलेल्या कर्ज प्रस्तावांचा सविस्तर तपशील खालीलप्रमाणे आहे."
+#         ),
+#         size=11,
+#         alignment=WD_ALIGN_PARAGRAPH.JUSTIFY,
+#         font_name="Kokila"
+#     )
+
+#     add_unicode_paragraph(
+#         document,
+#         "झोननिहाय / शाखानिहाय / ग्राहक / सभासदनिहाय / योजनानिहाय कर्ज मंजुरीचा तपशील",
+#         bold=True,
+#         size=11,
+#         alignment=WD_ALIGN_PARAGRAPH.CENTER,
+#         font_name="Kokila",
+#         space_before=6,
+#         space_after=5
+#     )
+
+#     # title = document.add_paragraph()
+#     # title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+#     # title_run = title.add_run("LOAN MEETING REGISTER")
+#     # title_run.bold = True
+#     # title_run.font.name = "Arial"
+#     # title_run.font.size = Pt(15)
+
+#     # date_line = document.add_paragraph()
+#     # date_line.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+#     # date_run = date_line.add_run(
+#     #     "Account Opening Date: {0} To {1}".format(
+#     #         start_date_obj.strftime("%d-%m-%Y"),
+#     #         end_date_obj.strftime("%d-%m-%Y")
+#     #     )
+#     # )
+#     # date_run.bold = True
+#     # date_run.font.name = "Arial"
+#     # date_run.font.size = Pt(9)
+
+#     document.add_paragraph("")
+
+#     headers = [
+#         "Zone",
+#         "Region",
+#         "Branch",
+#         "Customer Name",
+#         "Scheme Name",
+#         "Months",
+#         "A/c No./CIF.",
+#         "Req. Loan Amount"
+#     ]
+
+#     table = document.add_table(rows=1, cols=len(headers))
+#     table.style = "Table Grid"
+#     table.autofit = False
+#     # Center the complete table horizontally within page margins.
+#     table.alignment = WD_TABLE_ALIGNMENT.CENTER
+
+#     # Force fixed layout so Word does not expand columns due to long text.
+#     tbl_pr = table._tbl.tblPr
+
+#     tbl_layout = OxmlElement("w:tblLayout")
+#     tbl_layout.set(qn("w:type"), "fixed")
+#     tbl_pr.append(tbl_layout)
+
+#     # column_widths = [
+#     #     Inches(0.95),  # Zone
+#     #     Inches(0.95),  # Region
+#     #     Inches(1.10),  # Branch
+#     #     Inches(1.70),  # Customer Name
+#     #     Inches(1.20),  # Scheme Name
+#     #     Inches(0.60),  # Months
+#     #     Inches(1.20),  # A/c No./CIF.
+#     #     Inches(1.10),  # Req. Loan Amount
+#     # ]
+#     column_widths = [
+#         Inches(0.70),  # Zone
+#         Inches(0.70),  # Region
+#         Inches(0.98),  # Branch
+#         Inches(1.45),  # Customer Name
+#         Inches(1.45),  # Scheme Name
+#         Inches(0.70),  # Months: APR
+#         Inches(0.82),  # A/c No./CIF.
+#         Inches(1.10),  # Req. Loan Amount
+#     ]
+
+#     header_row = table.rows[0]
+#     set_row_cant_split(header_row)
+
+#     for column_index, header in enumerate(headers):
+#         header_cell = header_row.cells[column_index]
+#         header_cell.width = column_widths[column_index]
+
+#         set_cell_background(header_cell, "D9E1F2")
+
+#         set_cell_text(
+#             header_cell,
+#             header,
+#             bold=True,
+#             alignment=WD_ALIGN_PARAGRAPH.CENTER,
+#             font_size=8
+#         )
+
+#     grand_total_records = 0
+#     grand_total_amount = 0.0
+
+#     # Zone 1 records -> Zone 1 Total -> Zone 2 records -> Zone 2 Total...
+#     # for zone, zone_rows in sorted(
+#     #     zone_wise_rows.items(),
+#     #     key=lambda item: item[0].lower()
+#     # ):
+
+#     def zone_sort_key(zone_name):
+#         """
+#         Sort numeric zones logically:
+#         Zone 1, Zone 2, Zone 3 ... Zone 10
+#         instead of Zone 1, Zone 10, Zone 2.
+#         """
+#         match = re.fullmatch(r"Zone\s+(\d+)", zone_name, flags=re.IGNORECASE)
+
+#         if match:
+#             return (0, int(match.group(1)))
+
+#         return (1, zone_name.lower())
+
+#     for zone, zone_rows in sorted(
+#         zone_wise_rows.items(),
+#         key=lambda item: zone_sort_key(item[0])
+#     ):
+#         zone_total_records = 0
+#         zone_total_amount = 0.0
+
+#         # All Regions under current Zone are included here.
+#         for row in zone_rows:
+#             record_row = table.add_row()
+#             set_row_cant_split(record_row)
+
+#             for column_index, width in enumerate(column_widths):
+#                 record_row.cells[column_index].width = width
+
+#             cif_id = str(row.get("cif_id") or "").strip()
+#             ac_no = str(row.get("ac_no") or "").strip()
+
+#             # Requirement says cif_id. Account number is fallback only
+#             # if Finacle CIF is blank.
+#             account_or_cif = cif_id or ac_no
+
+#             requested_amount = safe_float(row.get("dis_amt"))
+
+#             # values = [
+#             #     zone,
+#             #     normalize_group_value(row.get("region_name"), default=""),
+#             #     normalize_group_value(row.get("sol_desc"), default=""),
+#             #     normalize_group_value(row.get("acct_name"), default=""),
+#             #     normalize_group_value(row.get("schm_desc"), default=""),
+#             #     "APR",
+#             #     account_or_cif,
+#             #     format_amount(requested_amount)
+#             # ]
+#             values = [
+#                 zone,
+#                 normalize_group_value(row.get("region_name"), default=""),
+#                 # normalize_group_value(row.get("sol_desc"), default=""),
+#                 normalize_branch_name(
+#                     normalize_group_value(row.get("sol_desc"), default="")
+#                 ),
+#                 normalize_group_value(row.get("acct_name"), default=""),
+#                 normalize_group_value(row.get("schm_desc"), default=""),
+#                 "APR",
+#                 account_or_cif,
+#                 format_amount(requested_amount)
+#             ]
+
+#             for column_index, value in enumerate(values):
+#                 alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+#                 if column_index in (5, 7):
+#                     alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+#                 set_cell_text(
+#                     record_row.cells[column_index],
+#                     value,
+#                     bold=False,
+#                     alignment=alignment,
+#                     font_size=7
+#                 )
+
+#             zone_total_records += 1
+#             zone_total_amount += requested_amount
+#             grand_total_records += 1
+#             grand_total_amount += requested_amount
+
+#         # Exactly one total row for this Zone after all its Regions.
+#         zone_total_row = table.add_row()
+#         set_row_cant_split(zone_total_row)
+
+#         for column_index, width in enumerate(column_widths):
+#             zone_total_row.cells[column_index].width = width
+
+#         for cell in zone_total_row.cells:
+#             set_cell_background(cell, "63A4F7")
+
+#         # Total label only in Zone column. No merged cells.
+#         set_cell_text(
+#             zone_total_row.cells[0],
+#             "{0} Total".format(zone),
+#             bold=True,
+#             alignment=WD_ALIGN_PARAGRAPH.LEFT,
+#             font_size=8
+#         )
+
+#         # Region through A/c No./CIF. remain blank.
+#         for column_index in range(1, 7):
+#             set_cell_text(
+#                 zone_total_row.cells[column_index],
+#                 "",
+#                 bold=True,
+#                 alignment=WD_ALIGN_PARAGRAPH.LEFT,
+#                 font_size=8
+#             )
+
+#         # Zone amount only in final column.
+#         set_cell_text(
+#             zone_total_row.cells[7],
+#             format_amount(zone_total_amount),
+#             bold=True,
+#             alignment=WD_ALIGN_PARAGRAPH.CENTER,
+#             font_size=8
+#         )
+
+#     # One final Grand Total after all Zone groups.
+#     grand_total_row = table.add_row()
+#     set_row_cant_split(grand_total_row)
+
+#     for column_index, width in enumerate(column_widths):
+#         grand_total_row.cells[column_index].width = width
+
+#     for cell in grand_total_row.cells:
+#         set_cell_background(cell, "D9E1F2")
+
+#     # Grand Total label only in Zone column. No merged cells.
+#     set_cell_text(
+#         grand_total_row.cells[0],
+#         "Grand Total",
+#         bold=True,
+#         alignment=WD_ALIGN_PARAGRAPH.LEFT,
+#         font_size=9
+#     )
+
+#     # Region through A/c No./CIF. remain blank.
+#     for column_index in range(1, 7):
+#         set_cell_text(
+#             grand_total_row.cells[column_index],
+#             "",
+#             bold=True,
+#             alignment=WD_ALIGN_PARAGRAPH.LEFT,
+#             font_size=9
+#         )
+
+#     # Grand total amount only in final column.
+#     set_cell_text(
+#         grand_total_row.cells[7],
+#         format_amount(grand_total_amount),
+#         bold=True,
+#         alignment=WD_ALIGN_PARAGRAPH.CENTER,
+#         font_size=9
+#     )
+
+#     # document.add_paragraph("")
+
+#     # summary = document.add_paragraph()
+#     # summary.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+#     # summary_run = summary.add_run(
+#     #     "Total Records: {0} | Grand Total Requested Loan Amount: {1}".format(
+#     #         grand_total_records,
+#     #         format_amount(grand_total_amount)
+#     #     )
+#     # )
+#     # summary_run.bold = True
+#     # summary_run.font.name = "Arial"
+#     # summary_run.font.size = Pt(9)
+
+#     add_unicode_paragraph(
+#         document,
+#         (
+#             "यामध्ये डेली डिपॉझिट योजना, डेली डिपॉझिट तारण कर्ज, आरडी / एसएमबीजी "
+#             "तारण कर्ज, मुदत ठेवीवरील कर्ज, वैयक्तिक कर्ज, कर्मचारी वैयक्तिक कर्ज, "
+#             "वाहन कर्ज, वापरलेले वाहन कर्ज, सहयोग महिला उद्योजिका सक्षमीकरण योजना कर्ज, "
+#             "संयुक्त दायित्व कर्ज, हॉस्पिटल व स्कूल कर्मचारी कर्ज तसेच इतर विविध कर्ज योजनांचा समावेश आहे."
+#         ),
+#         size=11,
+#         alignment=WD_ALIGN_PARAGRAPH.JUSTIFY,
+#         font_name="Kokila",
+#         space_before=8
+#     )
+
+#     add_unicode_paragraph(
+#         document,
+#         "",
+#         size=11,
+#         font_name="Kokila",
+#         space_before=14
+#     )
+
+#     add_unicode_paragraph(
+#         document,
+#         (
+#             "सदर सर्व कर्ज प्रस्तावांवर समितीच्या सभेत सविस्तर साधक-बाधक चर्चा करण्यात आली. "
+#             "चर्चेनंतर कर्ज समितीने सदर सर्व कर्ज प्रस्तावांना सर्वानुमते मान्यता देण्यात आली."
+#         ),
+#         size=11,
+#         alignment=WD_ALIGN_PARAGRAPH.JUSTIFY,
+#         font_name="kruti Dev 010",
+#         space_before=5
+#     )
+
+#     add_unicode_paragraph(
+#         document,
+#         "",
+#         size=11,
+#         font_name="Kokila",
+#         space_before=14
+#     )
+
+#     add_unicode_paragraph(
+#         document,
+#         (
+#             f"त्यानुसार, कर्ज समितीच्या दिनांक {meeting_date_text} रोजीच्या "
+#             "सभेचे कार्यवृत्त सर्वानुमते मंजूर करण्यात आले."
+#         ),
+#         bold=True,
+#         size=11,
+#         alignment=WD_ALIGN_PARAGRAPH.JUSTIFY,
+#         font_name="Kokila",
+#         space_before=5
+#     )
+
+#     add_unicode_paragraph(
+#         document,
+#         "",
+#         size=11,
+#         font_name="Kokila",
+#         space_before=14
+#     )
+
+#     signature_table = document.add_table(rows=1, cols=2)
+#     signature_table.autofit = False
+#     signature_table.alignment = WD_TABLE_ALIGNMENT.CENTER
+
+#     signature_widths = [
+#         Inches(3.40),
+#         Inches(3.40)
+#     ]
+
+#     for index, width in enumerate(signature_widths):
+#         signature_table.rows[0].cells[index].width = width
+
+#     set_cell_text(
+#         signature_table.rows[0].cells[0],
+#         "मुख्य कार्यकारी अधिकारी\n\nसहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.\nमुख्यालय, गोंदिया",
+#         bold=True,
+#         alignment=WD_ALIGN_PARAGRAPH.CENTER,
+#         font_size=10
+#     )
+
+#     set_cell_text(
+#         signature_table.rows[0].cells[1],
+#         "अध्यक्ष\n\nसहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.\nमुख्यालय, गोंदिया",
+#         bold=True,
+#         alignment=WD_ALIGN_PARAGRAPH.CENTER,
+#         font_size=10
+#     )
+
+#     file_buffer = io.BytesIO()
+#     document.save(file_buffer)
+#     file_buffer.seek(0)
+
+#     frappe.response.filename = (
+#         "Loan_Meeting_Register_{0}_to_{1}.docx".format(
+#             start_date_obj.strftime("%Y-%m-%d"),
+#             end_date_obj.strftime("%Y-%m-%d")
+#         )
+#     )
+#     frappe.response.filecontent = file_buffer.getvalue()
+#     frappe.response.type = "download"
+#     frappe.response.display_content_as = "attachment"
+
+
+@frappe.whitelist()
+def download_loan_meeting_register(start_date=None, end_date=None):
+    """
+    Generate and download a Zone-wise Loan Meeting Register as PDF.
+
+    Data is fetched from Finacle PostgreSQL.
+    Records are grouped zone-wise:
+        Zone 1 records -> Zone 1 Total
+        Zone 2 records -> Zone 2 Total
+        ...
+        Grand Total
+    """
+
+    if not start_date:
+        frappe.throw(_("Start Date is required."))
+
+    if not end_date:
+        frappe.throw(_("End Date is required."))
+
+    try:
+        start_date_obj = getdate(start_date)
+        end_date_obj = getdate(end_date)
+    except Exception:
+        frappe.throw(_("Please select valid Start Date and End Date."))
+
+    if start_date_obj > end_date_obj:
+        frappe.throw(_("Start Date cannot be greater than End Date."))
+
+    query = """
+        SELECT
+            g.cif_id,
+            g.foracid AS ac_no,
+            g.acct_name,
+            g.acct_opn_date,
+            g.acct_cls_date,
+            g.sol_id,
+            s.sol_desc,
+
+            CASE
+                WHEN g.schm_type = 'LAA'
+                THEN l.dis_amt
+                ELSE lh.sanct_lim
+            END AS dis_amt,
+
+            lr.flow_amt,
+            e.interest_rate,
+            g.clr_bal_amt,
+            g.cum_cr_amt AS total_amt_received,
+            g.schm_code,
+            g2.schm_desc,
+            g.schm_type,
+
+            CASE
+                WHEN g.schm_type = 'LAA'
+                THEN l.rep_perd_mths
+                ELSE NULL
+            END AS rep_perd_mths,
+
+            l2.lim_exp_date,
+
+            CASE
+                WHEN g.schm_type = 'LAA'
+                THEN l.ei_perd_start_date
+                ELSE NULL
+            END AS ei_perd_start_date,
+
+            CASE
+                WHEN g.schm_type = 'LAA'
+                THEN l.ei_perd_end_date
+                ELSE NULL
+            END AS ei_perd_end_date,
+
+            g.acct_cls_flg,
+            a.address_line1,
+            a.address_line2,
+            s.division_name,
+            s.region_name,
+            s.circle_office_name
+
+        FROM tbaadm.gam g
+
+        JOIN tbaadm.sol s
+            ON g.sol_id = s.sol_id
+
+        JOIN tbaadm.gsp g2
+            ON g.schm_code = g2.schm_code
+
+        LEFT JOIN crmuser.accounts a
+            ON g.cif_id = a.orgkey
+
+        LEFT JOIN tbaadm.lam l
+            ON g.acid = l.acid
+
+        LEFT JOIN tbaadm.eit e
+            ON e.entity_id = g.acid
+
+        LEFT JOIN tbaadm.lht l2
+            ON l2.acid = g.acid
+
+        LEFT JOIN (
+            SELECT DISTINCT ON (acid)
+                acid,
+                sanct_lim
+            FROM tbaadm.lht
+            ORDER BY acid, applicable_date DESC
+        ) lh
+            ON lh.acid = g.acid
+
+        LEFT JOIN (
+            SELECT
+                acid,
+                MAX(flow_amt) AS flow_amt
+            FROM tbaadm.lrs
+            GROUP BY acid
+        ) lr
+            ON lr.acid = g.acid
+
+        WHERE (
+            g.schm_type = 'LAA'
+            OR g.schm_code IN ('1301', '1302', '3028', '3047', '3050')
+        )
+        AND g.entity_cre_flg = 'Y'
+        AND g.del_flg = 'N'
+        AND g.acct_opn_date BETWEEN %(start_date)s AND %(end_date)s
+
+        ORDER BY
+            s.circle_office_name NULLS LAST,
+            s.region_name NULLS LAST,
+            s.sol_desc NULLS LAST,
+            g.acct_name NULLS LAST,
+            g.foracid NULLS LAST
+    """
+
+    params = {
+        "start_date": start_date_obj,
+        "end_date": end_date_obj
+    }
+
+    rows = execute_finacle_query(query, params)
+
+    if not rows:
+        frappe.msgprint(
+            _("No loan records found for the selected date range."),
+            title=_("No Records"),
+            indicator="orange"
+        )
+        return
+
+    def esc(value):
+        """Escape data before placing it into HTML."""
+        return html.escape(str(value or ""))
+
+    def normalize_group_value(value, default=""):
+        """Normalize spaces in fields used for grouping and display."""
+        value = " ".join(str(value or "").split()).strip()
+        return value if value else default
+
+    def normalize_zone_name(value):
+        """
+        Convert source formats into consistent zone values.
+
+        ZONE 1, Zone-1, zone_1, ZONE-01 -> Zone 1
+        """
+        raw_value = normalize_group_value(value, default="")
+
+        if not raw_value:
+            return "Unassigned Zone"
+
+        normalized = raw_value.upper()
+        normalized = normalized.replace("_", " ")
+        normalized = normalized.replace("-", " ")
+        normalized = " ".join(normalized.split())
+
+        match = re.fullmatch(r"ZONE\s*0*(\d+)", normalized)
+        if match:
+            return "Zone {0}".format(int(match.group(1)))
+
+        return raw_value.title()
+
+    def zone_sort_key(zone_name):
+        """Sort numeric zones as Zone 1, Zone 2 ... Zone 10."""
+        match = re.fullmatch(
+            r"Zone\s+(\d+)",
+            zone_name,
+            flags=re.IGNORECASE
+        )
+
+        if match:
+            return (0, int(match.group(1)))
+
+        return (1, zone_name.lower())
+
+    def safe_float(value, default=0.0):
+        """Safely convert Finacle amounts for total calculation."""
+        try:
+            if value in (None, ""):
+                return default
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
+    def format_amount(value):
+        """Format loan amount without a currency symbol."""
+        return "{:,.2f}".format(safe_float(value))
+
+    # Group records only by normalized Zone.
+    zone_wise_rows = {}
+
+    for row in rows:
+        zone = normalize_zone_name(row.get("circle_office_name"))
+        zone_wise_rows.setdefault(zone, []).append(row)
+
+    # Sort all records within every zone.
+    for zone in zone_wise_rows:
+        zone_wise_rows[zone].sort(
+            key=lambda row: (
+                normalize_group_value(row.get("region_name"), default=""),
+                normalize_branch_name(
+                    normalize_group_value(row.get("sol_desc"), default="")
+                ),
+                normalize_group_value(row.get("acct_name"), default=""),
+                normalize_group_value(row.get("cif_id"), default="")
+            )
+        )
+
+    report_rows = []
+    grand_total_records = 0
+    grand_total_amount = 0.0
+
+    for zone, zone_rows in sorted(
+        zone_wise_rows.items(),
+        key=lambda item: zone_sort_key(item[0])
+    ):
+        zone_total_amount = 0.0
+
+        for row in zone_rows:
+            cif_id = str(row.get("cif_id") or "").strip()
+            ac_no = str(row.get("ac_no") or "").strip()
+            account_or_cif = cif_id or ac_no
+
+            requested_amount = safe_float(row.get("dis_amt"))
+
+            region = normalize_group_value(
+                row.get("region_name"),
+                default=""
+            )
+
+            branch = normalize_branch_name(
+                normalize_group_value(
+                    row.get("sol_desc"),
+                    default=""
+                )
+            )
+
+            customer_name = normalize_group_value(
+                row.get("acct_name"),
+                default=""
+            )
+
+            scheme_name = normalize_group_value(
+                row.get("schm_desc"),
+                default=""
+            )
+
+            report_rows.append(f"""
+                <tr class="data-row">
+                    <td>{esc(zone)}</td>
+                    <td>{esc(region)}</td>
+                    <td>{esc(branch)}</td>
+                    <td>{esc(customer_name)}</td>
+                    <td>{esc(scheme_name)}</td>
+                    <td class="center-cell">APR</td>
+                    <td class="center-cell">{esc(account_or_cif)}</td>
+                    <td class="amount-cell">{esc(format_amount(requested_amount))}</td>
+                </tr>
+            """)
+
+            zone_total_amount += requested_amount
+            grand_total_amount += requested_amount
+            grand_total_records += 1
+
+        # Exactly one total row after every complete zone.
+        report_rows.append(f"""
+            <tr class="zone-total-row">
+                <td>{esc(zone)} Total</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td class="amount-cell">{esc(format_amount(zone_total_amount))}</td>
+            </tr>
+        """)
+
+    # One final grand total after all zones.
+    report_rows.append(f"""
+        <tr class="grand-total-row">
+            <td>Grand Total</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td class="amount-cell">{esc(format_amount(grand_total_amount))}</td>
+        </tr>
+    """)
+
+    meeting_date_text = start_date_obj.strftime("%d/%m/%Y")
+
+    report_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+
+        <style>
+    @page {{
+        size: A4 portrait;
+        margin: 12mm 7mm 14mm 7mm;
+    }}
+
+    * {{
+        box-sizing: border-box;
+    }}
+
+    body {{
+        margin: 0;
+        padding: 0;
+        color: #000;
+        font-size: 15px;
+        font-family: "Noto Sans Devanagari", "Nirmala UI", "Kokila", sans-serif;
+    }}
+
+    .company-name {{
+        text-align: center;
+        font-weight: bold;
+        font-size: 21px;
+        margin: 0 0 5px;
+    }}
+
+    .company-address {{
+        text-align: center;
+        font-size: 15px;
+        margin: 0 0 10px;
+    }}
+
+    .report-title {{
+        text-align: center;
+        font-weight: bold;
+        font-size: 20px;
+        margin: 5px 0;
+    }}
+
+    .report-subtitle {{
+        text-align: center;
+        font-weight: bold;
+        font-size: 17px;
+        margin: 4px 0 12px;
+    }}
+
+    .content {{
+        font-size: 15px;
+        line-height: 1.45;
+        text-align: justify;
+        margin: 8px 0;
+    }}
+
+    .content-bold {{
+        font-size: 15px;
+        font-weight: bold;
+        line-height: 1.45;
+        margin: 8px 0;
+    }}
+
+    .right-content {{
+        font-size: 15px;
+        line-height: 1.40;
+        text-align: right;
+        margin: 5px 0;
+    }}
+
+    .committee-table {{
+        width: 94%;
+        margin: 12px auto;
+        border-collapse: collapse;
+        font-size: 14px;
+    }}
+
+    .committee-table th,
+    .committee-table td {{
+        border: 1px solid #000;
+        padding: 6px 7px;
+        vertical-align: middle;
+    }}
+
+    .committee-table th {{
+        background-color: #D9E1F2;
+        text-align: center;
+        font-size: 15px;
+        font-weight: bold;
+    }}
+
+    .loan-table {{
+        width: 100%;
+        margin: 12px auto;
+        border-collapse: collapse;
+        table-layout: fixed;
+        font-family: Arial, sans-serif;
+        font-size: 11.5px;
+    }}
+
+    .loan-table th,
+    .loan-table td {{
+        border: 1px solid #000;
+        padding: 5px 4px;
+        vertical-align: middle;
+        overflow-wrap: break-word;
+        word-wrap: break-word;
+        line-height: 1.20;
+    }}
+
+    .loan-table th {{
+        background-color: #D9E1F2;
+        text-align: center;
+        font-size: 12.5px;
+        font-weight: bold;
+        line-height: 1.15;
+    }}
+
+    .loan-table tr {{
+        page-break-inside: avoid;
+    }}
+
+    .loan-table thead {{
+        display: table-header-group;
+    }}
+
+    .loan-table tfoot {{
+        display: table-footer-group;
+    }}
+
+    .center-cell {{
+        text-align: center;
+    }}
+
+    .amount-cell {{
+        text-align: right;
+        white-space: nowrap;
+    }}
+
+    .zone-total-row td {{
+        background-color: #63A4F7;
+        font-weight: bold;
+        font-size: 13.5px;
+        page-break-inside: avoid;
+    }}
+
+    .grand-total-row td {{
+        background-color: #D9E1F2;
+        font-weight: bold;
+        font-size: 14px;
+        page-break-inside: avoid;
+    }}
+
+    .signature-table {{
+        width: 92%;
+        margin: 32px auto 0;
+        border-collapse: collapse;
+        font-size: 16px;
+        font-weight: bold;
+    }}
+
+    .signature-table td {{
+        width: 50%;
+        padding: 14px;
+        text-align: center;
+        vertical-align: top;
+    }}
+</style>
+    </head>
+
+    <body>
+        <div class="company-name">
+            सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि., गोंदिया
+        </div>
+
+        <div class="company-address">
+            मुख्यालय: सहयोग हॉस्पिटल समोर, राणी अवंतीबाई चौक, रिंग रोड, गोंदिया
+        </div>
+
+        <div class="report-title">प्रोसिडिंग रजिस्टर</div>
+
+        <div class="report-subtitle">
+            "कर्ज समिती दैनिक सभा कार्यवृत्तांत"
+        </div>
+
+        <p class="content">
+            आज दिनांक {meeting_date_text} रोजी सायंकाळी 05:00 वाजता संस्थेच्या मुख्यालय,
+            सहयोग हॉस्पिटल समोर, राणी अवंतीबाई चौक, रिंग रोड, गोंदिया येथे कर्ज समितीची
+            दैनिक सभा आयोजित करण्यात आली.
+        </p>
+
+        <p class="content-bold">
+            सदर सभेस खालील पदाधिकारी उपस्थित होते:
+        </p>
+
+        <table class="committee-table">
+            <thead>
+                <tr>
+                    <th style="width: 10%;">अनु. क्र.</th>
+                    <th style="width: 55%;">पदाधिकारी / संचालक यांचे नाव</th>
+                    <th style="width: 35%;">पद</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <tr>
+                    <td style="text-align:center;">1</td>
+                    <td>श्री. जयेशचंद्र रमण रामादे</td>
+                    <td style="text-align:center;">अध्यक्ष</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;">2</td>
+                    <td>श्री. दत्तात्रय श्यामराव सावंत</td>
+                    <td style="text-align:center;">उपाध्यक्ष</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;">3</td>
+                    <td>श्री. शुभम गोपाल भिमटे</td>
+                    <td style="text-align:center;">संचालक</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;">4</td>
+                    <td>श्री. विलास रामलाल वासनिक</td>
+                    <td style="text-align:center;">मुख्य कार्यकारी अधिकारी</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center;">5</td>
+                    <td>श्री. राजेश मनोहरलाल सोनी</td>
+                    <td style="text-align:center;">सहाय्यक क्षेत्रीय व्यवस्थापक</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p class="content-bold" style="text-align:center;">
+            अध्यक्ष महोदयांच्या अनुमतीने सभेच्या कामकाजास प्रारंभ करण्यात आला.
+        </p>
+
+        <p class="content-bold">
+            विषय क्र. 1 : मागील सभेचे कार्यवृत्तांत वाचन करून कायम करणे.
+        </p>
+
+        <p class="content">
+            ठराव क्र. 1 : मागील सभेचे कार्यवृत्तांत सभेसमोर वाचन करून सादर करण्यात आले.
+            सदर कार्यवृत्तांतावर सविस्तर साधक-बाधक चर्चा करून ते सर्वानुमते मंजूर करण्यात आले.
+        </p>
+
+        <p class="right-content">
+            प्रस्तावक : मा. श्री. शुभम गोपाल भिमटे
+        </p>
+
+        <p class="right-content">
+            अनुमोदक : मा. श्री. दत्तात्रय श्यामराव सावंत
+        </p>
+
+        <p class="right-content" style="font-weight:bold;">
+            ठराव सर्व संमतीने मंजूर.
+        </p>
+
+        <p class="content-bold">
+            विषय क्र. 2 : दिनांक {meeting_date_text} रोजी मंजूर करण्यात आलेल्या
+            कर्ज प्रस्तावांना मान्यता देणे.
+        </p>
+
+        <p class="content">
+            ठराव क्र. 2 : दिनांक {meeting_date_text} रोजी प्राप्त झालेल्या कर्ज अर्जांवर
+            कार्यालयीन छाननी, परीक्षण व आवश्यक कार्यवाही पूर्ण करून मंजुरीसाठी सभेसमोर
+            सादर करण्यात आलेल्या कर्ज प्रस्तावांचा सविस्तर तपशील खालीलप्रमाणे आहे.
+        </p>
+
+        <p class="content-bold" style="text-align:center;">
+            झोननिहाय / शाखानिहाय / ग्राहक / सभासदनिहाय / योजनानिहाय कर्ज मंजुरीचा तपशील
+        </p>
+
+        <table class="loan-table">
+            <thead>
+                <tr>
+                    <th style="width:7%;">Zone</th>
+<th style="width:7%;">Region</th>
+<th style="width:10%;">Branch</th>
+<th style="width:22%;">Customer Name</th>
+<th style="width:20%;">Scheme Name</th>
+<th style="width:6%;">Months</th>
+<th style="width:11%;">A/c No./CIF.</th>
+<th style="width:17%;">Req. Loan Amount</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {"".join(report_rows)}
+            </tbody>
+        </table>
+
+        <p class="content">
+            यामध्ये डेली डिपॉझिट योजना, डेली डिपॉझिट तारण कर्ज, आरडी / एसएमबीजी तारण कर्ज,
+            मुदत ठेवीवरील कर्ज, वैयक्तिक कर्ज, कर्मचारी वैयक्तिक कर्ज, वाहन कर्ज,
+            वापरलेले वाहन कर्ज, सहयोग महिला उद्योजिका सक्षमीकरण योजना कर्ज,
+            संयुक्त दायित्व कर्ज, हॉस्पिटल व स्कूल कर्मचारी कर्ज तसेच इतर विविध
+            कर्ज योजनांचा समावेश आहे.
+        </p>
+
+        <p class="content">
+            सदर सर्व कर्ज प्रस्तावांवर समितीच्या सभेत सविस्तर साधक-बाधक चर्चा करण्यात आली.
+            चर्चेनंतर कर्ज समितीने सदर सर्व कर्ज प्रस्तावांना सर्वानुमते मान्यता देण्यात आली.
+        </p>
+
+        <p class="content-bold">
+            त्यानुसार, कर्ज समितीच्या दिनांक {meeting_date_text} रोजीच्या सभेचे कार्यवृत्त
+            सर्वानुमते मंजूर करण्यात आले.
+        </p>
+
+        <table class="signature-table">
+            <tr>
+                <td>
+                    मुख्य कार्यकारी अधिकारी<br><br>
+                    सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.<br>
+                    मुख्यालय, गोंदिया
+                </td>
+                <td>
+                    अध्यक्ष<br><br>
+                    सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.<br>
+                    मुख्यालय, गोंदिया
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+
+    pdf_options = {
+        "page-size": "A4",
+        "orientation": "Portrait",
+        "margin-top": "12mm",
+        "margin-right": "7mm",
+        "margin-bottom": "14mm",
+        "margin-left": "7mm",
+        "encoding": "UTF-8",
+        "quiet": "",
+        "footer-right": "Page [page] of [toPage]",
+        "footer-font-size": "7",
+        "footer-spacing": "3"
+    }
+
+    pdf_content = get_pdf(report_html, pdf_options)
+
+    frappe.response.filename = (
+        "Loan_Meeting_Register_{0}_to_{1}.pdf".format(
+            start_date_obj.strftime("%Y-%m-%d"),
+            end_date_obj.strftime("%Y-%m-%d")
+        )
+    )
+    frappe.response.filecontent = pdf_content
+    frappe.response.type = "download"
+    frappe.response.display_content_as = "attachment"
