@@ -31,6 +31,49 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 import json
 from PIL import Image
+from collections import defaultdict
+from decimal import Decimal, InvalidOperation
+
+from docx import Document as DocxDocument
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from docx.shared import Inches, Pt
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
+
+def execute_finacle_query(query, params=None):
+    """
+    Execute a read-only query against Finacle PostgreSQL and return
+    records as Frappe-style dictionaries.
+    """
+    conn = None
+    cursor = None
+
+    try:
+        conn = db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        cursor.execute(query, params or ())
+        rows = cursor.fetchall()
+
+        return [dict(row) for row in rows]
+
+    except Exception:
+        frappe.log_error(
+            frappe.get_traceback(),
+            "Finacle PostgreSQL Query Failed"
+        )
+        frappe.throw(_("Unable to fetch data from Finacle database."))
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if conn:
+            conn.close()
 
 
 class ShareApplication(Document):
