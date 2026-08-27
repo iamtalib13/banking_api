@@ -60,9 +60,20 @@ def db_connection():
         )
         return conn
     except Exception as e:
-        frappe.log_error(frappe.get_traceback(),
-                         "PostgreSQL Connection Failed")
-        frappe.throw(_("Database Connection Error: {0}").format(str(e)))
+        frappe.log_error(
+            frappe.get_traceback(),
+            "PostgreSQL Connection Failed"
+        )
+        frappe.throw(
+            _("Database Connection Error: {0}").format(str(e))
+        )
+
+
+def cint_safe(value, default=0):
+    try:
+        return int(value)
+    except Exception:
+        return default
 
 
 def execute_finacle_query(query, params=None):
