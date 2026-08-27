@@ -694,7 +694,7 @@ function open_proceeding_form_dialog() {
             }
 
             const method =
-                "banking_api.banking_api.doctype.share_application.share_application.download_loan_meeting_register";
+                "banking_api.banking_api.doctype.share_application.share_application.download_loan_meeting_register_pdf";
 
             const url =
                 `/api/method/${method}` +
