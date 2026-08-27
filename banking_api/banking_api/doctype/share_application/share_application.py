@@ -42,6 +42,7 @@ from docx.oxml.ns import qn
 from docx.shared import Inches, Pt
 import psycopg2
 from psycopg2.extras import RealDictCursor
+import re
 
 
 def db_connection():
@@ -1074,13 +1075,13 @@ def get_share_application_status_counts():
     return counts
 
 
-def normalize_group_value(value, default="Unassigned Zone"):
-    """
-    Normalize group values so 'Zone 1', ' Zone 1 ', and 'zone 1'
-    are treated as one group.
-    """
-    value = " ".join(str(value or "").split()).strip()
-    return value if value else default
+# def normalize_group_value(value, default="Unassigned Zone"):
+#     """
+#     Normalize group values so 'Zone 1', ' Zone 1 ', and 'zone 1'
+#     are treated as one group.
+#     """
+#     value = " ".join(str(value or "").split()).strip()
+#     return value if value else default
 
 
 def set_row_cant_split(table_row):
@@ -1712,14 +1713,49 @@ def download_loan_meeting_register(start_date=None, end_date=None):
         )
         return
 
+    # def normalize_group_value(value, default=""):
+    #     """
+    #     Prevent duplicate groups caused by whitespace differences.
+    #     Example:
+    #     ' Nagpur Zone ', 'Nagpur   Zone' -> 'Nagpur Zone'
+    #     """
+    #     value = " ".join(str(value or "").split()).strip()
+    #     return value if value else default
     def normalize_group_value(value, default=""):
         """
-        Prevent duplicate groups caused by whitespace differences.
-        Example:
-        ' Nagpur Zone ', 'Nagpur   Zone' -> 'Nagpur Zone'
+        Basic cleanup for Region, Branch, Customer and other display values.
         """
         value = " ".join(str(value or "").split()).strip()
         return value if value else default
+
+    def normalize_zone_name(value):
+        """
+        Convert multiple Finacle zone formats to one canonical key.
+
+        Examples:
+        ZONE 1  -> Zone 1
+        Zone-1  -> Zone 1
+        zone_1  -> Zone 1
+        ZONE-01 -> Zone 1
+        """
+        raw_value = normalize_group_value(value, default="")
+
+        if not raw_value:
+            return "Unassigned Zone"
+
+        normalized = raw_value.upper()
+        normalized = normalized.replace("_", " ")
+        normalized = normalized.replace("-", " ")
+        normalized = " ".join(normalized.split())
+
+        # Normalise numbered zone values.
+        # ZONE 1 / ZONE 01 / ZONE-1 become Zone 1.
+        match = re.fullmatch(r"ZONE\s*0*(\d+)", normalized)
+        if match:
+            return "Zone {0}".format(int(match.group(1)))
+
+        # For nonstandard zone values, preserve a readable title style.
+        return raw_value.title()
 
     def safe_float(value, default=0.0):
         """Safely convert Finacle amounts to float for summation."""
@@ -1780,13 +1816,13 @@ def download_loan_meeting_register(start_date=None, end_date=None):
         run.font.name = "Arial"
         run.font.size = Pt(font_size)
 
-    # Group strictly by Zone; Region is only used for sorting/display.
+    # Group only by canonical Zone value.
+    # Thus Zone-1, ZONE 1, and Zone 1 become the same Zone 1 group.
     zone_wise_rows = {}
 
     for row in rows:
-        zone = normalize_group_value(
-            row.get("circle_office_name"),
-            default="Unassigned Zone"
+        zone = normalize_zone_name(
+            row.get("circle_office_name")
         )
 
         zone_wise_rows.setdefault(zone, []).append(row)
@@ -1885,9 +1921,27 @@ def download_loan_meeting_register(start_date=None, end_date=None):
     grand_total_amount = 0.0
 
     # Zone 1 records -> Zone 1 Total -> Zone 2 records -> Zone 2 Total...
+    # for zone, zone_rows in sorted(
+    #     zone_wise_rows.items(),
+    #     key=lambda item: item[0].lower()
+    # ):
+
+    def zone_sort_key(zone_name):
+        """
+        Sort numeric zones logically:
+        Zone 1, Zone 2, Zone 3 ... Zone 10
+        instead of Zone 1, Zone 10, Zone 2.
+        """
+        match = re.fullmatch(r"Zone\s+(\d+)", zone_name, flags=re.IGNORECASE)
+
+        if match:
+            return (0, int(match.group(1)))
+
+        return (1, zone_name.lower())
+
     for zone, zone_rows in sorted(
         zone_wise_rows.items(),
-        key=lambda item: item[0].lower()
+        key=lambda item: zone_sort_key(item[0])
     ):
         zone_total_records = 0
         zone_total_amount = 0.0
@@ -1909,6 +1963,16 @@ def download_loan_meeting_register(start_date=None, end_date=None):
 
             requested_amount = safe_float(row.get("dis_amt"))
 
+            # values = [
+            #     zone,
+            #     normalize_group_value(row.get("region_name"), default=""),
+            #     normalize_group_value(row.get("sol_desc"), default=""),
+            #     normalize_group_value(row.get("acct_name"), default=""),
+            #     normalize_group_value(row.get("schm_desc"), default=""),
+            #     "APR",
+            #     account_or_cif,
+            #     format_amount(requested_amount)
+            # ]
             values = [
                 zone,
                 normalize_group_value(row.get("region_name"), default=""),
