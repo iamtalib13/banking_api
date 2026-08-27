@@ -44,6 +44,8 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import re
 from docx.enum.text import WD_BREAK
+from docx.enum.section import WD_ORIENT
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
 
 
 def db_connection():
@@ -1431,15 +1433,29 @@ def download_loan_meeting_register(start_date=None, end_date=None):
 
     document = DocxDocument()
 
-    section = document.sections[0]
-    section.top_margin = Inches(0.45)
-    section.bottom_margin = Inches(0.45)
-    section.left_margin = Inches(0.30)
-    section.right_margin = Inches(0.30)
+    # section = document.sections[0]
+    # section.top_margin = Inches(0.45)
+    # section.bottom_margin = Inches(0.45)
+    # section.left_margin = Inches(0.30)
+    # section.right_margin = Inches(0.30)
 
-    normal_style = document.styles["Normal"]
-    normal_style.font.name = "Arial"
-    normal_style.font.size = Pt(8)
+    # normal_style = document.styles["Normal"]
+    # normal_style.font.name = "Arial"
+    # normal_style.font.size = Pt(8)
+
+    section = document.sections[0]
+
+    # A4 Portrait
+    section.page_width = Inches(8.27)
+    section.page_height = Inches(11.69)
+
+    section.top_margin = Inches(0.35)
+    section.bottom_margin = Inches(0.35)
+    section.left_margin = Inches(0.20)
+    section.right_margin = Inches(0.20)
+
+    section.header_distance = Inches(0.15)
+    section.footer_distance = Inches(0.15)
 
     meeting_date_text = start_date_obj.strftime("%d/%m/%Y")
 
@@ -1691,15 +1707,34 @@ def download_loan_meeting_register(start_date=None, end_date=None):
     table = document.add_table(rows=1, cols=len(headers))
     table.style = "Table Grid"
     table.autofit = False
+    # Center the complete table horizontally within page margins.
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
 
+    # Force fixed layout so Word does not expand columns due to long text.
+    tbl_pr = table._tbl.tblPr
+
+    tbl_layout = OxmlElement("w:tblLayout")
+    tbl_layout.set(qn("w:type"), "fixed")
+    tbl_pr.append(tbl_layout)
+
+    # column_widths = [
+    #     Inches(0.95),  # Zone
+    #     Inches(0.95),  # Region
+    #     Inches(1.10),  # Branch
+    #     Inches(1.70),  # Customer Name
+    #     Inches(1.20),  # Scheme Name
+    #     Inches(0.60),  # Months
+    #     Inches(1.20),  # A/c No./CIF.
+    #     Inches(1.10),  # Req. Loan Amount
+    # ]
     column_widths = [
-        Inches(0.95),  # Zone
-        Inches(0.95),  # Region
-        Inches(1.10),  # Branch
-        Inches(1.70),  # Customer Name
-        Inches(1.20),  # Scheme Name
-        Inches(0.60),  # Months
-        Inches(1.20),  # A/c No./CIF.
+        Inches(0.48),  # Zone
+        Inches(0.52),  # Region
+        Inches(0.70),  # Branch
+        Inches(1.45),  # Customer Name
+        Inches(1.45),  # Scheme Name
+        Inches(0.38),  # Months: APR
+        Inches(0.82),  # A/c No./CIF.
         Inches(1.10),  # Req. Loan Amount
     ]
 
