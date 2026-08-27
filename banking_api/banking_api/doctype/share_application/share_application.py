@@ -59,6 +59,7 @@ def db_connection():
             database=creds.db_name
         )
         return conn
+
     except Exception as e:
         frappe.log_error(
             frappe.get_traceback(),
@@ -106,6 +107,59 @@ def execute_finacle_query(query, params=None):
 
         if conn:
             conn.close()
+
+
+def set_docx_cell_background(cell, hex_color):
+    """
+    Apply Word table-cell background colour.
+    Pass colour without '#', e.g. 'D9E1F2'.
+    """
+    tc_pr = cell._tc.get_or_add_tcPr()
+
+    shading = OxmlElement("w:shd")
+    shading.set(qn("w:fill"), hex_color.replace("#", ""))
+    shading.set(qn("w:val"), "clear")
+    tc_pr.append(shading)
+
+
+def set_docx_cell_text(
+    cell,
+    value,
+    *,
+    bold=False,
+    alignment=WD_ALIGN_PARAGRAPH.LEFT,
+    font_size=8
+):
+    """Set one formatted paragraph in a DOCX table cell."""
+    cell.text = ""
+    cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+
+    paragraph = cell.paragraphs[0]
+    paragraph.alignment = alignment
+
+    paragraph_format = paragraph.paragraph_format
+    paragraph_format.space_before = Pt(0)
+    paragraph_format.space_after = Pt(0)
+
+    run = paragraph.add_run(str(value if value is not None else ""))
+    run.bold = bold
+    run.font.name = "Arial"
+    run.font.size = Pt(font_size)
+
+
+def safe_float(value, default=0.0):
+    """Convert Finacle numeric values safely for totals."""
+    try:
+        if value in (None, ""):
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def format_amount(value):
+    """Format a numeric loan amount without currency symbol."""
+    return "{:,.2f}".format(safe_float(value))
 
 
 class ShareApplication(Document):
