@@ -1449,10 +1449,10 @@ def download_loan_meeting_register(start_date=None, end_date=None):
     section.page_width = Inches(8.27)
     section.page_height = Inches(11.69)
 
-    section.top_margin = Inches(0.35)
-    section.bottom_margin = Inches(0.35)
-    section.left_margin = Inches(0.20)
-    section.right_margin = Inches(0.20)
+    section.top_margin = Inches(0.50)
+    section.bottom_margin = Inches(0.50)
+    section.left_margin = Inches(0.35)
+    section.right_margin = Inches(0.35)
 
     section.header_distance = Inches(0.15)
     section.footer_distance = Inches(0.15)
@@ -1517,6 +1517,14 @@ def download_loan_meeting_register(start_date=None, end_date=None):
         size=11,
         font_name="Kokila",
         space_before=4
+    )
+
+    add_unicode_paragraph(
+        document,
+        "",
+        size=11,
+        font_name="Kokila",
+        space_before=14
     )
 
     committee_table = document.add_table(rows=1, cols=3)
@@ -1960,6 +1968,14 @@ def download_loan_meeting_register(start_date=None, end_date=None):
 
     add_unicode_paragraph(
         document,
+        "",
+        size=11,
+        font_name="Kokila",
+        space_before=14
+    )
+
+    add_unicode_paragraph(
+        document,
         (
             "सदर सर्व कर्ज प्रस्तावांवर समितीच्या सभेत सविस्तर साधक-बाधक चर्चा करण्यात आली. "
             "चर्चेनंतर कर्ज समितीने सदर सर्व कर्ज प्रस्तावांना सर्वानुमते मान्यता देण्यात आली."
@@ -1968,6 +1984,14 @@ def download_loan_meeting_register(start_date=None, end_date=None):
         alignment=WD_ALIGN_PARAGRAPH.JUSTIFY,
         font_name="kruti Dev 010",
         space_before=5
+    )
+
+    add_unicode_paragraph(
+        document,
+        "",
+        size=11,
+        font_name="Kokila",
+        space_before=14
     )
 
     add_unicode_paragraph(
@@ -1993,6 +2017,7 @@ def download_loan_meeting_register(start_date=None, end_date=None):
 
     signature_table = document.add_table(rows=1, cols=2)
     signature_table.autofit = False
+    signature_table.alignment = WD_TABLE_ALIGNMENT.CENTER
 
     signature_widths = [
         Inches(3.40),
