@@ -55,6 +55,7 @@ import re
 
 from frappe.utils import getdate
 from frappe.utils.pdf import get_pdf
+from datetime import timedelta
 
 
 def db_connection():
@@ -2466,6 +2467,9 @@ def download_loan_meeting_register_pdf(account_opening_date=None):
     )
 
     meeting_date_text = account_opening_date_obj.strftime("%d/%m/%Y")
+    previous_date_obj = account_opening_date_obj - timedelta(days=1)
+
+    previous_meeting_date_text = previous_date_obj.strftime("%d/%m/%Y")
 
     report_html = f"""
     <!DOCTYPE html>
@@ -2762,7 +2766,7 @@ def download_loan_meeting_register_pdf(account_opening_date=None):
         </p>
 
         <p class="content">
-            ठराव क्र. 1 : मागील सभा दिनांक {meeting_date_text} रोजी झालेल्या दैनंदिन सभेचे कार्यवृत्त सभेसमोर वाचन करून सादर करण्यात आले. सदर कार्यवृत्तावर सविस्तर साधक-बाधक चर्चा करण्यात आली. चर्चेनंतर दिनांक {meeting_date_text} रोजीच्या सभेचे कार्यवृत्त सर्वानुमते मंजूर करण्यात आले.
+            ठराव क्र. 1 : मागील सभा दिनांक {previous_meeting_date_text} रोजी झालेल्या दैनंदिन सभेचे कार्यवृत्त सभेसमोर वाचन करून सादर करण्यात आले. सदर कार्यवृत्तावर सविस्तर साधक-बाधक चर्चा करण्यात आली. चर्चेनंतर दिनांक {previous_meeting_date_text} रोजीच्या सभेचे कार्यवृत्त सर्वानुमते मंजूर करण्यात आले.
         </p>
 
         <p class="right-content">
