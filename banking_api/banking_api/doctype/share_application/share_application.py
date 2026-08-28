@@ -2702,7 +2702,7 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
 
     <body>
         <div class="company-name">
-            सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि., गोंदिया
+            सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि. गोंदिया
         </div>
 
         <div class="company-address">
