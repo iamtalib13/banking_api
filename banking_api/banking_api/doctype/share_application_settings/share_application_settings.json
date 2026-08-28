@@ -173,8 +173,7 @@
   {
    "fieldname": "share_certificate_image",
    "fieldtype": "Attach Image",
-   "label": "Share Certificate Image",
-   "reqd": 1
+   "label": "Share Certificate Image"
   },
   {
    "fieldname": "proceeding_form_configuration",
@@ -184,14 +183,12 @@
   {
    "fieldname": "chairman_signature",
    "fieldtype": "Attach Image",
-   "label": "Chairman Signature",
-   "reqd": 1
+   "label": "Chairman Signature"
   },
   {
    "fieldname": "ceo_signature",
    "fieldtype": "Attach Image",
-   "label": "CEO Signature",
-   "reqd": 1
+   "label": "CEO Signature"
   },
   {
    "fieldname": "column_break_xhzx",
@@ -202,7 +199,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-25 14:10:41.402840",
+ "modified": "2026-08-28 17:48:09.166235",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Share Application Settings",
