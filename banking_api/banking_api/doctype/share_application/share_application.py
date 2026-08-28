@@ -55,6 +55,7 @@ import re
 
 from frappe.utils import getdate
 from frappe.utils.pdf import get_pdf
+from datetime import timedelta
 
 
 def db_connection():
@@ -2068,7 +2069,7 @@ def download_loan_meeting_register_docx(start_date=None, end_date=None):
 
 
 @frappe.whitelist()
-def download_loan_meeting_register_pdf(start_date=None, end_date=None):
+def download_loan_meeting_register_pdf(account_opening_date=None):
     """
     Generate and download a Zone-wise Loan Meeting Register as PDF.
 
@@ -2082,20 +2083,13 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
     Grand Total
     """
 
-    if not start_date:
-        frappe.throw(_("Start Date is required."))
-
-    if not end_date:
-        frappe.throw(_("End Date is required."))
+    if not account_opening_date:
+        frappe.throw(_("Account Opening Date is required."))
 
     try:
-        start_date_obj = getdate(start_date)
-        end_date_obj = getdate(end_date)
+        account_opening_date_obj = getdate(account_opening_date)
     except Exception:
-        frappe.throw(_("Please select valid Start Date and End Date."))
-
-    if start_date_obj > end_date_obj:
-        frappe.throw(_("Start Date cannot be greater than End Date."))
+        frappe.throw(_("Please select a valid Account Opening Date."))
 
     query = """
         SELECT
@@ -2192,7 +2186,7 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
         )
         AND g.entity_cre_flg = 'Y'
         AND g.del_flg = 'N'
-        AND g.acct_opn_date BETWEEN %(start_date)s AND %(end_date)s
+        AND g.acct_opn_date = %(account_opening_date)s
 
         ORDER BY
             s.circle_office_name NULLS LAST,
@@ -2203,8 +2197,7 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
     """
 
     params = {
-        "start_date": start_date_obj,
-        "end_date": end_date_obj
+        "account_opening_date": account_opening_date_obj
     }
 
     rows = execute_finacle_query(query, params)
@@ -2275,6 +2268,21 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
         """Format loan amounts without a currency symbol."""
         return "{:,.2f}".format(safe_float(value))
 
+    def format_account_opening_date(value):
+        """
+        Format Finacle acct_opn_date for the Months column.
+
+        Example:
+        2026-08-01 -> 01-08-2026
+        """
+        if not value:
+            return ""
+
+        try:
+            return getdate(value).strftime("%d-%m-%Y")
+        except Exception:
+            return str(value)
+
     def build_loan_row(cells, row_class="data-row"):
         """
         Each record is an independent table inside an unbreakable wrapper.
@@ -2307,9 +2315,36 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
         zone = normalize_zone_name(row.get("circle_office_name"))
         zone_wise_rows.setdefault(zone, []).append(row)
 
+    # for zone in zone_wise_rows:
+    #     zone_wise_rows[zone].sort(
+    #         key=lambda row: (
+    #             normalize_group_value(row.get("region_name"), default=""),
+    #             normalize_branch_name(
+    #                 normalize_group_value(row.get("sol_desc"), default="")
+    #             ),
+    #             normalize_group_value(row.get("acct_name"), default=""),
+    #             normalize_group_value(row.get("cif_id"), default="")
+    #         )
+    #     )
+
+    def get_sortable_date(value):
+        """
+        Convert PostgreSQL date/datetime/string to a sortable ISO date value.
+
+        Empty/invalid dates are intentionally placed at the end of a Zone.
+        """
+        if not value:
+            return "9999-12-31"
+
+        try:
+            return getdate(value).strftime("%Y-%m-%d")
+        except Exception:
+            return "9999-12-31"
+
     for zone in zone_wise_rows:
         zone_wise_rows[zone].sort(
             key=lambda row: (
+                get_sortable_date(row.get("acct_opn_date")),
                 normalize_group_value(row.get("region_name"), default=""),
                 normalize_branch_name(
                     normalize_group_value(row.get("sol_desc"), default="")
@@ -2358,6 +2393,25 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
                 default=""
             )
 
+            # report_rows.append(
+            #     build_loan_row(
+            #         [
+            #             esc(zone),
+            #             esc(region),
+            #             esc(branch),
+            #             esc(customer_name),
+            #             esc(scheme_name),
+            #             "APR",
+            #             esc(account_or_cif),
+            #             esc(format_amount(requested_amount))
+            #         ],
+            #         "data-row"
+            #     )
+            # )
+            account_opening_date = format_account_opening_date(
+                row.get("acct_opn_date")
+            )
+
             report_rows.append(
                 build_loan_row(
                     [
@@ -2366,7 +2420,7 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
                         esc(branch),
                         esc(customer_name),
                         esc(scheme_name),
-                        "APR",
+                        esc(account_opening_date),
                         esc(account_or_cif),
                         esc(format_amount(requested_amount))
                     ],
@@ -2412,7 +2466,39 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
         )
     )
 
-    meeting_date_text = start_date_obj.strftime("%d/%m/%Y")
+    meeting_date_text = account_opening_date_obj.strftime("%d/%m/%Y")
+    previous_date_obj = account_opening_date_obj - timedelta(days=1)
+
+    previous_meeting_date_text = previous_date_obj.strftime("%d/%m/%Y")
+
+    settings = frappe.get_single("Share Application Settings")
+
+    ceo_signature = (settings.ceo_signature or "").strip()
+    chairman_signature = (settings.chairman_signature or "").strip()
+
+    if not ceo_signature:
+        frappe.throw(
+            _("CEO Signature is not configured in Share Application Settings.")
+        )
+
+    if not chairman_signature:
+        frappe.throw(
+            _("Chairman Signature is not configured in Share Application Settings.")
+        )
+
+    site_url = frappe.utils.get_url().rstrip("/")
+
+    ceo_signature_url = (
+        ceo_signature
+        if ceo_signature.startswith(("http://", "https://"))
+        else f"{site_url}{ceo_signature}"
+    )
+
+    chairman_signature_url = (
+        chairman_signature
+        if chairman_signature.startswith(("http://", "https://"))
+        else f"{site_url}{chairman_signature}"
+    )
 
     report_html = f"""
     <!DOCTYPE html>
@@ -2582,19 +2668,19 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
             }}
 
             .col-customer {{
-                width: 22%;
-            }}
-
-            .col-scheme {{
                 width: 20%;
             }}
 
+            .col-scheme {{
+                width: 18%;
+            }}
+
             .col-months {{
-                width: 6%;
+                width: 11%;
             }}
 
             .col-account {{
-                width: 11%;
+                width: 10%;
             }}
 
             .col-amount {{
@@ -2636,12 +2722,21 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
                 text-align: center;
                 vertical-align: top;
             }}
+
+            .signature-image {{
+                display: block;
+                width: 130px;
+                max-width: 130px;
+                max-height: 55px;
+                object-fit: contain;
+                margin: 0 auto 6px auto;
+            }}
         </style>
     </head>
 
     <body>
         <div class="company-name">
-            सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि., गोंदिया
+            सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि. गोंदिया
         </div>
 
         <div class="company-address">
@@ -2655,9 +2750,7 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
         </div>
 
         <p class="content">
-            आज दिनांक {meeting_date_text} रोजी सायंकाळी 05:00 वाजता संस्थेच्या मुख्यालय,
-            सहयोग हॉस्पिटल समोर, राणी अवंतीबाई चौक, रिंग रोड, गोंदिया येथे कर्ज समितीची
-            दैनिक सभा आयोजित करण्यात आली.
+            आज दिनांक {meeting_date_text} रोजी सायंकाळी 05:00 वाजता, संस्थेच्या मुख्यालय, सहयोग हॉस्पिटल समोर, राणी अवंतीबाई चौक, रिंग रोड, गोंदिया येथे कर्ज समितीची दैनंदिन सभा संस्थेचे अध्यक्ष श्री. जयेशचंद्र रमण रामदे यांच्या अध्यक्षतेखाली आयोजित करण्यात आली.
         </p>
 
         <p class="content-bold">
@@ -2711,8 +2804,7 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
         </p>
 
         <p class="content">
-            ठराव क्र. 1 : मागील सभेचे कार्यवृत्तांत सभेसमोर वाचन करून सादर करण्यात आले.
-            सदर कार्यवृत्तांतावर सविस्तर साधक-बाधक चर्चा करून ते सर्वानुमते मंजूर करण्यात आले.
+            ठराव क्र. 1 : मागील सभा दिनांक {previous_meeting_date_text} रोजी झालेल्या दैनंदिन सभेचे कार्यवृत्त सभेसमोर वाचन करून सादर करण्यात आले. सदर कार्यवृत्तावर सविस्तर साधक-बाधक चर्चा करण्यात आली. चर्चेनंतर दिनांक {previous_meeting_date_text} रोजीच्या सभेचे कार्यवृत्त सर्वानुमते मंजूर करण्यात आले.
         </p>
 
         <p class="right-content">
@@ -2733,9 +2825,7 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
         </p>
 
         <p class="content">
-            ठराव क्र. 2 : दिनांक {meeting_date_text} रोजी प्राप्त झालेल्या कर्ज अर्जांवर
-            कार्यालयीन छाननी, परीक्षण व आवश्यक कार्यवाही पूर्ण करून मंजुरीसाठी सभेसमोर
-            सादर करण्यात आलेल्या कर्ज प्रस्तावांचा सविस्तर तपशील खालीलप्रमाणे आहे.
+            ठराव क्र. 2 : दिनांक {meeting_date_text} रोजी प्राप्त झालेल्या कर्ज अर्जांवर कार्यालयीन छाननी, परीक्षण व आवश्यक कार्यवाही पूर्ण करून मंजुरीसाठी सभेसमोर झोननिहाय व कर्ज योजनानिहाय मंजूर करण्यात आलेल्या कर्ज प्रस्तावांचा सविस्तर तपशील सादर करण्यात आला.
         </p>
 
         <p class="content-bold" style="text-align:center;">
@@ -2751,7 +2841,7 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
                         <th class="col-branch">Branch</th>
                         <th class="col-customer">Customer Name</th>
                         <th class="col-scheme">Scheme Name</th>
-                        <th class="col-months">Months</th>
+                        <th class="col-months">A/c Open Date</th>
                         <th class="col-account">A/c No./CIF.</th>
                         <th class="col-amount">Req. Loan Amount</th>
                     </tr>
@@ -2770,8 +2860,7 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
         </p>
 
         <p class="content">
-            सदर सर्व कर्ज प्रस्तावांवर समितीच्या सभेत सविस्तर साधक-बाधक चर्चा करण्यात आली.
-            चर्चेनंतर कर्ज समितीने सदर सर्व कर्ज प्रस्तावांना सर्वानुमते मान्यता देण्यात आली.
+            सदर सर्व कर्ज प्रस्तावांवर समितीच्या सभेत सविस्तर साधक-बाधक चर्चा करण्यात आली. चर्चेनंतर कर्ज समितीने दिनांक {meeting_date_text} रोजी मंजूर केलेल्या सर्व कर्ज प्रस्तावांना सर्वानुमते मान्यता देण्यात आली.
         </p>
 
         <p class="content-bold">
@@ -2780,19 +2869,34 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
         </p>
 
         <table class="signature-table">
-            <tr>
-                <td>
-                    मुख्य कार्यकारी अधिकारी<br><br>
-                    सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.<br>
-                    मुख्यालय, गोंदिया
-                </td>
-                <td>
-                    अध्यक्ष<br><br>
-                    सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.<br>
-                    मुख्यालय, गोंदिया
-                </td>
-            </tr>
-        </table>
+    <tr>
+        <td>
+            <img
+                src="{ceo_signature_url}"
+                alt="CEO Signature"
+                class="signature-image"
+            ><br>
+
+            मुख्य कार्यकारी अधिकारी<br><br>
+
+            सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.<br>
+            मुख्यालय, गोंदिया
+        </td>
+
+        <td>
+            <img
+                src="{chairman_signature_url}"
+                alt="Chairman Signature"
+                class="signature-image"
+            ><br>
+
+            अध्यक्ष<br><br>
+
+            सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.<br>
+            मुख्यालय, गोंदिया
+        </td>
+    </tr>
+</table>
     </body>
     </html>
     """
@@ -2814,9 +2918,8 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
     pdf_content = get_pdf(report_html, pdf_options)
 
     frappe.response.filename = (
-        "Loan_Meeting_Register_{0}_to_{1}.pdf".format(
-            start_date_obj.strftime("%Y-%m-%d"),
-            end_date_obj.strftime("%Y-%m-%d")
+        "Loan_Meeting_Register_{0}.pdf".format(
+            account_opening_date_obj.strftime("%Y-%m-%d")
         )
     )
     frappe.response.filecontent = pdf_content
