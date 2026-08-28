@@ -2428,9 +2428,9 @@ def download_loan_meeting_register_pdf(account_opening_date=None):
                 )
             )
 
-        zone_total_amount += requested_amount
-        grand_total_amount += requested_amount
-        grand_total_records += 1
+            zone_total_amount += requested_amount
+            grand_total_amount += requested_amount
+            grand_total_records += 1
 
         # Add exactly one subtotal after all records of one zone.
         report_rows.append(
