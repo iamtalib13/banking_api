@@ -2275,6 +2275,21 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
         """Format loan amounts without a currency symbol."""
         return "{:,.2f}".format(safe_float(value))
 
+    def format_account_opening_date(value):
+        """
+        Format Finacle acct_opn_date for the Months column.
+
+        Example:
+        2026-08-01 -> 01-08-2026
+        """
+        if not value:
+            return ""
+
+        try:
+            return getdate(value).strftime("%d-%m-%Y")
+        except Exception:
+            return str(value)
+
     def build_loan_row(cells, row_class="data-row"):
         """
         Each record is an independent table inside an unbreakable wrapper.
@@ -2307,9 +2322,36 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
         zone = normalize_zone_name(row.get("circle_office_name"))
         zone_wise_rows.setdefault(zone, []).append(row)
 
+    # for zone in zone_wise_rows:
+    #     zone_wise_rows[zone].sort(
+    #         key=lambda row: (
+    #             normalize_group_value(row.get("region_name"), default=""),
+    #             normalize_branch_name(
+    #                 normalize_group_value(row.get("sol_desc"), default="")
+    #             ),
+    #             normalize_group_value(row.get("acct_name"), default=""),
+    #             normalize_group_value(row.get("cif_id"), default="")
+    #         )
+    #     )
+
+    def get_sortable_date(value):
+        """
+        Convert PostgreSQL date/datetime/string to a sortable ISO date value.
+
+        Empty/invalid dates are intentionally placed at the end of a Zone.
+        """
+        if not value:
+            return "9999-12-31"
+
+        try:
+            return getdate(value).strftime("%Y-%m-%d")
+        except Exception:
+            return "9999-12-31"
+
     for zone in zone_wise_rows:
         zone_wise_rows[zone].sort(
             key=lambda row: (
+                get_sortable_date(row.get("acct_opn_date")),
                 normalize_group_value(row.get("region_name"), default=""),
                 normalize_branch_name(
                     normalize_group_value(row.get("sol_desc"), default="")
@@ -2358,6 +2400,25 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
                 default=""
             )
 
+            # report_rows.append(
+            #     build_loan_row(
+            #         [
+            #             esc(zone),
+            #             esc(region),
+            #             esc(branch),
+            #             esc(customer_name),
+            #             esc(scheme_name),
+            #             "APR",
+            #             esc(account_or_cif),
+            #             esc(format_amount(requested_amount))
+            #         ],
+            #         "data-row"
+            #     )
+            # )
+            account_opening_date = format_account_opening_date(
+                row.get("acct_opn_date")
+            )
+
             report_rows.append(
                 build_loan_row(
                     [
@@ -2366,7 +2427,7 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
                         esc(branch),
                         esc(customer_name),
                         esc(scheme_name),
-                        "APR",
+                        esc(account_opening_date),
                         esc(account_or_cif),
                         esc(format_amount(requested_amount))
                     ],
@@ -2374,9 +2435,9 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
                 )
             )
 
-            zone_total_amount += requested_amount
-            grand_total_amount += requested_amount
-            grand_total_records += 1
+        zone_total_amount += requested_amount
+        grand_total_amount += requested_amount
+        grand_total_records += 1
 
         # Add exactly one subtotal after all records of one zone.
         report_rows.append(
@@ -2582,19 +2643,19 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
             }}
 
             .col-customer {{
-                width: 22%;
-            }}
-
-            .col-scheme {{
                 width: 20%;
             }}
 
+            .col-scheme {{
+                width: 18%;
+            }}
+
             .col-months {{
-                width: 6%;
+                width: 11%;
             }}
 
             .col-account {{
-                width: 11%;
+                width: 10%;
             }}
 
             .col-amount {{
@@ -2751,7 +2812,7 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
                         <th class="col-branch">Branch</th>
                         <th class="col-customer">Customer Name</th>
                         <th class="col-scheme">Scheme Name</th>
-                        <th class="col-months">Months</th>
+                        <th class="col-months">A/c Open Date</th>
                         <th class="col-account">A/c No./CIF.</th>
                         <th class="col-amount">Req. Loan Amount</th>
                     </tr>
