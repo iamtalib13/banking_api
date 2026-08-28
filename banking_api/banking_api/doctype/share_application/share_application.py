@@ -2471,6 +2471,35 @@ def download_loan_meeting_register_pdf(account_opening_date=None):
 
     previous_meeting_date_text = previous_date_obj.strftime("%d/%m/%Y")
 
+    settings = frappe.get_single("Share Application Settings")
+
+    ceo_signature = (settings.ceo_signature or "").strip()
+    chairman_signature = (settings.chairman_signature or "").strip()
+
+    if not ceo_signature:
+        frappe.throw(
+            _("CEO Signature is not configured in Share Application Settings.")
+        )
+
+    if not chairman_signature:
+        frappe.throw(
+            _("Chairman Signature is not configured in Share Application Settings.")
+        )
+
+    site_url = frappe.utils.get_url().rstrip("/")
+
+    ceo_signature_url = (
+        ceo_signature
+        if ceo_signature.startswith(("http://", "https://"))
+        else f"{site_url}{ceo_signature}"
+    )
+
+    chairman_signature_url = (
+        chairman_signature
+        if chairman_signature.startswith(("http://", "https://"))
+        else f"{site_url}{chairman_signature}"
+    )
+
     report_html = f"""
     <!DOCTYPE html>
     <html>
@@ -2693,6 +2722,15 @@ def download_loan_meeting_register_pdf(account_opening_date=None):
                 text-align: center;
                 vertical-align: top;
             }}
+
+            .signature-image {{
+                display: block;
+                width: 130px;
+                max-width: 130px;
+                max-height: 55px;
+                object-fit: contain;
+                margin: 0 auto 6px auto;
+            }}
         </style>
     </head>
 
@@ -2831,19 +2869,34 @@ def download_loan_meeting_register_pdf(account_opening_date=None):
         </p>
 
         <table class="signature-table">
-            <tr>
-                <td>
-                    मुख्य कार्यकारी अधिकारी<br><br>
-                    सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.<br>
-                    मुख्यालय, गोंदिया
-                </td>
-                <td>
-                    अध्यक्ष<br><br>
-                    सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.<br>
-                    मुख्यालय, गोंदिया
-                </td>
-            </tr>
-        </table>
+    <tr>
+        <td>
+            <img
+                src="{ceo_signature_url}"
+                alt="CEO Signature"
+                class="signature-image"
+            ><br>
+
+            मुख्य कार्यकारी अधिकारी<br><br>
+
+            सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.<br>
+            मुख्यालय, गोंदिया
+        </td>
+
+        <td>
+            <img
+                src="{chairman_signature_url}"
+                alt="Chairman Signature"
+                class="signature-image"
+            ><br>
+
+            अध्यक्ष<br><br>
+
+            सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.<br>
+            मुख्यालय, गोंदिया
+        </td>
+    </tr>
+</table>
     </body>
     </html>
     """
