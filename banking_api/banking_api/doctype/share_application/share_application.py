@@ -2068,7 +2068,7 @@ def download_loan_meeting_register_docx(start_date=None, end_date=None):
 
 
 @frappe.whitelist()
-def download_loan_meeting_register_pdf(start_date=None, end_date=None):
+def download_loan_meeting_register_pdf(account_opening_date=None):
     """
     Generate and download a Zone-wise Loan Meeting Register as PDF.
 
@@ -2082,20 +2082,13 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
     Grand Total
     """
 
-    if not start_date:
-        frappe.throw(_("Start Date is required."))
-
-    if not end_date:
-        frappe.throw(_("End Date is required."))
+    if not account_opening_date:
+        frappe.throw(_("Account Opening Date is required."))
 
     try:
-        start_date_obj = getdate(start_date)
-        end_date_obj = getdate(end_date)
+        account_opening_date_obj = getdate(account_opening_date)
     except Exception:
-        frappe.throw(_("Please select valid Start Date and End Date."))
-
-    if start_date_obj > end_date_obj:
-        frappe.throw(_("Start Date cannot be greater than End Date."))
+        frappe.throw(_("Please select a valid Account Opening Date."))
 
     query = """
         SELECT
@@ -2192,7 +2185,7 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
         )
         AND g.entity_cre_flg = 'Y'
         AND g.del_flg = 'N'
-        AND g.acct_opn_date BETWEEN %(start_date)s AND %(end_date)s
+        AND g.acct_opn_date = %(account_opening_date)s
 
         ORDER BY
             s.circle_office_name NULLS LAST,
@@ -2203,8 +2196,7 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
     """
 
     params = {
-        "start_date": start_date_obj,
-        "end_date": end_date_obj
+        "account_opening_date": account_opening_date_obj
     }
 
     rows = execute_finacle_query(query, params)
@@ -2473,7 +2465,7 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
         )
     )
 
-    meeting_date_text = start_date_obj.strftime("%d/%m/%Y")
+    meeting_date_text = account_opening_date_obj.strftime("%d/%m/%Y")
 
     report_html = f"""
     <!DOCTYPE html>
@@ -2873,9 +2865,8 @@ def download_loan_meeting_register_pdf(start_date=None, end_date=None):
     pdf_content = get_pdf(report_html, pdf_options)
 
     frappe.response.filename = (
-        "Loan_Meeting_Register_{0}_to_{1}.pdf".format(
-            start_date_obj.strftime("%Y-%m-%d"),
-            end_date_obj.strftime("%Y-%m-%d")
+        "Loan_Meeting_Register_{0}.pdf".format(
+            account_opening_date_obj.strftime("%Y-%m-%d")
         )
     )
     frappe.response.filecontent = pdf_content
