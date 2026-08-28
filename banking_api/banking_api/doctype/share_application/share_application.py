@@ -56,6 +56,8 @@ import re
 from frappe.utils import getdate
 from frappe.utils.pdf import get_pdf
 from datetime import timedelta
+import base64
+import mimetypes
 
 
 def db_connection():
@@ -2068,6 +2070,53 @@ def download_loan_meeting_register_docx(start_date=None, end_date=None):
     frappe.response.display_content_as = "attachment"
 
 
+def get_signature_base64_data_uri(file_url, label):
+    """
+    Read a Frappe signature attachment from server storage and return it as
+    a Base64 data URI suitable for <img src="..."> in wkhtmltopdf PDF HTML.
+
+    This works for both:
+    /files/<file>
+    /private/files/<file>
+    """
+    file_path = get_signature_file_path(file_url, label)
+
+    mime_type, _ = mimetypes.guess_type(file_path)
+
+    if not mime_type or not mime_type.startswith("image/"):
+        extension = os.path.splitext(file_path)[1].lower()
+
+        mime_type_map = {
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".gif": "image/gif",
+            ".bmp": "image/bmp"
+        }
+
+        mime_type = mime_type_map.get(extension, "image/png")
+
+    try:
+        with open(file_path, "rb") as signature_file:
+            encoded_image = base64.b64encode(
+                signature_file.read()
+            ).decode("utf-8")
+
+        return "data:{0};base64,{1}".format(
+            mime_type,
+            encoded_image
+        )
+
+    except Exception:
+        frappe.log_error(
+            frappe.get_traceback(),
+            "{0} Base64 Conversion Failed".format(label)
+        )
+        frappe.throw(
+            _("{0} could not be loaded for PDF generation.").format(label)
+        )
+
+
 @frappe.whitelist()
 def download_loan_meeting_register_pdf(account_opening_date=None):
     """
@@ -2471,33 +2520,45 @@ def download_loan_meeting_register_pdf(account_opening_date=None):
 
     previous_meeting_date_text = previous_date_obj.strftime("%d/%m/%Y")
 
+    # settings = frappe.get_single("Share Application Settings")
+
+    # ceo_signature = (settings.ceo_signature or "").strip()
+    # chairman_signature = (settings.chairman_signature or "").strip()
+
+    # if not ceo_signature:
+    #     frappe.throw(
+    #         _("CEO Signature is not configured in Share Application Settings.")
+    #     )
+
+    # if not chairman_signature:
+    #     frappe.throw(
+    #         _("Chairman Signature is not configured in Share Application Settings.")
+    #     )
+
+    # site_url = frappe.utils.get_url().rstrip("/")
+
+    # ceo_signature_url = (
+    #     ceo_signature
+    #     if ceo_signature.startswith(("http://", "https://"))
+    #     else f"{site_url}{ceo_signature}"
+    # )
+
+    # chairman_signature_url = (
+    #     chairman_signature
+    #     if chairman_signature.startswith(("http://", "https://"))
+    #     else f"{site_url}{chairman_signature}"
+    # )
+
     settings = frappe.get_single("Share Application Settings")
 
-    ceo_signature = (settings.ceo_signature or "").strip()
-    chairman_signature = (settings.chairman_signature or "").strip()
-
-    if not ceo_signature:
-        frappe.throw(
-            _("CEO Signature is not configured in Share Application Settings.")
-        )
-
-    if not chairman_signature:
-        frappe.throw(
-            _("Chairman Signature is not configured in Share Application Settings.")
-        )
-
-    site_url = frappe.utils.get_url().rstrip("/")
-
-    ceo_signature_url = (
-        ceo_signature
-        if ceo_signature.startswith(("http://", "https://"))
-        else f"{site_url}{ceo_signature}"
+    ceo_signature_data_uri = get_signature_base64_data_uri(
+        settings.ceo_signature,
+        "CEO Signature"
     )
 
-    chairman_signature_url = (
-        chairman_signature
-        if chairman_signature.startswith(("http://", "https://"))
-        else f"{site_url}{chairman_signature}"
+    chairman_signature_data_uri = get_signature_base64_data_uri(
+        settings.chairman_signature,
+        "Chairman Signature"
     )
 
     report_html = f"""
@@ -2709,28 +2770,45 @@ def download_loan_meeting_register_pdf(account_opening_date=None):
             }}
 
             .signature-table {{
-                width: 92%;
-                margin: 32px auto 0;
-                border-collapse: collapse;
-                font-size: 16px;
-                font-weight: bold;
-            }}
+    width: 92%;
+    margin: 32px auto 0;
+    border-collapse: collapse;
+    font-size: 16px;
+    font-weight: bold;
+    page-break-inside: avoid;
+    break-inside: avoid;
+}}
 
-            .signature-table td {{
-                width: 50%;
-                padding: 14px;
-                text-align: center;
-                vertical-align: top;
-            }}
+.signature-table td {{
+    width: 50%;
+    padding: 14px;
+    text-align: center;
+    vertical-align: top;
+}}
 
-            .signature-image {{
-                display: block;
-                width: 130px;
-                max-width: 130px;
-                max-height: 55px;
-                object-fit: contain;
-                margin: 0 auto 6px auto;
-            }}
+.signature-image {{
+    display: block;
+    width: 145px;
+    height: 65px;
+    max-width: 145px;
+    max-height: 65px;
+    object-fit: contain;
+    margin: 0 auto 8px auto;
+}}
+
+.signature-designation {{
+    font-size: 16px;
+    font-weight: bold;
+    margin: 0 0 8px 0;
+    font-family: "Noto Sans Devanagari", "Nirmala UI", "Kokila", sans-serif;
+}}
+
+.signature-organization {{
+    font-size: 13px;
+    line-height: 1.35;
+    font-weight: bold;
+    font-family: "Noto Sans Devanagari", "Nirmala UI", "Kokila", sans-serif;
+}}
         </style>
     </head>
 
@@ -2872,28 +2950,36 @@ def download_loan_meeting_register_pdf(account_opening_date=None):
     <tr>
         <td>
             <img
-                src="{ceo_signature_url}"
+                src="{ceo_signature_data_uri}"
                 alt="CEO Signature"
                 class="signature-image"
-            ><br>
+            >
 
-            मुख्य कार्यकारी अधिकारी<br><br>
+            <div class="signature-designation">
+                मुख्य कार्यकारी अधिकारी
+            </div>
 
-            सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.<br>
-            मुख्यालय, गोंदिया
+            <div class="signature-organization">
+                सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.<br>
+                मुख्यालय, गोंदिया
+            </div>
         </td>
 
         <td>
             <img
-                src="{chairman_signature_url}"
+                src="{chairman_signature_data_uri}"
                 alt="Chairman Signature"
                 class="signature-image"
-            ><br>
+            >
 
-            अध्यक्ष<br><br>
+            <div class="signature-designation">
+                अध्यक्ष
+            </div>
 
-            सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.<br>
-            मुख्यालय, गोंदिया
+            <div class="signature-organization">
+                सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.<br>
+                मुख्यालय, गोंदिया
+            </div>
         </td>
     </tr>
 </table>
