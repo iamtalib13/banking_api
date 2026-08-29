@@ -2734,19 +2734,19 @@ def download_loan_meeting_register_pdf(account_opening_date=None):
             }}
 
             .col-scheme {{
-                width: 18%;
+                width: 15%;
             }}
 
             .col-months {{
-                width: 11%;
-            }}
-
-            .col-account {{
                 width: 10%;
             }}
 
-            .col-amount {{
+            .col-account {{
                 width: 17%;
+            }}
+
+            .col-amount {{
+                width: 14%;
             }}
 
             .center-cell {{
@@ -2771,45 +2771,45 @@ def download_loan_meeting_register_pdf(account_opening_date=None):
             }}
 
             .signature-table {{
-    width: 92%;
-    margin: 32px auto 0;
-    border-collapse: collapse;
-    font-size: 16px;
-    font-weight: bold;
-    page-break-inside: avoid;
-    break-inside: avoid;
-}}
+                width: 92%;
+                margin: 32px auto 0;
+                border-collapse: collapse;
+                font-size: 16px;
+                font-weight: bold;
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }}
 
-.signature-table td {{
-    width: 50%;
-    padding: 14px;
-    text-align: center;
-    vertical-align: top;
-}}
+            .signature-table td {{
+                width: 50%;
+                padding: 14px;
+                text-align: center;
+                vertical-align: top;
+            }}
 
-.signature-image {{
-    display: block;
-    width: 145px;
-    height: 65px;
-    max-width: 145px;
-    max-height: 65px;
-    object-fit: contain;
-    margin: 0 auto 8px auto;
-}}
+            .signature-image {{
+                display: block;
+                width: 145px;
+                height: 65px;
+                max-width: 145px;
+                max-height: 65px;
+                object-fit: contain;
+                margin: 0 auto 8px auto;
+            }}
 
-.signature-designation {{
-    font-size: 16px;
-    font-weight: bold;
-    margin: 0 0 8px 0;
-    font-family: "Noto Sans Devanagari", "Nirmala UI", "Kokila", sans-serif;
-}}
+            .signature-designation {{
+                font-size: 16px;
+                font-weight: bold;
+                margin: 0 0 8px 0;
+                font-family: "Noto Sans Devanagari", "Nirmala UI", "Kokila", sans-serif;
+            }}
 
-.signature-organization {{
-    font-size: 13px;
-    line-height: 1.35;
-    font-weight: bold;
-    font-family: "Noto Sans Devanagari", "Nirmala UI", "Kokila", sans-serif;
-}}
+            .signature-organization {{
+                font-size: 13px;
+                line-height: 1.35;
+                font-weight: bold;
+                font-family: "Noto Sans Devanagari", "Nirmala UI", "Kokila", sans-serif;
+            }}
         </style>
     </head>
 
@@ -2921,7 +2921,7 @@ def download_loan_meeting_register_pdf(account_opening_date=None):
                         <th class="col-customer">Customer Name</th>
                         <th class="col-scheme">Scheme Name</th>
                         <th class="col-months">A/c Open Date</th>
-                        <th class="col-account">A/c No./CIF.</th>
+                        <th class="col-account">A/c No.</th>
                         <th class="col-amount">Req. Loan Amount</th>
                     </tr>
                 </thead>
