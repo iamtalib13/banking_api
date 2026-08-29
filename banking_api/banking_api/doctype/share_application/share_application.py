@@ -2416,7 +2416,8 @@ def download_loan_meeting_register_pdf(account_opening_date=None):
         for row in zone_rows:
             cif_id = str(row.get("cif_id") or "").strip()
             ac_no = str(row.get("ac_no") or "").strip()
-            account_or_cif = cif_id or ac_no
+            # account_or_cif = cif_id or ac_no
+            account_or_cif = ac_no or cif_id
 
             requested_amount = safe_float(row.get("dis_amt"))
 
