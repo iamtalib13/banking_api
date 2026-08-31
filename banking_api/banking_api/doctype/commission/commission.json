@@ -8,6 +8,7 @@
  "field_order": [
   "agent_code",
   "agent_operative_account",
+  "deposit_amount",
   "tenure_months",
   "sol_id",
   "scheme_code",
@@ -20,6 +21,7 @@
   "pan_status",
   "column_break_ajmr",
   "agent_name",
+  "customer_account_name",
   "customer_account_number",
   "account_opening_date",
   "tenure_days",
@@ -169,12 +171,24 @@
    "fieldname": "pan_status",
    "fieldtype": "Data",
    "label": "PAN Status"
+  },
+  {
+   "fieldname": "customer_account_name",
+   "fieldtype": "Data",
+   "label": "Customer Account Name",
+   "search_index": 1
+  },
+  {
+   "fieldname": "deposit_amount",
+   "fieldtype": "Int",
+   "label": "Deposit Amount",
+   "search_index": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-17 16:50:34.604734",
+ "modified": "2026-08-31 15:24:27.599040",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Commission",
