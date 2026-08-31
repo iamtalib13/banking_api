@@ -58,6 +58,14 @@ from frappe.utils.pdf import get_pdf
 from datetime import timedelta
 import base64
 import mimetypes
+import io
+import frappe
+from frappe import _
+from frappe.utils import getdate, formatdate
+from docx import Document as DocxDocument
+from docx.shared import Inches, Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from docx.oxml.ns import qn
 
 
 def db_connection():
@@ -478,14 +486,6 @@ def validate_image_file(file_path, label):
 
 @frappe.whitelist()
 def download_proceeding_form(account_opening_date):
-    import io
-    import frappe
-    from frappe import _
-    from frappe.utils import getdate, formatdate
-    from docx import Document as DocxDocument
-    from docx.shared import Inches, Pt
-    from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
-    from docx.oxml.ns import qn
 
     if not account_opening_date:
         frappe.throw(_("Account Opening Date is required."))
