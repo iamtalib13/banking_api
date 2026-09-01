@@ -67,6 +67,16 @@ from docx.shared import Inches, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.oxml.ns import qn
 
+import base64
+import html
+import mimetypes
+import os
+
+import frappe
+from frappe import _
+from frappe.utils import getdate
+from frappe.utils.pdf import get_pdf
+
 
 def db_connection():
     """Connect to external PostgreSQL (Finacle) using Finacle DB Credentials."""
@@ -3012,3 +3022,28 @@ def download_loan_meeting_register_pdf(account_opening_date=None):
     frappe.response.filecontent = pdf_content
     frappe.response.type = "download"
     frappe.response.display_content_as = "attachment"
+
+
+def get_signature_base64_data_uri(file_url, label):
+    """
+    Read an uploaded Frappe image attachment and return a base64 data URI
+    suitable for use in an HTML <img> tag.
+    """
+    file_path = get_signature_file_path(file_url, label)
+
+    mime_type, _ = mimetypes.guess_type(file_path)
+    if not mime_type or not mime_type.startswith("image/"):
+        frappe.throw(
+            _("{0} must be a valid image file.").format(label)
+        )
+
+    try:
+        with open(file_path, "rb") as image_file:
+            encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
+    except OSError:
+        frappe.throw(
+            _("{0} could not be read from the server. "
+              "Please upload the image again.").format(label)
+        )
+
+    return f"data:{mime_type};base64,{encoded_image}"
