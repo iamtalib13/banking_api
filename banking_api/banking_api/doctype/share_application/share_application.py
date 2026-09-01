@@ -3005,6 +3005,21 @@ def get_signature_base64_data_uri(file_url, label):
     return f"data:{mime_type};base64,{encoded_image}"
 
 
+def prevent_row_break_across_pages(row):
+    """
+    Prevent one DOCX table row from breaking across pages.
+
+    If the row does not fit in the remaining page area, Word moves
+    the complete row to the next page.
+    """
+    tr_pr = row._tr.get_or_add_trPr()
+
+    cant_split = OxmlElement("w:cantSplit")
+    cant_split.set(qn("w:val"), "1")
+
+    tr_pr.append(cant_split)
+
+
 @frappe.whitelist()
 def download_proceeding_form_pdf(account_opening_date):
     """
