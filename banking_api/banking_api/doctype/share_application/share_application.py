@@ -1,81 +1,37 @@
 # Copyright (c) 2026, Talib Sheikh and contributors
 # For license information, please see license.txt
-
-from openpyxl.worksheet.table import Table, TableStyleInfo
-from openpyxl.utils import get_column_letter
-from openpyxl.styles import Font, PatternFill, Alignment
-from openpyxl import Workbook
-import frappe
+import base64
 import csv
+import html
 import io
-from frappe import _
-from frappe.model.document import Document
-import io
-import frappe
-from frappe import _
-from frappe.utils import getdate, formatdate
-from frappe.model.document import Document
-from docx import Document as DocxDocument
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.shared import Pt, Inches
-from docx.oxml.ns import qn
-from docx.shared import Pt
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-import random
-import os
-from docx.shared import Inches
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.shared import Pt, Inches
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.oxml import OxmlElement
-from docx.oxml.ns import qn
 import json
-from PIL import Image
+import mimetypes
+import os
+import random
+import re
 from collections import defaultdict
+from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 
+import frappe
+import psycopg2
 from docx import Document as DocxDocument
-from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.section import WD_ORIENT
+from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK, WD_LINE_SPACING
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt
-import psycopg2
+from frappe import _
+from frappe.model.document import Document
+from frappe.utils import formatdate, getdate
+from frappe.utils.pdf import get_pdf
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.table import Table, TableStyleInfo
+from PIL import Image
 from psycopg2.extras import RealDictCursor
-import re
-from docx.enum.text import WD_BREAK
-from docx.enum.section import WD_ORIENT
-from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT, WD_TABLE_ALIGNMENT
-import html
-import re
-
-from frappe.utils.pdf import get_pdf
-import html
-import re
-
-from frappe.utils import getdate
-from frappe.utils.pdf import get_pdf
-from datetime import timedelta
-import base64
-import mimetypes
-import io
-import frappe
-from frappe import _
-from frappe.utils import getdate, formatdate
-from docx import Document as DocxDocument
-from docx.shared import Inches, Pt
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
-from docx.oxml.ns import qn
-
-import base64
-import html
-import mimetypes
-import os
-
-import frappe
-from frappe import _
-from frappe.utils import getdate
-from frappe.utils.pdf import get_pdf
 
 
 def db_connection():
