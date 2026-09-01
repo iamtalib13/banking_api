@@ -3021,7 +3021,7 @@ def prevent_row_break_across_pages(row):
 
 
 @frappe.whitelist()
-def download_proceeding_form_pdf(account_opening_date):
+def download_proceeding_form_pdfs(account_opening_date):
     """
     Generate and download the Share Proceeding Form as a PDF.
     """
@@ -3449,6 +3449,557 @@ def download_proceeding_form_pdf(account_opening_date):
                 alt="Chairman Signature"
                 class="individual-signature-image"
             >
+            <p class="individual-signature-text">
+                अध्यक्ष<br>
+                सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.<br>
+                मुख्यालय, गोंदिया
+            </p>
+        </div>
+    </body>
+    </html>
+    """
+
+    pdf_options = {
+        "page-size": "A4",
+        "orientation": "Portrait",
+        "margin-top": "13mm",
+        "margin-right": "13mm",
+        "margin-bottom": "18mm",
+        "margin-left": "13mm",
+        "encoding": "UTF-8",
+        "quiet": "",
+        "footer-right": "Page [page] of [toPage]",
+        "footer-font-size": "10",
+        "footer-spacing": "4"
+    }
+
+    pdf_content = get_pdf(report_html, pdf_options)
+
+    frappe.response.filename = (
+        f"Proceeding_Form_{selected_date.strftime('%Y-%m-%d')}.pdf"
+    )
+    frappe.response.filecontent = pdf_content
+    frappe.response.type = "download"
+    frappe.response.display_content_as = "attachment"
+
+
+@frappe.whitelist()
+def download_proceeding_form_pdf(account_opening_date):
+    """
+    Generate and download the Share Proceeding Form as a PDF.
+
+    Each Appendix-A member row is rendered as a separate one-row table
+    inside an unbreakable wrapper. This prevents wkhtmltopdf from splitting
+    a member record across PDF pages.
+    """
+
+    if not account_opening_date:
+        frappe.throw(_("Account Opening Date is required."))
+
+    try:
+        selected_date = getdate(account_opening_date)
+    except Exception:
+        frappe.throw(_("Invalid date selected."))
+
+    records = frappe.get_all(
+        "Share Application",
+        filters={
+            "account_opening_date": selected_date,
+            "payment_status": "Success"
+        },
+        fields=["name", "customer_name", "branch"],
+        order_by="name asc"
+    )
+
+    if not records:
+        frappe.msgprint(
+            _(
+                "No Share Application records with successful payment "
+                "found for the selected Account Opening Date."
+            ),
+            title=_("No Records"),
+            indicator="orange"
+        )
+        return
+
+    def to_devanagari_digits(number):
+        devanagari_digits = "०१२३४५६७८९"
+        return "".join(devanagari_digits[int(d)] for d in str(number))
+
+    def to_devanagari_date(date_obj):
+        day = to_devanagari_digits(date_obj.day)
+        month = to_devanagari_digits(date_obj.month)
+        year = to_devanagari_digits(date_obj.year)
+        return f"{day}/{month}/{year}"
+
+    def esc(value):
+        """Escape variable values before using them inside HTML."""
+        return html.escape(str(value or ""))
+
+    def build_member_row(cells):
+        """
+        Render one applicant record as an independent one-row table.
+
+        A normal long HTML table can have a row split by wkhtmltopdf across
+        pages. A separate wrapper/table makes the entire applicant row
+        an atomic printable unit.
+        """
+        return f"""
+            <div class="member-row-wrapper">
+                <table class="members-table member-row-table">
+                    <tbody>
+                        <tr>
+                            <td class="col-sr center">{cells[0]}</td>
+                            <td class="col-application">{cells[1]}</td>
+                            <td class="col-name">{cells[2]}</td>
+                            <td class="col-branch">{cells[3]}</td>
+                            <td class="col-share center">{cells[4]}</td>
+                            <td class="col-fee center">{cells[5]}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        """
+
+    total_members = len(records)
+    total_members_dev = to_devanagari_digits(total_members)
+    selected_date_dev = to_devanagari_date(selected_date)
+
+    proposer, approver, meeting_no = get_proceeding_data(selected_date)
+    meeting_no_dev = to_devanagari_digits(meeting_no)
+
+    # Dynamic signatures from Share Application Settings.
+    settings = frappe.get_single("Share Application Settings")
+
+    chairman_signature_data_uri = get_signature_base64_data_uri(
+        settings.chairman_signature,
+        "Chairman Signature"
+    )
+
+    ceo_signature_data_uri = get_signature_base64_data_uri(
+        settings.ceo_signature,
+        "CEO Signature"
+    )
+
+    # Build Appendix-A member rows as separate protected blocks.
+    member_rows = []
+
+    for idx, row in enumerate(records, start=1):
+        branch_raw = (row.get("branch") or "").strip()
+        branch_value = normalize_branch_name(branch_raw)
+
+        member_rows.append(
+            build_member_row([
+                esc(to_devanagari_digits(idx)),
+                esc(row.get("name") or ""),
+                esc(row.get("customer_name") or ""),
+                esc(branch_value),
+                "१०",
+                "१०"
+            ])
+        )
+
+    report_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+
+        <style>
+            @page {{
+                size: A4 portrait;
+                margin: 13mm 13mm 18mm 13mm;
+            }}
+
+            * {{
+                box-sizing: border-box;
+            }}
+
+            body {{
+                margin: 0;
+                padding: 0;
+                color: #000;
+                font-family: "Noto Sans Devanagari", "Nirmala UI", "Kokila", sans-serif;
+                font-size: 17px;
+                line-height: 1.45;
+            }}
+
+            .company-name {{
+                text-align: center;
+                font-size: 27px;
+                line-height: 1.30;
+                font-weight: bold;
+                margin: 0 0 8px 0;
+            }}
+
+            .heading {{
+                text-align: left;
+                font-size: 17px;
+                font-weight: bold;
+                margin: 0 0 4px 0;
+            }}
+
+            .content {{
+                text-align: justify;
+                font-size: 17px;
+                line-height: 1.55;
+                margin: 6px 0;
+            }}
+
+            .content-bold {{
+                font-size: 17px;
+                line-height: 1.50;
+                font-weight: bold;
+                margin: 6px 0;
+            }}
+
+            .resolution-title {{
+                font-size: 17px;
+                font-weight: bold;
+                margin: 10px 0 4px 0;
+            }}
+
+            .signatory-lines {{
+                font-size: 17px;
+                font-weight: bold;
+                line-height: 1.50;
+                margin: 10px 0 0 0;
+            }}
+
+            .signature-table {{
+                width: 100%;
+                margin: 10px 0 0 0;
+                border-collapse: collapse;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }}
+
+            .signature-table td {{
+                width: 50%;
+                vertical-align: top;
+                text-align: center;
+                padding: 0 10px;
+            }}
+
+            .signature-image {{
+                display: block;
+                width: 95px;
+                height: 45px;
+                max-width: 95px;
+                max-height: 45px;
+                object-fit: contain;
+                margin: 0 auto 3px auto;
+            }}
+
+            .signature-designation {{
+                font-size: 17px;
+                font-weight: bold;
+                line-height: 1.35;
+                margin: 0 0 2px 0;
+            }}
+
+            .signature-organization {{
+                font-size: 15px;
+                font-weight: bold;
+                line-height: 1.35;
+                margin: 0;
+            }}
+
+            .page-break {{
+                page-break-before: always;
+            }}
+
+            .appendix-title {{
+                text-align: center;
+                font-size: 17px;
+                font-weight: bold;
+                margin: 0 0 4px 0;
+            }}
+
+            .appendix-subtitle {{
+                text-align: center;
+                font-size: 17px;
+                font-weight: bold;
+                margin: 0 0 8px 0;
+            }}
+
+            .appendix-meta {{
+                font-size: 17px;
+                font-weight: bold;
+                margin: 2px 0;
+            }}
+
+            /*
+             * Appendix-A table structure:
+             *
+             * - One header table
+             * - Each applicant row in a separate table
+             *
+             * This is more reliable in wkhtmltopdf than a single long
+             * table with multiple <tr> tags.
+             */
+            .members-table-container {{
+                display: block;
+                width: 100%;
+                margin: 10px 0 8px 0;
+                padding: 0;
+            }}
+
+            .members-table {{
+                width: 100%;
+                margin: 0;
+                padding: 0;
+                border-collapse: collapse;
+                border-spacing: 0;
+                table-layout: fixed;
+                font-size: 14px;
+            }}
+
+            .members-header-table {{
+                margin: 0;
+            }}
+
+            .member-row-table {{
+                margin: 0;
+                border-top: 0;
+            }}
+
+            .members-table th,
+            .members-table td {{
+                border: 1px solid #000;
+                padding: 5px 4px;
+                vertical-align: middle;
+                overflow-wrap: break-word;
+                word-wrap: break-word;
+                line-height: 1.30;
+            }}
+
+            .members-table th {{
+                text-align: center;
+                font-size: 14px;
+                font-weight: bold;
+            }}
+
+            /*
+             * Critical page-break protection.
+             * If the record does not fit in the remaining page space,
+             * wkhtmltopdf should place the complete block on the next page.
+             */
+            .member-row-wrapper {{
+                display: block;
+                width: 100%;
+                margin: 0;
+                padding: 0;
+
+                page-break-inside: avoid !important;
+                page-break-before: auto !important;
+                page-break-after: auto !important;
+
+                break-inside: avoid !important;
+            }}
+
+            .member-row-wrapper table,
+            .member-row-wrapper tbody,
+            .member-row-wrapper tr,
+            .member-row-wrapper td {{
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }}
+
+            /*
+             * Table widths total 100%.
+             * The same CSS classes are used in both header and data tables.
+             */
+            .col-sr {{
+                width: 7%;
+            }}
+
+            .col-application {{
+                width: 20%;
+            }}
+
+            .col-name {{
+                width: 31%;
+            }}
+
+            .col-branch {{
+                width: 14%;
+            }}
+
+            .col-share {{
+                width: 15%;
+            }}
+
+            .col-fee {{
+                width: 13%;
+            }}
+
+            .center {{
+                text-align: center;
+            }}
+
+            .certification {{
+                text-align: justify;
+                font-size: 17px;
+                line-height: 1.55;
+                font-weight: bold;
+                margin: 10px 0 8px 0;
+            }}
+
+            .individual-signature {{
+                margin: 12px 0 0 0;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }}
+
+            .individual-signature-image {{
+                display: block;
+                width: 95px;
+                height: 45px;
+                max-width: 95px;
+                max-height: 45px;
+                object-fit: contain;
+                margin: 0 auto 3px auto;
+            }}
+
+            .individual-signature-text {{
+                text-align: left;
+                font-size: 17px;
+                font-weight: bold;
+                line-height: 1.40;
+                margin: 0;
+            }}
+        </style>
+    </head>
+
+    <body>
+        <!-- First Page -->
+        <div class="company-name">
+            सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.
+        </div>
+
+        <p class="heading">सभासद उपसमिती बैठकीची कार्यवाही</p>
+
+        <p class="heading">दिनांक: {esc(selected_date_dev)}</p>
+        <p class="heading">वेळ: ____११:३०____</p>
+        <p class="heading">स्थळ: मुख्यालय, गोंदिया</p>
+
+        <p class="heading">
+            विषय क्र. {esc(meeting_no_dev)}: नवीन सभासदत्व मंजूर करण्याबाबत
+        </p>
+
+        <p class="content">
+            मुख्य कार्यकारी अधिकारी यांनी सभेस अवगत केले की, संस्थेचे सभासदत्व प्राप्त करण्यासाठी विविध अर्जदारांकडून विहित नमुन्यात अर्ज प्राप्त झाले आहेत. सदर अर्जांची कार्यालयीन स्तरावर छाननी व पडताळणी करण्यात आली असून, अर्जदारांनी <strong>मल्टी स्टेट को-ऑपरेटिव्ह सोसायटीज अधिनियम, 2002,</strong> त्याअंतर्गत नियम व संस्थेच्या उपविधींनुसार आवश्यक पात्रता, प्रवेश फी, भागभांडवल रक्कम व इतर आवश्यक कागदपत्रांची पूर्तता केलेली आहे.
+        </p>
+
+        <p class="content">
+            सदर अर्जदारांची तपशीलवार यादी <strong>परिशिष्ट – अ</strong> मध्ये जोडण्यात आलेली असून ती सभासद उपसमिती समोर विचारार्थ सादर करण्यात आली.
+        </p>
+
+        <p class="resolution-title">ठराव क्र. {esc(meeting_no_dev)}</p>
+
+        <p class="content">
+            सभासद उपसमिती विषयावर सविस्तर चर्चा केली. परिशिष्ट – अ मधील सर्व अर्जदारांनी संस्थेच्या उपविधींनुसार सभासदत्वासाठी आवश्यक अटी पूर्ण केल्याचे निदर्शनास आले.
+            <br>
+            त्याअनुषंगाने खालीलप्रमाणे ठराव एकमताने मंजूर करण्यात आला:
+            <br>
+            "ठरविण्यात येते की, मल्टी स्टेट को-ऑपरेटिव्ह सोसायटीज अधिनियम, 2002, त्याअंतर्गत नियम व संस्थेच्या उपविधींमधील तरतुदींनुसार परिशिष्ट – अ मध्ये नमूद १ ते {esc(total_members_dev)} अर्जदारांना संस्थेचे नियमित सभासद म्हणून प्रवेश देण्यास मंजुरी देण्यात येत आहे. तसेच संबंधित अर्जदारांकडून विहित प्रवेश फी, भागभांडवल रक्कम व इतर आवश्यक औपचारिकता पूर्ण करून त्यांची सभासद म्हणून नोंद सदस्य नोंदवहीत करण्यात यावी व नियमानुसार सभासदत्व/भाग प्रमाणपत्र निर्गमित करण्यात यावे. असे सर्व समंतीने ठरविण्यात आले. "
+        </p>
+
+        <div class="signatory-lines">
+            <div>प्रस्तावक : {esc(proposer)}</div>
+            <div>अनुमोदक : {esc(approver)}</div>
+            <div>ठराव सर्वानुमते मंजूर.</div>
+        </div>
+
+        <table class="signature-table">
+            <tr>
+                <td>
+                    <img
+                        src="{chairman_signature_data_uri}"
+                        alt="Chairman Signature"
+                        class="signature-image"
+                    >
+                    <div class="signature-designation">अध्यक्ष</div>
+                    <div class="signature-organization">
+                        सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.<br>
+                        मुख्यालय, गोंदिया
+                    </div>
+                </td>
+
+                <td>
+                    <img
+                        src="{ceo_signature_data_uri}"
+                        alt="CEO Signature"
+                        class="signature-image"
+                    >
+                    <div class="signature-designation">मुख्य कार्यकारी अधिकारी</div>
+                    <div class="signature-organization">
+                        सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.<br>
+                        मुख्यालय, गोंदिया
+                    </div>
+                </td>
+            </tr>
+        </table>
+
+        <!-- Second Page -->
+        <div class="page-break"></div>
+
+        <p class="appendix-title">परिशिष्ट – अ</p>
+
+        <p class="appendix-subtitle">
+            नवीन सभासदत्वासाठी मंजुरी देण्यात आलेल्या अर्जदारांची यादी
+        </p>
+
+        <p class="appendix-meta">बैठक क्र.: __________</p>
+        <p class="appendix-meta">दिनांक: {esc(selected_date_dev)}</p>
+
+        <div class="members-table-container">
+
+            <!-- Header remains separate from member rows. -->
+            <table class="members-table members-header-table">
+                <thead>
+                    <tr>
+                        <th class="col-sr">अ.क्र.</th>
+                        <th class="col-application">अर्ज क्र.</th>
+                        <th class="col-name">अर्जदाराचे नाव</th>
+                        <th class="col-branch">गाव/शहर</th>
+                        <th class="col-share">भागभांडवल रक्कम</th>
+                        <th class="col-fee">प्रवेश फी</th>
+                    </tr>
+                </thead>
+            </table>
+
+            <!-- Every applicant is a separate unbreakable PDF block. -->
+            {"".join(member_rows)}
+
+        </div>
+
+        <p class="certification">
+            प्रमाणित करण्यात येते की, परिशिष्ट – अ मध्ये नमूद १ ते {esc(total_members_dev)} अर्जदारांची यादी संचालक मंडळाच्या बैठकी क्र. {esc(meeting_no_dev)} दिनांक __{esc(selected_date_dev)}__ मध्ये मंजूर करण्यात आलेल्या ठराव क्र. {esc(meeting_no_dev)} चा अविभाज्य भाग आहे.
+        </p>
+
+        <div class="individual-signature">
+            <img
+                src="{ceo_signature_data_uri}"
+                alt="CEO Signature"
+                class="individual-signature-image"
+            >
+
+            <p class="individual-signature-text">
+                मुख्य कार्यकारी अधिकारी<br>
+                सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.<br>
+                मुख्यालय, गोंदिया
+            </p>
+        </div>
+
+        <div class="individual-signature">
+            <img
+                src="{chairman_signature_data_uri}"
+                alt="Chairman Signature"
+                class="individual-signature-image"
+            >
+
             <p class="individual-signature-text">
                 अध्यक्ष<br>
                 सहयोग मल्टीस्टेट क्रेडिट को-ऑपरेटिव्ह सोसायटी लि.<br>
