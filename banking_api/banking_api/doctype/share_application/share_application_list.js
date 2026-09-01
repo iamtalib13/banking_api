@@ -102,8 +102,8 @@ frappe.listview_settings["Share Application"] = {
     refresh(listview) {
         hide_share_application_sidebar(listview);
         hide_share_application_list_view_button(listview);
-        hide_share_application_menu_button(listview);
-        fix_share_application_header_layout(listview);
+        // hide_share_application_menu_button(listview);
+        // fix_share_application_header_layout(listview);
 
         if (listview.page.__share_actions_added) return;
         listview.page.__share_actions_added = true;
@@ -184,7 +184,7 @@ function open_proceeding_form_dialog() {
             }
 
             window.open(
-                `/api/method/banking_api.banking_api.doctype.share_application.share_application.download_proceeding_form?account_opening_date=${encodeURIComponent(values.account_opening_date)}`,
+                `/api/method/banking_api.banking_api.doctype.share_application.share_application.download_proceeding_form_pdf?account_opening_date=${encodeURIComponent(values.account_opening_date)}`,
                 "_blank"
             );
 
