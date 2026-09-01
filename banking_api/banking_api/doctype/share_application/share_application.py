@@ -3848,6 +3848,8 @@ def download_proceeding_form_pdf(account_opening_date):
 
             .individual-signature {{
                 margin: 12px 0 0 0;
+                text-align: left;
+
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
             }}
@@ -3859,7 +3861,9 @@ def download_proceeding_form_pdf(account_opening_date):
                 max-width: 95px;
                 max-height: 45px;
                 object-fit: contain;
-                margin: 0 auto 3px auto;
+
+                /* Left-align the image */
+                margin: 0 0 3px 0;
             }}
 
             .individual-signature-text {{
