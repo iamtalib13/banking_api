@@ -3157,13 +3157,13 @@ def download_proceeding_form_pdf(account_opening_date):
                 padding: 0;
                 color: #000;
                 font-family: "Noto Sans Devanagari", "Nirmala UI", "Kokila", sans-serif;
-                font-size: 14px;
+                font-size: 17px;
                 line-height: 1.45;
             }}
 
             .company-name {{
                 text-align: center;
-                font-size: 24px;
+                font-size: 27px;
                 line-height: 1.30;
                 font-weight: bold;
                 margin: 0 0 8px 0;
@@ -3171,33 +3171,33 @@ def download_proceeding_form_pdf(account_opening_date):
 
             .heading {{
                 text-align: left;
-                font-size: 14px;
+                font-size: 17px;
                 font-weight: bold;
                 margin: 0 0 4px 0;
             }}
 
             .content {{
                 text-align: justify;
-                font-size: 14px;
+                font-size: 17px;
                 line-height: 1.55;
                 margin: 6px 0;
             }}
 
             .content-bold {{
-                font-size: 14px;
+                font-size: 17px;
                 line-height: 1.50;
                 font-weight: bold;
                 margin: 6px 0;
             }}
 
             .resolution-title {{
-                font-size: 14px;
+                font-size: 17px;
                 font-weight: bold;
                 margin: 10px 0 4px 0;
             }}
 
             .signatory-lines {{
-                font-size: 14px;
+                font-size: 17px;
                 font-weight: bold;
                 line-height: 1.50;
                 margin: 10px 0 0 0;
@@ -3229,14 +3229,14 @@ def download_proceeding_form_pdf(account_opening_date):
             }}
 
             .signature-designation {{
-                font-size: 14px;
+                font-size: 17px;
                 font-weight: bold;
                 line-height: 1.35;
                 margin: 0 0 2px 0;
             }}
 
             .signature-organization {{
-                font-size: 12px;
+                font-size: 15px;
                 font-weight: bold;
                 line-height: 1.35;
                 margin: 0;
@@ -3248,20 +3248,20 @@ def download_proceeding_form_pdf(account_opening_date):
 
             .appendix-title {{
                 text-align: center;
-                font-size: 14px;
+                font-size: 17px;
                 font-weight: bold;
                 margin: 0 0 4px 0;
             }}
 
             .appendix-subtitle {{
                 text-align: center;
-                font-size: 14px;
+                font-size: 17px;
                 font-weight: bold;
                 margin: 0 0 8px 0;
             }}
 
             .appendix-meta {{
-                font-size: 14px;
+                font-size: 17px;
                 font-weight: bold;
                 margin: 2px 0;
             }}
@@ -3271,7 +3271,7 @@ def download_proceeding_form_pdf(account_opening_date):
                 border-collapse: collapse;
                 table-layout: fixed;
                 margin: 10px 0 8px 0;
-                font-size: 11px;
+                font-size: 14px;
             }}
 
             .members-table th,
@@ -3286,7 +3286,7 @@ def download_proceeding_form_pdf(account_opening_date):
 
             .members-table th {{
                 text-align: center;
-                font-size: 11px;
+                font-size: 14px;
                 font-weight: bold;
             }}
 
@@ -3326,7 +3326,7 @@ def download_proceeding_form_pdf(account_opening_date):
 
             .certification {{
                 text-align: justify;
-                font-size: 14px;
+                font-size: 17px;
                 line-height: 1.55;
                 font-weight: bold;
                 margin: 10px 0 8px 0;
@@ -3350,7 +3350,7 @@ def download_proceeding_form_pdf(account_opening_date):
 
             .individual-signature-text {{
                 text-align: left;
-                font-size: 14px;
+                font-size: 17px;
                 font-weight: bold;
                 line-height: 1.40;
                 margin: 0;
@@ -3498,7 +3498,7 @@ def download_proceeding_form_pdf(account_opening_date):
         "encoding": "UTF-8",
         "quiet": "",
         "footer-right": "Page [page] of [toPage]",
-        "footer-font-size": "7",
+        "footer-font-size": "10",
         "footer-spacing": "4"
     }
 
