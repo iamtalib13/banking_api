@@ -184,7 +184,7 @@ function open_proceeding_form_dialog() {
             }
 
             window.open(
-                `/api/method/banking_api.banking_api.doctype.share_application.share_application.download_proceeding_form?account_opening_date=${encodeURIComponent(values.account_opening_date)}`,
+                `/api/method/banking_api.banking_api.doctype.share_application.share_application.download_proceeding_form_pdf?account_opening_date=${encodeURIComponent(values.account_opening_date)}`,
                 "_blank"
             );
 
