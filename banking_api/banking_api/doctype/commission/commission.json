@@ -32,7 +32,9 @@
   "commission_amount",
   "security_deposit",
   "cif",
-  "agent_security_account"
+  "agent_security_account",
+  "section_break_vlms",
+  "deferred_commission_details"
  ],
  "fields": [
   {
@@ -183,12 +185,22 @@
    "fieldtype": "Int",
    "label": "Deposit Amount",
    "search_index": 1
+  },
+  {
+   "fieldname": "section_break_vlms",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "deferred_commission_details",
+   "fieldtype": "Table",
+   "label": "Deferred Commission Details",
+   "options": "Deferred Commission Detail"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-31 15:24:27.599040",
+ "modified": "2026-09-02 16:13:41.199933",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Commission",
