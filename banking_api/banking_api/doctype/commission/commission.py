@@ -89,7 +89,7 @@ flow_data AS (
         ON tdt.acid = g.acid
         AND tdt.flow_code = 'NI'
     WHERE
-        tdt.flow_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-25'
+        tdt.flow_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-31'
     GROUP BY d.rm_id, g.foracid, g.schm_code
     HAVING SUM(tdt.flow_amt) > 0
 ),
@@ -108,14 +108,14 @@ tran_data AS (
         AND dtt.flow_code = 'NI'
     WHERE
         (
-            (dtt.tran_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-25'
+            (dtt.tran_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-31'
              AND dtt.value_date > DATE '2026-07-31')
             OR
-            (dtt.tran_date > DATE '2026-08-25'
-             AND dtt.value_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-25')
+            (dtt.tran_date > DATE '2026-08-31'
+             AND dtt.value_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-31')
             OR
-            (dtt.value_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-25'
-             AND dtt.tran_date > DATE '2026-08-30')
+            (dtt.value_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-31'
+             AND dtt.tran_date > DATE '2026-08-31')
         )
     GROUP BY d.rm_id, g.foracid, g.schm_code
     HAVING SUM(dtt.tran_amt) > 0
@@ -159,7 +159,7 @@ SELECT
         COALESCE(td.total_tran_amt,0)
     ) AS commission_amount,
     CASE
-        WHEN ad.acct_opn_date + INTERVAL '1 year' >= DATE '2026-08-25' THEN 'YES'
+        WHEN ad.acct_opn_date + INTERVAL '1 year' >= DATE '2026-08-31' THEN 'YES'
         ELSE 'NO'
     END AS one_year_completed,
     ad.deposit_period_days,
@@ -225,22 +225,22 @@ AND g.schm_code IN (
 '2201','2202','2203',
 '9001','9002'
 )
-AND g.acct_opn_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-25'
+AND g.acct_opn_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-31'
 AND g.acct_cls_flg = 'N'
 LEFT JOIN tbaadm.tam AS tam
 ON tam.acid = g.acid
 LEFT JOIN tbaadm.dtt AS dtt
 ON dtt.acid = g.acid
 AND dtt.flow_code = 'PI'
-AND dtt.tran_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-25'
+AND dtt.tran_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-31'
 AND NOT (
-dtt.value_date >= DATE '2026-05-01'
+dtt.value_date >= DATE '2026-07-01'
 AND dtt.value_date < DATE '2026-08-01'
 )
 LEFT JOIN tbaadm.tdt AS tdt
 ON tdt.acid = g.acid
 AND tdt.flow_code = 'PI'
-AND tdt.flow_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-25'
+AND tdt.flow_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-31'
 LEFT JOIN custom.dsaauth AS d2
 ON UPPER(ds.rm_id) = UPPER(d2.user_id)
 LEFT JOIN tbaadm.get AS g2
@@ -297,7 +297,7 @@ COALESCE(SUM(ad.total_tran_amt_dtt),0),
 COALESCE(SUM(ad.total_flow_amt_tdt),0)
 ) AS commission_amount,
 CASE
-WHEN ad.acct_opn_date + INTERVAL '1 year' <= DATE '2026-08-25' THEN 'YES'
+WHEN ad.acct_opn_date + INTERVAL '1 year' <= DATE '2026-08-31' THEN 'YES'
 ELSE 'NO'
 END AS one_year_completed,
 MAX(COALESCE(rd.referencenumber,'N/A')) AS referencenumber
@@ -329,6 +329,7 @@ ad.sol_id,
 ad.rm_id,
 ad.scheme_code,
 ad.deposit_period_mths;
+
 
 """
 
