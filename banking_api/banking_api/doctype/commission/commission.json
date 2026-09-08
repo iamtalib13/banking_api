@@ -194,13 +194,15 @@
    "fieldname": "deferred_commission_details",
    "fieldtype": "Table",
    "label": "Deferred Commission Details",
-   "options": "Deferred Commission Detail"
+   "options": "Deferred Commission Detail",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
+ "hide_toolbar": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-02 16:13:41.199933",
+ "modified": "2026-09-08 10:43:26.956234",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Commission",
