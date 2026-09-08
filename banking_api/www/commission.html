@@ -17,20 +17,6 @@
         <div class="dashboard">
 
             <!-- Header -->
-            <!-- <header class="dash-header">
-                <div class="header-left">
-                    <h1>Commission Dashboard</h1>
-                    <p class="subtitle">Head Office · Agent Commission Overview</p>
-                </div>
-                <button class="btn-refresh" :class="{ spinning: loading }" @click="refreshAll()">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M23 4v6h-6M1 20v-6h6" />
-                        <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
-                    </svg>
-                    Refresh
-                </button>
-            </header> -->
-
             <header class="dash-header">
                 <div class="header-left">
                     <h1>Commission Dashboard</h1>
@@ -84,15 +70,6 @@
                         <button v-if="autocomplete.sol_id.query" class="clear-btn"
                             @mousedown.prevent="clearAutocomplete('sol_id')">×</button>
 
-                        <!-- <div class="autocomplete-dropdown" v-if="autocomplete.sol_id.open">
-                            <template v-if="getMatches('sol_id').length">
-                                <div class="autocomplete-item" v-for="opt in getMatches('sol_id')" :key="opt.value"
-                                    @mousedown.prevent="selectOption('sol_id', opt)">
-                                    [[ opt.label ]]
-                                </div>
-                            </template>
-                            <div class="autocomplete-empty" v-else>No matches</div>
-                        </div> -->
                         <!-- SOL autocomplete dropdown -->
                         <div class="autocomplete-dropdown" v-if="autocomplete.sol_id.open">
                             <div class="autocomplete-item" v-for="opt in getMatches('sol_id')" :key="opt.value"
@@ -114,15 +91,6 @@
                         <button v-if="autocomplete.scheme_code.query" class="clear-btn"
                             @mousedown.prevent="clearAutocomplete('scheme_code')">×</button>
 
-                        <!-- <div class="autocomplete-dropdown" v-if="autocomplete.scheme_code.open">
-                            <template v-if="getMatches('scheme_code').length">
-                                <div class="autocomplete-item" v-for="opt in getMatches('scheme_code')" :key="opt.value"
-                                    @mousedown.prevent="selectOption('scheme_code', opt)">
-                                    [[ opt.label ]]
-                                </div>
-                            </template>
-                            <div class="autocomplete-empty" v-else>No matches</div>
-                        </div> -->
                         <!-- Scheme Code autocomplete dropdown -->
                         <div class="autocomplete-dropdown" v-if="autocomplete.scheme_code.open">
                             <div class="autocomplete-item" v-for="opt in getMatches('scheme_code')" :key="opt.value"
@@ -132,15 +100,6 @@
                             <div class="autocomplete-empty" v-if="getMatches('scheme_code').length === 0">No matches
                             </div>
                         </div>
-                        <!-- Agent Code autocomplete dropdown -->
-                        <!-- <div class="autocomplete-dropdown" v-if="autocomplete.agent_code.open">
-                            <div class="autocomplete-item" v-for="opt in getMatches('agent_code')" :key="opt.value"
-                                @mousedown.prevent="selectOption('agent_code', opt)">
-                                [[ opt.label ]]
-                            </div>
-                            <div class="autocomplete-empty" v-if="getMatches('agent_code').length === 0">No matches
-                            </div>
-                        </div> -->
                     </div>
                 </div>
 
@@ -153,16 +112,6 @@
                             @blur="onAutocompleteBlur('agent_code')">
                         <button v-if="autocomplete.agent_code.query" class="clear-btn"
                             @mousedown.prevent="clearAutocomplete('agent_code')">×</button>
-
-                        <!-- <div class="autocomplete-dropdown" v-if="autocomplete.agent_code.open">
-                            <template v-if="getMatches('agent_code').length">
-                                <div class="autocomplete-item" v-for="opt in getMatches('agent_code')" :key="opt.value"
-                                    @mousedown.prevent="selectOption('agent_code', opt)">
-                                    [[ opt.label ]]
-                                </div>
-                            </template>
-                            <div class="autocomplete-empty" v-else>No matches</div>
-                        </div> -->
                         <!-- Agent Code autocomplete dropdown -->
                         <div class="autocomplete-dropdown" v-if="autocomplete.agent_code.open">
                             <div class="autocomplete-item" v-for="opt in getMatches('agent_code')" :key="opt.value"
@@ -209,41 +158,7 @@
             <div class="table-card">
                 <div class="table-wrap">
                     <table>
-                        <!-- <thead>
-                            <tr>
-                                <th>SOL ID</th>
-                                <th>SOL Name</th>
-                                <th>Agent Code</th>
-                                <th>Scheme Code</th>
-                                <th class="num">Eligible Amount</th>
-                                <th class="num">Commission Amount</th>
-                                <th class="num">TDS</th>
-                                <th class="num">Security Deposit</th>
-                                <th class="num">Net Pay</th>
-                                <th class="num">Deduction</th>
-                                <th class="num">Final Net Pay</th>
-                            </tr>
-                        </thead> -->
-                        <!-- <thead>
-                            <tr>
-                                <th>SOL ID</th>
-                                <th>SOL Name</th>
-                                <th>Agent Code</th>
-                                <th>Scheme Code</th>
-                                <th>PAN</th>
-                                <th>PAN Status</th>
-                                <th>CIF</th>
-                                <th>Security Account</th>
-                                <th>Operative Account</th>
-                                <th class="num">Eligible Amount</th>
-                                <th class="num">Commission Amount</th>
-                                <th class="num">TDS</th>
-                                <th class="num">Security Deposit</th>
-                                <th class="num">Net Pay</th>
-                                <th class="num">Deduction</th>
-                                <th class="num">Final Net Pay</th>
-                            </tr>
-                        </thead> -->
+
                         <thead>
                             <tr>
                                 <th class="checkbox-col">
@@ -267,13 +182,6 @@
                                 <th class="num">Final Net Pay</th>
                             </tr>
                         </thead>
-                        <!-- <tbody v-if="loading">
-                            <tr class="skeleton-row" v-for="n in 6" :key="n">
-                                <td colspan="11">
-                                    <div class="skeleton-bar"></div>
-                                </td>
-                            </tr>
-                        </tbody> -->
                         <tbody v-if="loading">
                             <tr class="skeleton-row" v-for="n in 6" :key="n">
                                 <td colspan="16">
@@ -283,63 +191,6 @@
                         </tbody>
 
                         <tbody v-if="!loading && records.length > 0">
-                            <!-- <tr v-for="(row, idx) in records" :key="row.name"
-                                :style="{ '--row-delay': idx * 35 + 'ms' }" class="data-row">
-                                <td>[[ row.sol_id ]]</td>
-                                <td>[[ row.sol_description || '—' ]]</td>
-                                <td>[[ row.agent_code || '—' ]]</td>
-                                <td><span class="chip" v-if="row.scheme_code">[[ row.scheme_code ]]</span><span
-                                        v-else>—</span></td>
-                                <td class="num">[[ formatCurrency(row.eligible_amount) ]]</td>
-                                <td class="num">[[ formatCurrency(row.commission_amount) ]]</td>
-                                <td class="num">[[ formatCurrency(row.tds) ]]</td>
-                                <td class="num">[[ formatCurrency(row.security_deposit) ]]</td>
-                                <td class="num">[[ formatCurrency(row.netpay) ]]</td>
-                                <td class="num muted">NA</td>
-                                <td class="num strong muted">NA</td>
-                            </tr> -->
-                            <!-- working new code -->
-                            <!-- <tr v-for="(row, idx) in records" :key="row.name"
-                                :style="{ '--row-delay': idx * 35 + 'ms' }" class="data-row">
-                                <td>[[ row.sol_id ]]</td>
-                                <td>[[ row.sol_description || '—' ]]</td>
-                                <td>[[ row.agent_code || '—' ]]</td>
-                                <td><span class="chip" v-if="row.scheme_code">[[ row.scheme_code ]]</span><span
-                                        v-else>—</span></td>
-                                <td>[[ row.pan_card || '—' ]]</td>
-                                <td>[[ row.pan_status || '—' ]]</td>
-                                <td>[[ row.cif || '—' ]]</td>
-                                <td>[[ row.agent_security_account || '—' ]]</td>
-                                <td>[[ row.agent_operative_account || '—' ]]</td>
-                                <td class="num">[[ formatCurrency(row.eligible_amount) ]]</td>
-                                <td class="num">[[ formatCurrency(row.commission_amount) ]]</td>
-                                <td class="num">[[ formatCurrency(row.tds) ]]</td>
-                                <td class="num">[[ formatCurrency(row.security_deposit) ]]</td>
-                                <td class="num">[[ formatCurrency(row.netpay) ]]</td>
-                                <td class="num muted">NA</td>
-                                <td class="num strong muted">NA</td>
-                            </tr> -->
-
-                            <!-- <tr v-for="(row, idx) in records" :key="row.agent_code"
-                                :style="{ '--row-delay': idx * 35 + 'ms' }" class="data-row">
-                                <td>[[ row.sol_id ]]</td>
-                                <td>[[ row.sol_description || '—' ]]</td>
-                                <td>[[ row.agent_code || '—' ]]</td>
-                                <td><span class="chip" v-if="row.scheme_code">[[ row.scheme_code ]]</span><span
-                                        v-else>—</span></td>
-                                <td>[[ row.pan_card || '—' ]]</td>
-                                <td>[[ row.pan_status || '—' ]]</td>
-                                <td>[[ row.cif || '—' ]]</td>
-                                <td>[[ row.security_account || '—' ]]</td>
-                                <td>[[ row.operative_account || '—' ]]</td>
-                                <td class="num">[[ formatCurrency(row.eligible_amount) ]]</td>
-                                <td class="num">[[ formatCurrency(row.commission_amount) ]]</td>
-                                <td class="num">[[ formatCurrency(row.tds) ]]</td>
-                                <td class="num">[[ formatCurrency(row.security_deposit) ]]</td>
-                                <td class="num">[[ formatCurrency(row.netpay) ]]</td>
-                                <td class="num muted">NA</td>
-                                <td class="num strong muted">NA</td>
-                            </tr> -->
                             <tr v-for="(row, idx) in records" :key="row.agent_code"
                                 :style="{ '--row-delay': idx * 35 + 'ms' }" class="data-row"
                                 :class="{ 'row-selected': isRowSelected(row.agent_code) }">
@@ -366,15 +217,6 @@
                                 <td class="num strong muted">NA</td>
                             </tr>
                         </tbody>
-
-                        <!-- <tbody v-if="!loading && records.length === 0">
-                            <tr>
-                                <td colspan="11" class="empty-state">
-                                    <div class="empty-icon">📄</div>
-                                    No commission records found for the selected filters.
-                                </td>
-                            </tr>
-                        </tbody> -->
                         <tbody v-if="!loading && records.length === 0">
                             <tr>
                                 <td colspan="16" class="empty-state">
@@ -439,28 +281,6 @@
 
     <script>
         // ---- Field mapping matches the "Commission" doctype exactly ----
-        // const CONFIG = {
-        //     doctype: 'Commission',
-        //     fields: [
-        //         'name', 'sol_id', 'sol_description', 'agent_code', 'agent_name', 'scheme_code',
-        //         'scheme_description', 'agent_operative_account', 'customer_account_number',
-        //         'eligible_amount', 'commission_amount', 'tds', 'security_deposit', 'netpay'
-        //     ],
-        //     summaryMethod: '/api/method/banking_api.www.commission.get_commission_summary',
-        //     filterOptionsMethod: '/api/method/banking_api.www.commission.get_commission_filter_options'
-        // };
-
-        // const CONFIG = {
-        //     doctype: 'Commission',
-        //     fields: [
-        //         'name', 'sol_id', 'sol_description', 'agent_code', 'agent_name', 'scheme_code',
-        //         'scheme_description', 'agent_operative_account', 'customer_account_number',
-        //         'eligible_amount', 'commission_amount', 'tds', 'security_deposit', 'netpay',
-        //         'pan_card', 'pan_status', 'cif', 'agent_security_account', 'agent_operative_account'
-        //     ],
-        //     summaryMethod: '/api/method/banking_api.www.commission.get_commission_summary',
-        //     filterOptionsMethod: '/api/method/banking_api.www.commission.get_commission_filter_options'
-        // };
         const CONFIG = {
             groupedMethod: '/api/method/banking_api.www.commission.get_commission_grouped',
             groupedCountMethod: '/api/method/banking_api.www.commission.get_commission_grouped_count',
@@ -706,41 +526,6 @@
                 if (this.filters.agent_operative_account) f.push(['agent_operative_account', 'like', `%${this.filters.agent_operative_account}%`]);
                 return f;
             },
-
-            // async fetchRecords(resetPage) {
-            //     if (resetPage) this.pagination.page = 1;
-            //     this.loading = true;
-            //     this.errorMsg = '';
-            //     try {
-            //         const filters = this.buildFilters();
-
-            //         const [listRes, countRes] = await Promise.all([
-            //             apiGet('/api/method/frappe.client.get_list', {
-            //                 doctype: CONFIG.doctype,
-            //                 fields: JSON.stringify(CONFIG.fields),
-            //                 filters: JSON.stringify(filters),
-            //                 order_by: 'modified desc',
-            //                 limit_page_length: this.pagination.pageSize,
-            //                 limit_start: (this.pagination.page - 1) * this.pagination.pageSize
-            //             }),
-            //             apiGet('/api/method/frappe.client.get_count', {
-            //                 doctype: CONFIG.doctype,
-            //                 filters: JSON.stringify(filters)
-            //             })
-            //         ]);
-
-            //         this.records = listRes || [];
-            //         this.pagination.total = countRes || 0;
-
-            //         await this.fetchSummary(filters);
-            //     } catch (e) {
-            //         console.error('Failed to load commission data', e);
-            //         this.errorMsg = e.message || 'Failed to load records.';
-            //         this.records = [];
-            //     } finally {
-            //         this.loading = false;
-            //     }
-            // },
 
 
             async fetchRecords(resetPage) {
