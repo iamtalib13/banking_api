@@ -1048,138 +1048,198 @@ def _create_commission_payment_if_missing(payment_data):
 
 def create_commission_payment_records(commission_doc):
     """
-    Create Commission Payment schedule records from one Commission document.
+    Create payment records after Commission calculation.
 
-    Normal commission types:
-    - One Commission Payment document.
+    Normal type:
+    - One consolidated payment record for the agent.
 
-    Deferred commission type:
-    - One Commission Payment document for every row in
-      Commission.deferred_commission_details.
+    Deferred type:
+    - One payment record per yearly deferred schedule row.
     """
-    if not commission_doc:
-        frappe.throw(_("Commission document is required"))
-
-    commission_type = _get_product_commission_type(
-        commission_doc.scheme_code
+    commission_type = frappe.db.get_value(
+        "Product",
+        str(commission_doc.scheme_code).strip(),
+        "commission_type",
     )
 
-    payment_results = []
-
-    # ----------------------------------------------------------
-    # NORMAL COMMISSION TYPES
-    # Fixed Rate / Age Based / Eligible Amount Based
-    # ----------------------------------------------------------
-    if commission_type != "Deferred":
-        payment_data = {
-            "commission": commission_doc.name,
-            "agent_code": commission_doc.agent_code,
-            "payment_type": "Normal",
-            "payment_year": 1,
-            "due_date": commission_doc.creation,
-            "source_deferred_detail": None,
-
-            "gross_commission": flt(commission_doc.commission_amount),
-            "tds_amount": flt(commission_doc.tds),
-            "security_deposit_amount": flt(
-                commission_doc.security_deposit
-            ),
-            "netpay_amount": flt(commission_doc.netpay),
-            "deduction_amount": flt(commission_doc.deduction),
-            "final_netpay": flt(commission_doc.final_net_pay),
-
-            "payment_status": "Pending",
-        }
-
-        payment_results.append(
-            _create_commission_payment_if_missing(payment_data)
-        )
-
-        return {
-            "commission_type": commission_type,
-            "payment_type": "Normal",
-            "created_count": sum(
-                1 for row in payment_results if row["created"]
-            ),
-            "existing_count": sum(
-                1 for row in payment_results if not row["created"]
-            ),
-            "payments": payment_results,
-        }
-
-    # ----------------------------------------------------------
-    # DEFERRED COMMISSION TYPE
-    # ----------------------------------------------------------
-    if not commission_doc.deferred_commission_details:
+    if not commission_type:
         frappe.throw(
-            _(
-                "Deferred Commission Details are missing in Commission: {0}. "
-                "Calculate the Deferred commission schedule first."
-            ).format(commission_doc.name)
+            _("Commission Type is missing for Scheme Code: {0}").format(
+                commission_doc.scheme_code
+            )
         )
 
-    for deferred_row in commission_doc.deferred_commission_details:
-        payment_year = int(deferred_row.year_no or 0)
-
-        if payment_year <= 0:
-            frappe.throw(
-                _(
-                    "Invalid Year No in Deferred Commission Detail "
-                    "for Commission: {0}"
-                ).format(commission_doc.name)
-            )
-
-        if not deferred_row.due_date:
-            frappe.throw(
-                _(
-                    "Due Date is missing for Deferred Year {0} "
-                    "in Commission: {1}"
-                ).format(
-                    payment_year,
-                    commission_doc.name,
-                )
-            )
-
-        deferred_netpay = flt(deferred_row.netpay)
-
-        payment_data = {
-            "commission": commission_doc.name,
-            "agent_code": commission_doc.agent_code,
-            "payment_type": "Deferred",
-            "payment_year": payment_year,
-            "due_date": deferred_row.due_date,
-            "source_deferred_detail": deferred_row.name,
-
-            "gross_commission": flt(deferred_row.gross_commission),
-            "tds_amount": flt(deferred_row.tds),
-            "security_deposit_amount": flt(
-                deferred_row.security_deposit
-            ),
-            "netpay_amount": deferred_netpay,
-            "deduction_amount": 0,
-            "final_netpay": deferred_netpay,
-
-            "payment_status": (
-                "Due"
-                if deferred_row.status == "Due"
-                else "Pending"
+    if commission_type == "Deferred":
+        return {
+            "commission_type": "Deferred",
+            "deferred_result": _create_deferred_payment_records(
+                commission_doc
             ),
         }
-
-        payment_results.append(
-            _create_commission_payment_if_missing(payment_data)
-        )
 
     return {
         "commission_type": commission_type,
-        "payment_type": "Deferred",
-        "created_count": sum(
-            1 for row in payment_results if row["created"]
+        "normal_result": _create_normal_agent_payment_if_missing(
+            commission_doc.agent_code
         ),
-        "existing_count": sum(
-            1 for row in payment_results if not row["created"]
-        ),
-        "payments": payment_results,
+    }
+
+
+def _get_deferred_product_codes():
+    """
+    Return Product document names configured with Deferred commission type.
+
+    Product.name equals Product.product_code because Product uses:
+    autoname = field:product_code
+    """
+    return frappe.get_all(
+        "Product",
+        filters={"commission_type": "Deferred"},
+        pluck="name",
+    )
+
+
+def _create_normal_agent_payment_if_missing(agent_code, due_date=None):
+    """
+    Create one consolidated Commission Payment record for one agent.
+
+    Includes only Commission records whose Product commission type
+    is NOT Deferred.
+    """
+    if not agent_code:
+        frappe.throw(_("Agent Code is required"))
+
+    agent_code = str(agent_code).strip()
+    due_date = due_date or frappe.utils.today()
+
+    deferred_product_codes = _get_deferred_product_codes()
+
+    deferred_condition = ""
+    values = {"agent_code": agent_code}
+
+    if deferred_product_codes:
+        placeholders = ", ".join(
+            [f"%(deferred_scheme_{i})s" for i in range(
+                len(deferred_product_codes))]
+        )
+
+        deferred_condition = f"""
+            AND c.scheme_code NOT IN ({placeholders})
+        """
+
+        for i, scheme_code in enumerate(deferred_product_codes):
+            values[f"deferred_scheme_{i}"] = scheme_code
+
+    totals = frappe.db.sql(
+        f"""
+        SELECT
+            COALESCE(
+                SUM(CAST(NULLIF(TRIM(c.commission_amount), '') AS DECIMAL(18,2))),
+                0
+            ) AS gross_commission,
+
+            COALESCE(
+                SUM(CAST(NULLIF(TRIM(c.tds), '') AS DECIMAL(18,2))),
+                0
+            ) AS tds_amount,
+
+            COALESCE(
+                SUM(CAST(NULLIF(TRIM(c.security_deposit), '') AS DECIMAL(18,2))),
+                0
+            ) AS security_deposit_amount,
+
+            COALESCE(
+                SUM(CAST(NULLIF(TRIM(c.netpay), '') AS DECIMAL(18,2))),
+                0
+            ) AS netpay_amount,
+
+            MAX(CAST(NULLIF(TRIM(c.deduction), '') AS DECIMAL(18,2))) AS deduction_amount,
+
+            MAX(CAST(NULLIF(TRIM(c.final_net_pay), '') AS DECIMAL(18,2))) AS final_netpay
+
+        FROM `tabCommission` c
+        WHERE c.agent_code = %(agent_code)s
+        AND c.docstatus < 2
+        {deferred_condition}
+        """,
+        values,
+        as_dict=True,
+    )
+
+    totals = totals[0] if totals else {}
+
+    gross_commission = flt(totals.get("gross_commission"))
+    tds_amount = flt(totals.get("tds_amount"))
+    security_deposit_amount = flt(totals.get("security_deposit_amount"))
+    netpay_amount = flt(totals.get("netpay_amount"))
+    deduction_amount = flt(totals.get("deduction_amount"))
+    final_netpay = flt(totals.get("final_netpay"))
+
+    if gross_commission <= 0 and netpay_amount <= 0:
+        return {
+            "created": False,
+            "reason": "No normal Commission amount available for this agent",
+            "name": None,
+        }
+
+    existing_payment = frappe.db.exists(
+        "Commission Payment",
+        {
+            "agent_code": agent_code,
+            "payment_type": "Normal",
+            "due_date": due_date,
+            "docstatus": ("<", 2),
+        },
+    )
+
+    if existing_payment:
+        payment_doc = frappe.get_doc("Commission Payment", existing_payment)
+
+        # Do not alter a payment that is currently processing or already paid.
+        if payment_doc.payment_status in ("Processing", "Paid"):
+            return {
+                "created": False,
+                "updated": False,
+                "name": payment_doc.name,
+                "reason": "Payment is already Processing or Paid",
+            }
+
+        payment_doc.gross_commission = gross_commission
+        payment_doc.tds_amount = tds_amount
+        payment_doc.security_deposit_amount = security_deposit_amount
+        payment_doc.netpay_amount = netpay_amount
+        payment_doc.deduction_amount = deduction_amount
+        payment_doc.final_netpay = final_netpay
+        payment_doc.payment_status = "Pending"
+        payment_doc.save(ignore_permissions=True)
+
+        return {
+            "created": False,
+            "updated": True,
+            "name": payment_doc.name,
+        }
+
+    payment_doc = frappe.get_doc({
+        "doctype": "Commission Payment",
+        "agent_code": agent_code,
+        "payment_type": "Normal",
+        "payment_year": 1,
+        "due_date": due_date,
+        "gross_commission": gross_commission,
+        "tds_amount": tds_amount,
+        "security_deposit_amount": security_deposit_amount,
+        "netpay_amount": netpay_amount,
+        "deduction_amount": deduction_amount,
+        "final_netpay": final_netpay,
+        "payment_status": "Pending",
+    })
+
+    payment_doc.insert(ignore_permissions=True)
+
+    return {
+        "created": True,
+        "updated": False,
+        "name": payment_doc.name,
     }
 
 
@@ -1520,6 +1580,98 @@ def calculate_commission_amount(docname):
         })
 
     return response
+
+
+def _create_deferred_payment_records(commission_doc):
+    """
+    Create one Commission Payment document for each row in
+    Commission.deferred_commission_details.
+
+    Each Deferred payment remains linked to its individual Commission record,
+    because every annual installment has its own source record, year, and due date.
+    """
+    if not commission_doc.deferred_commission_details:
+        return {
+            "created_count": 0,
+            "existing_count": 0,
+            "payments": [],
+        }
+
+    payment_results = []
+
+    for deferred_row in commission_doc.deferred_commission_details:
+        payment_year = int(deferred_row.year_no or 0)
+
+        if payment_year <= 0:
+            frappe.throw(
+                _("Invalid Deferred Year No in Commission: {0}").format(
+                    commission_doc.name
+                )
+            )
+
+        if not deferred_row.due_date:
+            frappe.throw(
+                _("Due Date is required for Deferred Year {0}").format(
+                    payment_year
+                )
+            )
+
+        existing_payment = frappe.db.exists(
+            "Commission Payment",
+            {
+                "commission": commission_doc.name,
+                "payment_type": "Deferred",
+                "payment_year": payment_year,
+                "docstatus": ("<", 2),
+            },
+        )
+
+        if existing_payment:
+            payment_results.append({
+                "created": False,
+                "name": existing_payment,
+            })
+            continue
+
+        payment_doc = frappe.get_doc({
+            "doctype": "Commission Payment",
+            "commission": commission_doc.name,
+            "agent_code": commission_doc.agent_code,
+            "payment_type": "Deferred",
+            "payment_year": payment_year,
+            "due_date": deferred_row.due_date,
+            "source_deferred_detail": deferred_row.name,
+            "gross_commission": flt(deferred_row.gross_commission),
+            "tds_amount": flt(deferred_row.tds),
+            "security_deposit_amount": flt(
+                deferred_row.security_deposit
+            ),
+            "netpay_amount": flt(deferred_row.netpay),
+            "deduction_amount": 0,
+            "final_netpay": flt(deferred_row.netpay),
+            "payment_status": (
+                "Due"
+                if deferred_row.status == "Due"
+                else "Pending"
+            ),
+        })
+
+        payment_doc.insert(ignore_permissions=True)
+
+        payment_results.append({
+            "created": True,
+            "name": payment_doc.name,
+        })
+
+    return {
+        "created_count": sum(
+            1 for payment in payment_results if payment["created"]
+        ),
+        "existing_count": sum(
+            1 for payment in payment_results if not payment["created"]
+        ),
+        "payments": payment_results,
+    }
 
 
 def _get_product_with_deferred_schedule(product_name):
