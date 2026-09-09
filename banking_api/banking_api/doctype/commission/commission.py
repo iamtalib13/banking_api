@@ -39,161 +39,6 @@ def db_connection():
         frappe.throw(_("Database Connection Error"))
 
 
-# QUERY_1 = """
-# WITH account_data AS (
-#     SELECT
-#         d.rm_id,
-#         g2.emp_name AS rm_name,
-#         d2.operacc,
-#         g.cif_id,
-#         g.acct_opn_date,
-#         a2.relationshipopeningdate AS cif_id_opening_date,
-#         g.foracid,
-#         g.sol_id,
-#         sol.sol_desc,
-#         g.schm_code AS scheme_code,
-#         gsp.schm_desc,
-#         tam.deposit_period_days,
-#         tam.deposit_period_mths,
-#         tam.deposit_amount,
-#         /* ADDED - ACCOUNT NAME FROM GAM */
-#         g.acct_name
-#     FROM custom.dsamap d
-#     INNER JOIN tbaadm.gam g
-#         ON g.foracid = d.account_number
-#         AND g.schm_code IN ('2004','2005','2006','2010','2011','2012','2013','2014','2015')
-#     LEFT JOIN tbaadm.tam tam
-#         ON tam.acid = g.acid
-#     LEFT JOIN crmuser.accounts a2
-#         ON g.cif_id = a2.orgkey
-#     LEFT JOIN tbaadm.sol sol
-#         ON g.sol_id = sol.sol_id
-#     LEFT JOIN tbaadm.gsp gsp
-#         ON g.schm_code = gsp.schm_code
-#     LEFT JOIN custom.dsaauth d2
-#         ON d.rm_id = d2.user_id
-#     LEFT JOIN tbaadm.get g2
-#         ON d2.user_id = g2.emp_id
-# ),
-# flow_data AS (
-#     SELECT
-#         d.rm_id,
-#         g.foracid,
-#         g.schm_code,
-#         SUM(tdt.flow_amt) AS total_flow_amount
-#     FROM custom.dsamap d
-#     INNER JOIN tbaadm.gam g
-#         ON g.foracid = d.account_number
-#         AND g.schm_code IN ('2004','2005','2006','2010','2011','2012','2013','2014','2015')
-#     INNER JOIN tbaadm.tdt tdt
-#         ON tdt.acid = g.acid
-#         AND tdt.flow_code = 'NI'
-#     WHERE
-#         tdt.flow_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-31'
-#     GROUP BY d.rm_id, g.foracid, g.schm_code
-#     HAVING SUM(tdt.flow_amt) > 0
-# ),
-# tran_data AS (
-#     SELECT
-#         d.rm_id,
-#         g.foracid,
-#         g.schm_code,
-#         SUM(dtt.tran_amt) AS total_tran_amt
-#     FROM custom.dsamap d
-#     INNER JOIN tbaadm.gam g
-#         ON g.foracid = d.account_number
-#         AND g.schm_code IN ('2004','2005','2006','2010','2011','2012','2013','2014','2015')
-#     INNER JOIN tbaadm.dtt dtt
-#         ON dtt.acid = g.acid
-#         AND dtt.flow_code = 'NI'
-#     WHERE
-#         (
-#             (dtt.tran_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-31'
-#              AND dtt.value_date > DATE '2026-07-31')
-#             OR
-#             (dtt.tran_date > DATE '2026-08-31'
-#              AND dtt.value_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-31')
-#             OR
-#             (dtt.value_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-31'
-#              AND dtt.tran_date > DATE '2026-08-31')
-#         )
-#     GROUP BY d.rm_id, g.foracid, g.schm_code
-#     HAVING SUM(dtt.tran_amt) > 0
-# ),
-# reference_data AS (
-#     SELECT
-#         ed.referencenumber,
-#         da.user_id AS rm_id
-#     FROM crmuser.entitydocument ed
-#     INNER JOIN tbaadm.gam g
-#         ON ed.orgkey = g.cif_id
-#     INNER JOIN custom.dsaauth da
-#         ON g.foracid = da.operacc
-#     WHERE ed.doccode = 'PAN'
-# )
-# SELECT
-#     ad.rm_id,
-#     ad.rm_name,
-#     ad.operacc,
-#     ad.cif_id,
-#     ad.acct_opn_date,
-#     ad.acct_opn_date,
-#     ad.cif_id_opening_date,
-#     ad.foracid,
-#     /* ADDED - ACCOUNT NAME */
-#     ad.acct_name,
-#     ad.deposit_amount,
-#     COALESCE(fd.total_flow_amount,0) AS total_flow_amount,
-#     /* CHANGED - SCHEME 2004 KA FLOW AMT SAME RAHEGA
-#        SCHEME 2005-2015 KA * 3 HOGA */
-#     CASE
-#         WHEN ad.scheme_code = '2004'
-#             THEN COALESCE(fd.total_flow_amount,0)
-#         WHEN ad.scheme_code IN ('2005','2006','2010','2011','2012','2013','2014','2015')
-#             THEN COALESCE(fd.total_flow_amount,0) * 3
-#         ELSE COALESCE(fd.total_flow_amount,0)
-#     END AS adjusted_flow_amount,
-#     COALESCE(td.total_tran_amt,0) AS total_tran_amt,
-#     LEAST(
-#         COALESCE(fd.total_flow_amount,0),
-#         COALESCE(td.total_tran_amt,0)
-#     ) AS commission_amount,
-#     CASE
-#         WHEN ad.acct_opn_date + INTERVAL '1 year' >= DATE '2026-08-31' THEN 'YES'
-#         ELSE 'NO'
-#     END AS one_year_completed,
-#     ad.deposit_period_days,
-#     ad.deposit_period_mths,
-#     COALESCE(rd.referencenumber,'N/A') AS referencenumber,
-#     ad.scheme_code,
-#     ad.schm_desc,
-#     ad.sol_id,
-#     ad.sol_desc
-# FROM account_data ad
-# LEFT JOIN flow_data fd
-#     ON ad.rm_id = fd.rm_id
-#     AND ad.foracid = fd.foracid
-#     AND ad.scheme_code = fd.schm_code
-# LEFT JOIN tran_data td
-#     ON ad.rm_id = td.rm_id
-#     AND ad.foracid = td.foracid
-#     AND ad.scheme_code = td.schm_code
-# LEFT JOIN reference_data rd
-#     ON ad.rm_id = rd.rm_id
-# WHERE
-#     COALESCE(td.total_tran_amt,0) > 0
-#     -- ADDED: SIRF RDDSA AUR DDDSA PREFIX WALE RM_ID
-# AND (
-#     UPPER(ad.rm_id) LIKE 'RDDSA%'
-#     OR UPPER(ad.rm_id) LIKE 'DDDSA%'
-# )
-# ORDER BY
-#     ad.foracid,
-#     ad.rm_id,
-#     ad.scheme_code;
-#     """
-
-
 QUERY_1 = """
 WITH account_data AS (
     SELECT
@@ -676,6 +521,168 @@ def fetch_and_create_commission():
             conn.close()
 
 
+# new fetch_and_create_commission function
+# @frappe.whitelist()
+# def fetch_and_create_commission():
+#     """
+#     Execute Query 2 first, then Query 1.
+
+#     Each Commission document is committed individually.
+
+#     Important:
+#     Query 1 and Query 2 use independent PostgreSQL connections.
+#     This reduces long-session hot-standby recovery conflicts.
+#     """
+#     frappe.only_for(("System Manager",))
+
+#     inserted_docs = []
+#     errors = []
+
+#     query_1_rows = []
+#     query_2_rows = []
+
+#     query_1_created = 0
+#     query_2_created = 0
+
+#     query_1_error = None
+#     query_2_error = None
+
+#     # ==========================================================
+#     # QUERY 2
+#     # ==========================================================
+#     conn_query_2 = None
+
+#     try:
+#         conn_query_2 = db_connection()
+
+#         query_2_rows = _run_query(conn_query_2, QUERY_2)
+
+#         for row in query_2_rows:
+#             try:
+#                 docname = _create_commission_from_query_2(row)
+
+#                 inserted_docs.append(docname)
+#                 query_2_created += 1
+
+#             except Exception:
+#                 frappe.db.rollback()
+
+#                 error_message = (
+#                     f"Query 2 row failed for foracid "
+#                     f"{row.get('foracid')}: {frappe.get_traceback()}"
+#                 )
+
+#                 frappe.log_error(
+#                     error_message,
+#                     "Commission Import Query 2 Row Error",
+#                 )
+
+#                 errors.append(error_message)
+
+#     except Exception:
+#         query_2_error = frappe.get_traceback()
+
+#         frappe.log_error(
+#             query_2_error,
+#             "Commission Import Query 2 Failed",
+#         )
+
+#         errors.append(
+#             "Query 2 failed. Check Error Log: Commission Import Query 2 Failed"
+#         )
+
+#     finally:
+#         if conn_query_2:
+#             conn_query_2.close()
+
+#     # ==========================================================
+#     # QUERY 1
+#     # Uses a fresh PostgreSQL connection.
+#     # ==========================================================
+#     conn_query_1 = None
+
+#     try:
+#         conn_query_1 = db_connection()
+
+#         query_1_rows = _run_query(conn_query_1, QUERY_1)
+
+#         for row in query_1_rows:
+#             try:
+#                 docname = _create_commission_from_query_1(row)
+
+#                 inserted_docs.append(docname)
+#                 query_1_created += 1
+
+#             except Exception:
+#                 frappe.db.rollback()
+
+#                 error_message = (
+#                     f"Query 1 row failed for foracid "
+#                     f"{row.get('foracid')}: {frappe.get_traceback()}"
+#                 )
+
+#                 frappe.log_error(
+#                     error_message,
+#                     "Commission Import Query 1 Row Error",
+#                 )
+
+#                 errors.append(error_message)
+
+#     except Exception:
+#         query_1_error = frappe.get_traceback()
+
+#         frappe.log_error(
+#             query_1_error,
+#             "Commission Import Query 1 Failed",
+#         )
+
+#         errors.append(
+#             "Query 1 failed due to external PostgreSQL query conflict. "
+#             "Query 2 records, if created, remain safely committed."
+#         )
+
+#     finally:
+#         if conn_query_1:
+#             conn_query_1.close()
+
+#     frappe.db.commit()
+
+#     # Return partial status instead of raising an HTTP 500 after
+#     # Query 2 has already been successfully committed.
+#     if query_1_error or query_2_error:
+#         status = "partial"
+#     else:
+#         status = "completed"
+
+#     return {
+#         "status": status,
+
+#         "query_1_fetched": len(query_1_rows),
+#         "query_2_fetched": len(query_2_rows),
+
+#         "query_1_created": query_1_created,
+#         "query_2_created": query_2_created,
+
+#         "inserted_count": len(inserted_docs),
+
+#         "error_count": len(errors),
+#         "errors": errors,
+
+#         "query_1_failed": bool(query_1_error),
+#         "query_2_failed": bool(query_2_error),
+
+#         "message": (
+#             "Commission import completed successfully."
+#             if status == "completed"
+#             else (
+#                 "Commission import completed partially. "
+#                 "Previously committed records are safe. "
+#                 "Check Error Log for the failed query."
+#             )
+#         ),
+#     }
+
+
 @frappe.whitelist()
 def run_fetch_and_create_commission_with_progress(limit=None):
     """
@@ -1125,6 +1132,219 @@ def _update_agent_deduction_and_final_net_pay(agent_code):
     }
 
 
+def _get_product_commission_type(scheme_code):
+    """
+    Return Commission Type configured in Product.
+
+    Product name equals Product.product_code because Product uses:
+    autoname = field:product_code
+    """
+    if not scheme_code:
+        frappe.throw(_("Scheme Code is required to create Commission Payment"))
+
+    product_name = str(scheme_code).strip()
+
+    commission_type = frappe.db.get_value(
+        "Product",
+        product_name,
+        "commission_type",
+    )
+
+    if not commission_type:
+        frappe.throw(
+            _("Commission Type is not configured in Product: {0}").format(
+                product_name
+            )
+        )
+
+    return commission_type
+
+
+def _commission_payment_exists(commission_name, payment_type, payment_year):
+    """
+    Check whether a Commission Payment already exists.
+
+    Duplicate key:
+    Commission + Payment Type + Payment Year.
+    """
+    return frappe.db.exists(
+        "Commission Payment",
+        {
+            "commission": commission_name,
+            "payment_type": payment_type,
+            "payment_year": payment_year,
+            "docstatus": ("<", 2),
+        },
+    )
+
+
+def _create_commission_payment_if_missing(payment_data):
+    """
+    Insert a Commission Payment only if the same schedule/payment
+    record does not already exist.
+    """
+    existing_payment = _commission_payment_exists(
+        payment_data.get("commission"),
+        payment_data.get("payment_type"),
+        payment_data.get("payment_year"),
+    )
+
+    if existing_payment:
+        return {
+            "created": False,
+            "name": existing_payment,
+        }
+
+    payment_doc = frappe.get_doc({
+        "doctype": "Commission Payment",
+        **payment_data,
+    })
+
+    payment_doc.insert(ignore_permissions=True)
+
+    return {
+        "created": True,
+        "name": payment_doc.name,
+    }
+
+
+def create_commission_payment_records(commission_doc):
+    """
+    Create Commission Payment schedule records from one Commission document.
+
+    Normal commission types:
+    - One Commission Payment document.
+
+    Deferred commission type:
+    - One Commission Payment document for every row in
+      Commission.deferred_commission_details.
+    """
+    if not commission_doc:
+        frappe.throw(_("Commission document is required"))
+
+    commission_type = _get_product_commission_type(
+        commission_doc.scheme_code
+    )
+
+    payment_results = []
+
+    # ----------------------------------------------------------
+    # NORMAL COMMISSION TYPES
+    # Fixed Rate / Age Based / Eligible Amount Based
+    # ----------------------------------------------------------
+    if commission_type != "Deferred":
+        payment_data = {
+            "commission": commission_doc.name,
+            "agent_code": commission_doc.agent_code,
+            "payment_type": "Normal",
+            "payment_year": 1,
+            "due_date": commission_doc.creation,
+            "source_deferred_detail": None,
+
+            "gross_commission": flt(commission_doc.commission_amount),
+            "tds_amount": flt(commission_doc.tds),
+            "security_deposit_amount": flt(
+                commission_doc.security_deposit
+            ),
+            "netpay_amount": flt(commission_doc.netpay),
+            "deduction_amount": flt(commission_doc.deduction),
+            "final_netpay": flt(commission_doc.final_net_pay),
+
+            "payment_status": "Pending",
+        }
+
+        payment_results.append(
+            _create_commission_payment_if_missing(payment_data)
+        )
+
+        return {
+            "commission_type": commission_type,
+            "payment_type": "Normal",
+            "created_count": sum(
+                1 for row in payment_results if row["created"]
+            ),
+            "existing_count": sum(
+                1 for row in payment_results if not row["created"]
+            ),
+            "payments": payment_results,
+        }
+
+    # ----------------------------------------------------------
+    # DEFERRED COMMISSION TYPE
+    # ----------------------------------------------------------
+    if not commission_doc.deferred_commission_details:
+        frappe.throw(
+            _(
+                "Deferred Commission Details are missing in Commission: {0}. "
+                "Calculate the Deferred commission schedule first."
+            ).format(commission_doc.name)
+        )
+
+    for deferred_row in commission_doc.deferred_commission_details:
+        payment_year = int(deferred_row.year_no or 0)
+
+        if payment_year <= 0:
+            frappe.throw(
+                _(
+                    "Invalid Year No in Deferred Commission Detail "
+                    "for Commission: {0}"
+                ).format(commission_doc.name)
+            )
+
+        if not deferred_row.due_date:
+            frappe.throw(
+                _(
+                    "Due Date is missing for Deferred Year {0} "
+                    "in Commission: {1}"
+                ).format(
+                    payment_year,
+                    commission_doc.name,
+                )
+            )
+
+        deferred_netpay = flt(deferred_row.netpay)
+
+        payment_data = {
+            "commission": commission_doc.name,
+            "agent_code": commission_doc.agent_code,
+            "payment_type": "Deferred",
+            "payment_year": payment_year,
+            "due_date": deferred_row.due_date,
+            "source_deferred_detail": deferred_row.name,
+
+            "gross_commission": flt(deferred_row.gross_commission),
+            "tds_amount": flt(deferred_row.tds),
+            "security_deposit_amount": flt(
+                deferred_row.security_deposit
+            ),
+            "netpay_amount": deferred_netpay,
+            "deduction_amount": 0,
+            "final_netpay": deferred_netpay,
+
+            "payment_status": (
+                "Due"
+                if deferred_row.status == "Due"
+                else "Pending"
+            ),
+        }
+
+        payment_results.append(
+            _create_commission_payment_if_missing(payment_data)
+        )
+
+    return {
+        "commission_type": commission_type,
+        "payment_type": "Deferred",
+        "created_count": sum(
+            1 for row in payment_results if row["created"]
+        ),
+        "existing_count": sum(
+            1 for row in payment_results if not row["created"]
+        ),
+        "payments": payment_results,
+    }
+
+
 @frappe.whitelist()
 def calculate_commission_amount(docname):
     """
@@ -1423,6 +1643,12 @@ def calculate_commission_amount(docname):
         commission_doc.agent_code
     )
 
+    commission_doc.reload()
+
+    payment_result = create_commission_payment_records(
+        commission_doc
+    )
+
     frappe.db.commit()
 
     response = {
@@ -1445,6 +1671,7 @@ def calculate_commission_amount(docname):
         "tds": tds,
         "security_deposit": security_deposit,
         "netpay": netpay,
+        "commission_payment": payment_result,
     }
 
     if is_deferred:
