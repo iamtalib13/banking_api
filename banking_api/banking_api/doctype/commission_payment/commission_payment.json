@@ -17,6 +17,7 @@
   "payment_type",
   "due_date",
   "agent_code",
+  "agent_operative_account",
   "agent_scheme_section",
   "gross_commission",
   "security_deposit_amount",
@@ -180,13 +181,21 @@
    "fieldname": "agent_code",
    "fieldtype": "Data",
    "label": "Agent Code"
+  },
+  {
+   "fieldname": "agent_operative_account",
+   "fieldtype": "Data",
+   "label": "Agent Operative Account",
+   "read_only": 1,
+   "reqd": 1,
+   "search_index": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-09-09 16:52:16.491242",
+ "modified": "2026-09-10 11:58:56.077013",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Commission Payment",

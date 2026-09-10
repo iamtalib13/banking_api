@@ -23,6 +23,11 @@ class CommissionPayment(Document):
                 _("Agent Code is required")
             )
 
+        if not self.agent_operative_account:
+            frappe.throw(
+                _("Agent Operative Account is required")
+            )
+
         if not self.payment_year or self.payment_year <= 0:
             frappe.throw(
                 _("Payment Year must be greater than zero")
