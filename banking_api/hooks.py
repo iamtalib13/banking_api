@@ -196,9 +196,9 @@ scheduler_events = {
     "cron": {
 
         # sync employees to finacle every night at 2 AM
-        "0 2 * * *": [
-            "banking_api.finacle_sync.sync_employees_to_finacle"
-        ],
+        # "0 2 * * *": [
+        #     "banking_api.finacle_sync.sync_employees_to_finacle"
+        # ],
 
         # run share application sync and payment
         "0 11,14,17 * * 1-6": [
