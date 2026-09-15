@@ -338,6 +338,179 @@ def _update_payment_failure(
     frappe.db.commit()
 
 
+# def _build_finacle_xml(
+#     debit_account,
+#     credit_account,
+#     amount,
+#     settings,
+#     payment_doc,
+# ):
+#     """
+#     Build Finacle XferTrnAdd XML.
+
+#     Debit account:
+#         Commission Settings.debit_account_number
+
+#     Credit account:
+#         Commission Payment.agent_operative_account
+
+#     Amount:
+#         Commission Payment.final_netpay
+#     """
+#     current_date = datetime.now().strftime(
+#         "%Y-%m-%dT%H:%M:%S.%f"
+#     )[:-3]
+
+#     request_uuid = random.randint(
+#         1000000000,
+#         9999999999,
+#     )
+
+#     transaction_type = (
+#         getattr(settings, "transaction_type", None)
+#         or "T"
+#     )
+
+#     transaction_sub_type = (
+#         getattr(settings, "transaction_sub_type", None)
+#         or "CI"
+#     )
+
+#     bank_id = (
+#         getattr(settings, "bank_id", None)
+#         or "01"
+#     )
+
+#     channel_id = (
+#         getattr(settings, "channel_id", None)
+#         or "COR"
+#     )
+
+#     debit_particulars = (
+#         getattr(settings, "debit_particulars", None)
+#         or "Commission Payment Debited"
+#     )
+
+#     credit_particulars = (
+#         getattr(settings, "credit_particulars", None)
+#         or "Agent Commission Credited"
+#     )
+
+#     payment_reference = (
+#         f"Commission Payment {payment_doc.name} "
+#         f"Agent {payment_doc.agent_code}"
+#     )
+
+#     debit_account = xml_escape(
+#         str(debit_account or "").strip()
+#     )
+
+#     credit_account = xml_escape(
+#         str(credit_account or "").strip()
+#     )
+
+#     transaction_type = xml_escape(
+#         str(transaction_type or "").strip()
+#     )
+
+#     transaction_sub_type = xml_escape(
+#         str(transaction_sub_type or "").strip()
+#     )
+
+#     bank_id = xml_escape(
+#         str(bank_id or "").strip()
+#     )
+
+#     channel_id = xml_escape(
+#         str(channel_id or "").strip()
+#     )
+
+#     debit_particulars = xml_escape(
+#         str(debit_particulars or "").strip()
+#     )
+
+#     credit_particulars = xml_escape(
+#         str(credit_particulars or "").strip()
+#     )
+
+#     payment_reference = xml_escape(
+#         str(payment_reference or "").strip()
+#     )
+
+#     amount = _money(amount)
+
+#     return f"""<?xml version="1.0" encoding="UTF-8"?>
+# <FIXML xsi:schemaLocation="http://www.finacle.com/fixml XferTrnAdd.xsd"
+#        xmlns="http://www.finacle.com/fixml"
+#        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+#     <Header>
+#         <RequestHeader>
+#             <MessageKey>
+#                 <RequestUUID>{request_uuid}</RequestUUID>
+#                 <ServiceRequestId>XferTrnAdd</ServiceRequestId>
+#                 <ServiceRequestVersion>10.2</ServiceRequestVersion>
+#                 <ChannelId>{channel_id}</ChannelId>
+#                 <LanguageId></LanguageId>
+#             </MessageKey>
+#             <RequestMessageInfo>
+#                 <BankId>{bank_id}</BankId>
+#                 <TimeZone></TimeZone>
+#                 <EntityId></EntityId>
+#                 <EntityType></EntityType>
+#                 <ArmCorrelationId>{payment_doc.name}</ArmCorrelationId>
+#                 <MessageDateTime>{current_date}</MessageDateTime>
+#             </RequestMessageInfo>
+#             <Security>
+#                 <Token>
+#                     <PasswordToken>
+#                         <UserId></UserId>
+#                         <Password></Password>
+#                     </PasswordToken>
+#                 </Token>
+#             </Security>
+#         </RequestHeader>
+#     </Header>
+#     <Body>
+#         <XferTrnAddRequest>
+#             <XferTrnAddRq>
+#                 <XferTrnHdr>
+#                     <TrnType>{transaction_type}</TrnType>
+#                     <TrnSubType>{transaction_sub_type}</TrnSubType>
+#                 </XferTrnHdr>
+#                 <XferTrnDetail>
+#                     <PartTrnRec>
+#                         <AcctId>
+#                             <AcctId>{debit_account}</AcctId>
+#                         </AcctId>
+#                         <CreditDebitFlg>D</CreditDebitFlg>
+#                         <TrnAmt>
+#                             <amountValue>{amount:.2f}</amountValue>
+#                             <currencyCode>INR</currencyCode>
+#                         </TrnAmt>
+#                         <TrnParticulars>{debit_particulars}</TrnParticulars>
+#                         <PartTrnRmks>{payment_reference}</PartTrnRmks>
+#                         <ValueDt>{current_date}</ValueDt>
+#                     </PartTrnRec>
+#                     <PartTrnRec>
+#                         <AcctId>
+#                             <AcctId>{credit_account}</AcctId>
+#                         </AcctId>
+#                         <CreditDebitFlg>C</CreditDebitFlg>
+#                         <TrnAmt>
+#                             <amountValue>{amount:.2f}</amountValue>
+#                             <currencyCode>INR</currencyCode>
+#                         </TrnAmt>
+#                         <TrnParticulars>{credit_particulars}</TrnParticulars>
+#                         <PartTrnRmks>{payment_reference}</PartTrnRmks>
+#                         <ValueDt>{current_date}</ValueDt>
+#                     </PartTrnRec>
+#                 </XferTrnDetail>
+#             </XferTrnAddRq>
+#         </XferTrnAddRequest>
+#     </Body>
+# </FIXML>"""
+
+
 def _build_finacle_xml(
     debit_account,
     credit_account,
@@ -345,18 +518,6 @@ def _build_finacle_xml(
     settings,
     payment_doc,
 ):
-    """
-    Build Finacle XferTrnAdd XML.
-
-    Debit account:
-        Commission Settings.debit_account_number
-
-    Credit account:
-        Commission Payment.agent_operative_account
-
-    Amount:
-        Commission Payment.final_netpay
-    """
     current_date = datetime.now().strftime(
         "%Y-%m-%dT%H:%M:%S.%f"
     )[:-3]
@@ -366,98 +527,46 @@ def _build_finacle_xml(
         9999999999,
     )
 
-    transaction_type = (
-        getattr(settings, "transaction_type", None)
-        or "T"
-    )
-
-    transaction_sub_type = (
-        getattr(settings, "transaction_sub_type", None)
-        or "CI"
-    )
-
-    bank_id = (
-        getattr(settings, "bank_id", None)
-        or "01"
-    )
-
-    channel_id = (
-        getattr(settings, "channel_id", None)
-        or "COR"
-    )
-
     debit_particulars = (
         getattr(settings, "debit_particulars", None)
-        or "Commission Payment Debited"
+        or "Commission Fund Debited"
     )
 
     credit_particulars = (
         getattr(settings, "credit_particulars", None)
-        or "Agent Commission Credited"
-    )
-
-    payment_reference = (
-        f"Commission Payment {payment_doc.name} "
-        f"Agent {payment_doc.agent_code}"
-    )
-
-    debit_account = xml_escape(
-        str(debit_account or "").strip()
-    )
-
-    credit_account = xml_escape(
-        str(credit_account or "").strip()
-    )
-
-    transaction_type = xml_escape(
-        str(transaction_type or "").strip()
-    )
-
-    transaction_sub_type = xml_escape(
-        str(transaction_sub_type or "").strip()
-    )
-
-    bank_id = xml_escape(
-        str(bank_id or "").strip()
-    )
-
-    channel_id = xml_escape(
-        str(channel_id or "").strip()
-    )
-
-    debit_particulars = xml_escape(
-        str(debit_particulars or "").strip()
-    )
-
-    credit_particulars = xml_escape(
-        str(credit_particulars or "").strip()
-    )
-
-    payment_reference = xml_escape(
-        str(payment_reference or "").strip()
+        or "COMMISSION PAYMENT"
     )
 
     amount = _money(amount)
 
+    debit_account = xml_escape(
+        str(debit_account).strip()
+    )
+
+    credit_account = xml_escape(
+        str(credit_account).strip()
+    )
+
+    debit_particulars = xml_escape(
+        str(debit_particulars).strip()
+    )
+
+    credit_particulars = xml_escape(
+        str(credit_particulars).strip()
+    )
+
     return f"""<?xml version="1.0" encoding="UTF-8"?>
-<FIXML xsi:schemaLocation="http://www.finacle.com/fixml XferTrnAdd.xsd"
-       xmlns="http://www.finacle.com/fixml"
-       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<FIXML xsi:schemaLocation="http://www.finacle.com/fixml XferTrnAdd.xsd" xmlns="http://www.finacle.com/fixml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <Header>
         <RequestHeader>
             <MessageKey>
                 <RequestUUID>{request_uuid}</RequestUUID>
                 <ServiceRequestId>XferTrnAdd</ServiceRequestId>
                 <ServiceRequestVersion>10.2</ServiceRequestVersion>
-                <ChannelId>{channel_id}</ChannelId>
-                <LanguageId></LanguageId>
+                <ChannelId>COR</ChannelId>
             </MessageKey>
             <RequestMessageInfo>
-                <BankId>{bank_id}</BankId>
-                <TimeZone></TimeZone>
-                <EntityId></EntityId>
-                <EntityType></EntityType>
-                <ArmCorrelationId>{payment_doc.name}</ArmCorrelationId>
+                <BankId>01</BankId>
                 <MessageDateTime>{current_date}</MessageDateTime>
             </RequestMessageInfo>
             <Security>
@@ -474,8 +583,8 @@ def _build_finacle_xml(
         <XferTrnAddRequest>
             <XferTrnAddRq>
                 <XferTrnHdr>
-                    <TrnType>{transaction_type}</TrnType>
-                    <TrnSubType>{transaction_sub_type}</TrnSubType>
+                    <TrnType>T</TrnType>
+                    <TrnSubType>CI</TrnSubType>
                 </XferTrnHdr>
                 <XferTrnDetail>
                     <PartTrnRec>
@@ -488,9 +597,9 @@ def _build_finacle_xml(
                             <currencyCode>INR</currencyCode>
                         </TrnAmt>
                         <TrnParticulars>{debit_particulars}</TrnParticulars>
-                        <PartTrnRmks>{payment_reference}</PartTrnRmks>
                         <ValueDt>{current_date}</ValueDt>
                     </PartTrnRec>
+
                     <PartTrnRec>
                         <AcctId>
                             <AcctId>{credit_account}</AcctId>
@@ -501,7 +610,6 @@ def _build_finacle_xml(
                             <currencyCode>INR</currencyCode>
                         </TrnAmt>
                         <TrnParticulars>{credit_particulars}</TrnParticulars>
-                        <PartTrnRmks>{payment_reference}</PartTrnRmks>
                         <ValueDt>{current_date}</ValueDt>
                     </PartTrnRec>
                 </XferTrnDetail>
@@ -871,6 +979,10 @@ def pay_now_commission_payment(payment_name):
         )
 
         try:
+            frappe.log_error(
+                title=f"Commission XML - {payment_doc.name}",
+                message=xml_data,
+            )
             response = requests.post(
                 settings.finacle_api_url,
                 data=xml_data.encode("utf-8"),
