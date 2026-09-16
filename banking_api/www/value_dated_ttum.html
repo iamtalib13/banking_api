@@ -1,0 +1,249 @@
+{% extends "templates/web.html" %}
+
+
+{% block title %}Value Dated TTUM{% endblock %}
+
+
+{% block page_content %}
+<div class="ttum-page">
+    <div class="ttum-card">
+        <div class="ttum-header">
+            <h1>Value Dated TTUM</h1>
+            <p class="ttum-subtitle">
+                Upload Excel file and convert it into Value Dated TTUM TXT files.
+            </p>
+        </div>
+
+
+        <div class="ttum-form">
+            <div class="form-group">
+                <label for="excelFile">Upload Excel File</label>
+                <input type="file" id="excelFile" accept=".xlsx,.xls,.xlsb,.csv,.ods" class="form-control">
+                <small class="help-text">
+                    Excel header row must contain: Account Number, Tran Currency Code, Sol ID, Part Tran Type,
+                    Transaction Amount, Transaction Particular, Value Date.
+                </small>
+            </div>
+
+
+            <div class="form-group">
+                <label for="recordsPerFile">Records per TXT File</label>
+                <input type="number" id="recordsPerFile" class="form-control" min="1" step="1" value="1000"
+                    inputmode="numeric">
+                <small class="help-text">
+                    Number of transaction records per generated TXT file.
+                </small>
+            </div>
+
+
+            <div class="form-group">
+                <button type="button" id="processBtn" class="btn btn-primary">
+                    Generate TTUM TXT
+                </button>
+            </div>
+        </div>
+
+
+        <div id="statusBox" class="status-box"></div>
+
+
+        <div class="ttum-info">
+            <h3>Excel Format</h3>
+            <ul>
+                <li>Row 1 must contain headers.</li>
+                <li>
+                    Headers: <strong>Account Number</strong>, <strong>Tran Currency Code</strong>,
+                    <strong>Sol ID</strong>, <strong>Part Tran Type</strong>,
+                    <strong>Transaction Amount</strong>, <strong>Transaction Particular</strong>,
+                    <strong>Value Date</strong>.
+                </li>
+                <li>Data starts from row 2.</li>
+                <li>Header labels are case-insensitive.</li>
+                <li>Account Number such as <strong>100110020034025.00</strong> is converted to
+                    <strong>100110020034025</strong>.
+                </li>
+                <li>Value Date is written in the 10-character Finacle field.</li>
+            </ul>
+        </div>
+
+
+        <div class="ttum-info mt-3">
+            <h3>TTUM Fixed-Length Layout</h3>
+            <ul>
+                <li><strong>foracid</strong>: Position 1 to 16, length 16</li>
+                <li><strong>tran_crncy_code</strong>: Position 17 to 19, length 3</li>
+                <li><strong>sol_id</strong>: Position 20 to 27, length 8</li>
+                <li><strong>part_tran_type</strong>: Position 28, length 1</li>
+                <li><strong>tran_amt</strong>: Position 29 to 45, length 17</li>
+                <li><strong>tran_particular</strong>: Position 46 to 75, length 30</li>
+                <li><strong>rpt_code through rate</strong>: Position 76 to 178, 103 blank spaces</li>
+                <li><strong>value_date</strong>: Position 179 to 188, length 10</li>
+                <li><strong>gl_date</strong>: Position 189 to 198, 10 blank spaces</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+
+<style>
+    .ttum-page {
+        padding: 24px 0 40px;
+    }
+
+
+    .ttum-card {
+        max-width: 900px;
+        margin: 0 auto;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+    }
+
+
+    .ttum-header {
+        margin-bottom: 24px;
+    }
+
+
+    .ttum-header h1 {
+        margin: 0 0 8px;
+        font-size: 28px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+
+    .ttum-subtitle {
+        margin: 0;
+        color: #6b7280;
+        font-size: 14px;
+    }
+
+
+    .ttum-form {
+        margin-bottom: 20px;
+    }
+
+
+    .form-group {
+        margin-bottom: 18px;
+    }
+
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: #111827;
+    }
+
+
+    .form-control {
+        width: 100%;
+        min-height: 42px;
+        padding: 10px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 14px;
+        color: #111827;
+        background: #fff;
+    }
+
+
+    .form-control:focus {
+        outline: none;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+
+    .help-text {
+        display: block;
+        margin-top: 6px;
+        color: #6b7280;
+        font-size: 12px;
+    }
+
+
+    .btn.btn-primary {
+        min-width: 180px;
+        border-radius: 8px;
+        padding: 10px 16px;
+        font-weight: 600;
+    }
+
+
+    .status-box {
+        min-height: 48px;
+        margin-top: 12px;
+        margin-bottom: 24px;
+        padding: 12px 14px;
+        border-radius: 8px;
+        background: #f3f4f6;
+        color: #111827;
+        white-space: pre-wrap;
+        border: 1px solid #e5e7eb;
+    }
+
+
+    .ttum-info {
+        padding: 18px;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        background: #fafafa;
+        margin-top: 18px;
+    }
+
+
+    .ttum-info h3 {
+        margin-top: 0;
+        margin-bottom: 12px;
+        font-size: 18px;
+        font-weight: 700;
+        color: #111827;
+    }
+
+
+    .ttum-info ul {
+        margin: 0;
+        padding-left: 18px;
+    }
+
+
+    .ttum-info li {
+        margin-bottom: 6px;
+        color: #374151;
+    }
+
+
+    .mt-3 {
+        margin-top: 16px;
+    }
+
+
+    @media (max-width: 768px) {
+        .ttum-card {
+            padding: 18px;
+        }
+
+
+        .ttum-header h1 {
+            font-size: 22px;
+        }
+
+
+        .btn.btn-primary {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+
+{% block script %}
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="/value_dated_ttum.js"></script>
+{% endblock %}
