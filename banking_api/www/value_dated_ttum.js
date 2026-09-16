@@ -28,7 +28,6 @@
 
 
     const fileInput = document.getElementById("excelFile");
-    const recordsInput = document.getElementById("recordsPerFile");
     const processBtn = document.getElementById("processBtn");
     const statusBox = document.getElementById("statusBox");
 
@@ -61,23 +60,6 @@
                 "Only Excel files are allowed: .xlsx, .xls, .xlsb, .csv, .ods"
             );
         }
-    }
-
-
-    function validateRecordsPerFile(value) {
-        const cleaned = String(value || "").trim();
-
-        if (!/^\d+$/.test(cleaned)) {
-            throw new Error("Records per file must be a positive integer.");
-        }
-
-        const parsed = Number(cleaned);
-
-        if (!Number.isInteger(parsed) || parsed < 1) {
-            throw new Error("Records per file must be greater than or equal to 1.");
-        }
-
-        return parsed;
     }
 
 
@@ -428,29 +410,16 @@
     }
 
 
-    function chunkArray(items, chunkSize) {
-        const chunks = [];
+    function generateTTUMFiles(rows) {
+        const lines = rows.map(buildTTUMLine);
 
-        for (let index = 0; index < items.length; index += chunkSize) {
-            chunks.push(items.slice(index, index + chunkSize));
-        }
-
-        return chunks;
-    }
-
-
-    function generateTTUMFiles(rows, recordsPerFile) {
-        const chunks = chunkArray(rows, recordsPerFile);
-
-        return chunks.map((chunk, index) => {
-            const lines = chunk.map(buildTTUMLine);
-
-            return {
-                filename: `VALUE_DATED_TTUM_${index + 1}.txt`,
+        return [
+            {
+                filename: `VALUE_DATED_TTUM.txt`,
                 content: lines.join("\n"),
-                record_count: chunk.length
-            };
-        });
+                record_count: rows.length
+            }
+        ];
     }
 
 
@@ -506,13 +475,6 @@
     }
 
 
-    if (recordsInput) {
-        recordsInput.addEventListener("input", function () {
-            this.value = this.value.replace(/\D/g, "");
-        });
-    }
-
-
     if (!processBtn) {
         console.error("Process button not found.");
         return;
@@ -527,10 +489,6 @@
 
             validateFile(file);
 
-            const recordsPerFile = validateRecordsPerFile(
-                recordsInput ? recordsInput.value : ""
-            );
-
             const workbook = await parseWorkbook(file);
             const rows = extractRows(workbook);
 
@@ -538,7 +496,7 @@
                 `Excel parsed successfully. Total rows: ${rows.length}. Generating TTUM files...`
             );
 
-            const txtFiles = generateTTUMFiles(rows, recordsPerFile);
+            const txtFiles = generateTTUMFiles(rows);
             const zipFilename = await downloadZipFile(txtFiles);
 
             const summary = txtFiles
