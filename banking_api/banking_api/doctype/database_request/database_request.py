@@ -32,7 +32,7 @@ def generate_pan_update_report():
     # Header row
     headers = [
         "sr_no",
-        "orgkey",
+        "cif_id",
         "field_name",
         "application_id",
         "pan",
@@ -77,7 +77,7 @@ def generate_pan_update_report():
 
             row = {
                 "sr_no": sr_no,
-                "orgkey": values.get("orgkey"),
+                "cif_id": values.get("orgkey"),
                 "field_name": values.get("field_name"),
                 "application_id": values.get("application_id"),
                 "pan": pan,
