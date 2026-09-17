@@ -31,6 +31,19 @@
     const processBtn = document.getElementById("processBtn");
     const statusBox = document.getElementById("statusBox");
 
+    const fileUploadInfo = document.getElementById("fileUploadInfo");
+
+    if (fileInput && fileUploadInfo) {
+        fileInput.addEventListener("change", () => {
+            const file = fileInput.files && fileInput.files[0];
+            if (file) {
+                fileUploadInfo.textContent = file.name;
+            } else {
+                fileUploadInfo.textContent = "No file chosen";
+            }
+        });
+    }
+
 
     function setStatus(message, isError = false) {
         if (!statusBox) return;
