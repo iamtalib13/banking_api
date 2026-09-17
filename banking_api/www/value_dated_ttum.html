@@ -6,6 +6,7 @@
 
 {% block page_content %}
 
+
 {% if is_access_denied %}
 <div class="access-denied-page">
     <div class="access-denied-card">
@@ -18,24 +19,21 @@
             </svg>
         </div>
 
+
         <h1 class="access-denied-title">{{ access_title or _("Access Restricted") }}</h1>
+
 
         <p class="access-denied-message">
             {{ access_message }}
         </p>
 
 
-        <!-- {% if required_role %}
-        <p class="access-denied-role">
-            {{ _("Required role:") }} <strong>{{ required_role }}</strong>
-        </p>
-        {% endif %}
-
-        <p class="access-denied-help">
-            {{ _("If you need access, please contact your system administrator.") }}
-        </p> -->
+        <a href="/" class="access-denied-home-btn">
+            {{ _("Home") }}
+        </a>
     </div>
 </div>
+
 
 <style>
     .access-denied-page {
@@ -46,6 +44,7 @@
         align-items: center;
         justify-content: center;
     }
+
 
     .access-denied-card {
         max-width: 520px;
@@ -58,10 +57,12 @@
         box-shadow: 0 10px 24px rgba(0, 0, 0, 0.06);
     }
 
+
     .access-denied-icon {
         margin-bottom: 18px;
         color: #6b7280;
     }
+
 
     .access-denied-title {
         margin: 0 0 12px;
@@ -72,45 +73,60 @@
         line-height: 1.25;
     }
 
+
     .access-denied-message {
-        margin: 0 0 10px;
+        margin: 0 0 16px;
         font-size: 15px;
         color: #374151;
         line-height: 1.5;
     }
 
-    .access-denied-role {
-        margin: 0 0 14px;
+
+    .access-denied-home-btn {
+        display: inline-block;
+        min-width: 140px;
+        padding: 10px 18px;
+        border-radius: 10px;
         font-size: 14px;
-        color: #4b5563;
-    }
-
-    .access-denied-role strong {
-        color: #111827;
         font-weight: 600;
+        text-decoration: none;
+        color: #fff;
+        background: #2563eb;
+        border: 1px solid #1d4ed8;
+        transition: background 0.15s ease, transform 0.05s ease;
     }
 
-    .access-denied-help {
-        margin: 0;
-        font-size: 13px;
-        color: #6b7280;
+
+    .access-denied-home-btn:hover {
+        background: #1d4ed8;
+        text-decoration: none;
+        color: #fff;
     }
+
+
+    .access-denied-home-btn:active {
+        transform: translateY(1px);
+    }
+
 
     @media (max-width: 640px) {
         .access-denied-card {
             padding: 24px 18px;
         }
 
+
         .access-denied-title {
             font-size: 20px;
         }
     }
+
 
     .web-footer {
         display: none;
     }
 </style>
 {% else %}
+
 
 <div class="ttum-page">
     <div class="ttum-card">
