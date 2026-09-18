@@ -353,34 +353,225 @@ def _safe_str(value):
     return str(value).strip()
 
 
+def _get_agent_details(agent_code):
+    """
+    Fetch agent-related fields from Agent DocType.
+
+    Matching rule:
+        Commission.agent_code == Agent.name
+
+    Missing Agent or missing field values become "0".
+    """
+    default_details = {
+        "cif": "0",
+        "agent_operative_account": "0",
+        "agent_saving_account": "0",
+        "pan_status": "0",
+        "agent_security_account": "0",
+    }
+
+    if not agent_code:
+        return default_details
+
+    agent_code = str(agent_code).strip()
+
+    if not agent_code:
+        return default_details
+
+    agent_details = frappe.db.get_value(
+        "Agent",
+        agent_code,
+        [
+            "cif",
+            "agent_operative_account",
+            "agent_saving_account",
+            "pan_status",
+            "agent_security_account",
+        ],
+        as_dict=True,
+    )
+
+    if not agent_details:
+        return default_details
+
+    return {
+        "cif": _safe_str(agent_details.get("cif")) or "0",
+        "agent_operative_account": (
+            _safe_str(
+                agent_details.get("agent_operative_account")
+            )
+            or "0"
+        ),
+        "agent_saving_account": (
+            _safe_str(
+                agent_details.get("agent_saving_account")
+            )
+            or "0"
+        ),
+        "pan_status": (
+            _safe_str(
+                agent_details.get("pan_status")
+            )
+            or "0"
+        ),
+        "agent_security_account": (
+            _safe_str(
+                agent_details.get("agent_security_account")
+            )
+            or "0"
+        ),
+    }
+
+
+# def _create_commission_from_query_1(row):
+#     doc = frappe.get_doc({
+#         "doctype": "Commission",
+
+#         "agent_code": _safe_str(row.get("rm_id")),
+#         "agent_name": _safe_str(row.get("rm_name")),
+#         # "agent_operative_account": _safe_str(row.get("operacc")),
+#         "customer_account_number": _safe_str(row.get("foracid")),
+#         "customer_account_name": _safe_str(row.get("acct_name")),
+#         "deposit_amount": _safe_int(row.get("deposit_amount")),
+
+#         "tenure_months": _safe_int(row.get("deposit_period_mths")),
+#         "tenure_days": _safe_int(row.get("deposit_period_days")),
+
+#         # "demand": _safe_int(row.get("total_flow_amount")),
+#         "demand": _safe_int(row.get("adjusted_flow_amount")),
+#         "collection": _safe_int(row.get("total_tran_amt")),
+
+#         # New fields
+#         "eligible_amount": _safe_int(row.get("commission_amount")),
+#         "account_opening_date": row.get("acct_opn_date"),
+#         "remarks": _safe_str(row.get("one_year_completed")),
+
+#         "pan_card": _safe_str(row.get("referencenumber")),
+#         "scheme_code": _safe_str(row.get("scheme_code")),
+#         "scheme_description": _safe_str(row.get("schm_desc")),
+#         "sol_id": _safe_str(row.get("sol_id")),
+#         "sol_description": _safe_str(row.get("sol_desc")),
+#     })
+
+#     doc.insert(ignore_permissions=True)
+#     frappe.db.commit()
+
+#     return doc.name
+
+
+# def _create_commission_from_query_2(row):
+#     doc = frappe.get_doc({
+#         "doctype": "Commission",
+
+#         "agent_code": _safe_str(row.get("rm_id")),
+#         "agent_name": _safe_str(row.get("rm_name")),
+#         # "agent_operative_account": _safe_str(row.get("operacc")),
+#         "customer_account_number": _safe_str(row.get("foracid")),
+#         "customer_account_name": _safe_str(row.get("acct_name")),
+#         "deposit_amount": _safe_int(row.get("deposit_amount")),
+
+#         "tenure_months": _safe_int(row.get("deposit_period_mths")),
+#         "tenure_days": _safe_int(row.get("deposit_period_days")),
+
+#         # "demand": _safe_int(row.get("total_flow_amt_tdt")),
+#         "demand": _safe_int(row.get("adjusted_flow_amount")),
+#         "collection": _safe_int(row.get("total_tran_amt_dtt")),
+
+#         # New fields
+#         "eligible_amount": _safe_int(row.get("commission_amount")),
+#         "account_opening_date": row.get("acct_opn_date"),
+#         "remarks": _safe_str(row.get("one_year_completed")),
+
+#         "pan_card": _safe_str(row.get("referencenumber")),
+#         "scheme_code": _safe_str(row.get("scheme_code")),
+#         "scheme_description": _safe_str(row.get("schm_desc")),
+#         "sol_id": _safe_str(row.get("sol_id")),
+#         "sol_description": _safe_str(row.get("sol_desc")),
+#     })
+
+#     doc.insert(ignore_permissions=True)
+#     frappe.db.commit()
+
+#     return doc.name
+
 def _create_commission_from_query_1(row):
+    agent_code = _safe_str(row.get("rm_id")) or "0"
+    agent_details = _get_agent_details(agent_code)
+
     doc = frappe.get_doc({
         "doctype": "Commission",
 
-        "agent_code": _safe_str(row.get("rm_id")),
-        "agent_name": _safe_str(row.get("rm_name")),
-        "agent_operative_account": _safe_str(row.get("operacc")),
-        "customer_account_number": _safe_str(row.get("foracid")),
-        "customer_account_name": _safe_str(row.get("acct_name")),
-        "deposit_amount": _safe_int(row.get("deposit_amount")),
+        "agent_code": agent_code,
+        "agent_name": _safe_str(row.get("rm_name")) or "0",
 
-        "tenure_months": _safe_int(row.get("deposit_period_mths")),
-        "tenure_days": _safe_int(row.get("deposit_period_days")),
+        # Values come from Agent DocType, not QUERY_1.
+        "cif": agent_details["cif"],
+        "agent_operative_account": (
+            agent_details["agent_operative_account"]
+        ),
+        "agent_saving_account": (
+            agent_details["agent_saving_account"]
+        ),
+        "pan_status": agent_details["pan_status"],
+        "agent_security_account": (
+            agent_details["agent_security_account"]
+        ),
 
-        # "demand": _safe_int(row.get("total_flow_amount")),
-        "demand": _safe_int(row.get("adjusted_flow_amount")),
-        "collection": _safe_int(row.get("total_tran_amt")),
+        "customer_account_number": (
+            _safe_str(row.get("foracid")) or "0"
+        ),
+        "customer_account_name": (
+            _safe_str(row.get("acct_name")) or "0"
+        ),
+        "deposit_amount": _safe_int(
+            row.get("deposit_amount")
+        ),
 
-        # New fields
-        "eligible_amount": _safe_int(row.get("commission_amount")),
-        "account_opening_date": row.get("acct_opn_date"),
-        "remarks": _safe_str(row.get("one_year_completed")),
+        "tenure_months": _safe_int(
+            row.get("deposit_period_mths")
+        ),
+        "tenure_days": _safe_int(
+            row.get("deposit_period_days")
+        ),
 
-        "pan_card": _safe_str(row.get("referencenumber")),
-        "scheme_code": _safe_str(row.get("scheme_code")),
-        "scheme_description": _safe_str(row.get("schm_desc")),
-        "sol_id": _safe_str(row.get("sol_id")),
-        "sol_description": _safe_str(row.get("sol_desc")),
+        "demand": _safe_int(
+            row.get("adjusted_flow_amount")
+        ),
+        "collection": _safe_int(
+            row.get("total_tran_amt")
+        ),
+
+        "eligible_amount": _safe_int(
+            row.get("commission_amount")
+        ),
+        "account_opening_date": row.get(
+            "acct_opn_date"
+        ),
+        "remarks": (
+            _safe_str(row.get("one_year_completed"))
+            or "0"
+        ),
+
+        "pan_card": (
+            _safe_str(row.get("referencenumber"))
+            or "0"
+        ),
+        "scheme_code": (
+            _safe_str(row.get("scheme_code"))
+            or "0"
+        ),
+        "scheme_description": (
+            _safe_str(row.get("schm_desc"))
+            or "0"
+        ),
+        "sol_id": (
+            _safe_str(row.get("sol_id"))
+            or "0"
+        ),
+        "sol_description": (
+            _safe_str(row.get("sol_desc"))
+            or "0"
+        ),
     })
 
     doc.insert(ignore_permissions=True)
@@ -390,33 +581,83 @@ def _create_commission_from_query_1(row):
 
 
 def _create_commission_from_query_2(row):
+    agent_code = _safe_str(row.get("rm_id")) or "0"
+    agent_details = _get_agent_details(agent_code)
+
     doc = frappe.get_doc({
         "doctype": "Commission",
 
-        "agent_code": _safe_str(row.get("rm_id")),
-        "agent_name": _safe_str(row.get("rm_name")),
-        "agent_operative_account": _safe_str(row.get("operacc")),
-        "customer_account_number": _safe_str(row.get("foracid")),
-        "customer_account_name": _safe_str(row.get("acct_name")),
-        "deposit_amount": _safe_int(row.get("deposit_amount")),
+        "agent_code": agent_code,
+        "agent_name": _safe_str(row.get("rm_name")) or "0",
 
-        "tenure_months": _safe_int(row.get("deposit_period_mths")),
-        "tenure_days": _safe_int(row.get("deposit_period_days")),
+        # Values come from Agent DocType, not QUERY_2.
+        "cif": agent_details["cif"],
+        "agent_operative_account": (
+            agent_details["agent_operative_account"]
+        ),
+        "agent_saving_account": (
+            agent_details["agent_saving_account"]
+        ),
+        "pan_status": agent_details["pan_status"],
+        "agent_security_account": (
+            agent_details["agent_security_account"]
+        ),
 
-        # "demand": _safe_int(row.get("total_flow_amt_tdt")),
-        "demand": _safe_int(row.get("adjusted_flow_amount")),
-        "collection": _safe_int(row.get("total_tran_amt_dtt")),
+        "customer_account_number": (
+            _safe_str(row.get("foracid")) or "0"
+        ),
+        "customer_account_name": (
+            _safe_str(row.get("acct_name")) or "0"
+        ),
+        "deposit_amount": _safe_int(
+            row.get("deposit_amount")
+        ),
 
-        # New fields
-        "eligible_amount": _safe_int(row.get("commission_amount")),
-        "account_opening_date": row.get("acct_opn_date"),
-        "remarks": _safe_str(row.get("one_year_completed")),
+        "tenure_months": _safe_int(
+            row.get("deposit_period_mths")
+        ),
+        "tenure_days": _safe_int(
+            row.get("deposit_period_days")
+        ),
 
-        "pan_card": _safe_str(row.get("referencenumber")),
-        "scheme_code": _safe_str(row.get("scheme_code")),
-        "scheme_description": _safe_str(row.get("schm_desc")),
-        "sol_id": _safe_str(row.get("sol_id")),
-        "sol_description": _safe_str(row.get("sol_desc")),
+        "demand": _safe_int(
+            row.get("adjusted_flow_amount")
+        ),
+        "collection": _safe_int(
+            row.get("total_tran_amt_dtt")
+        ),
+
+        "eligible_amount": _safe_int(
+            row.get("commission_amount")
+        ),
+        "account_opening_date": row.get(
+            "acct_opn_date"
+        ),
+        "remarks": (
+            _safe_str(row.get("one_year_completed"))
+            or "0"
+        ),
+
+        "pan_card": (
+            _safe_str(row.get("referencenumber"))
+            or "0"
+        ),
+        "scheme_code": (
+            _safe_str(row.get("scheme_code"))
+            or "0"
+        ),
+        "scheme_description": (
+            _safe_str(row.get("schm_desc"))
+            or "0"
+        ),
+        "sol_id": (
+            _safe_str(row.get("sol_id"))
+            or "0"
+        ),
+        "sol_description": (
+            _safe_str(row.get("sol_desc"))
+            or "0"
+        ),
     })
 
     doc.insert(ignore_permissions=True)
