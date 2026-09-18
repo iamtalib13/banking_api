@@ -1411,6 +1411,7 @@ def _create_normal_agent_payment_if_missing(agent_code, due_date=None):
         f"""
     SELECT
         MAX(NULLIF(TRIM(c.agent_operative_account), '')) AS agent_operative_account,
+        MAX(NULLIF(TRIM(c.agent_saving_account), '')) AS agent_saving_account,
 
         COALESCE(
             SUM(CAST(NULLIF(TRIM(c.commission_amount), '') AS DECIMAL(18,2))),
@@ -1448,10 +1449,19 @@ def _create_normal_agent_payment_if_missing(agent_code, due_date=None):
     agent_operative_account = _safe_str(
         totals.get("agent_operative_account")
     )
+    agent_saving_account = _safe_str(
+        totals.get("agent_saving_account")
+    )
 
     if not agent_operative_account:
         frappe.throw(
             _("Agent Operative Account not found for Agent: {0}").format(
+                agent_code
+            )
+        )
+    if not agent_saving_account:
+        frappe.throw(
+            _("Agent Saving Account not found for Agent: {0}").format(
                 agent_code
             )
         )
@@ -1493,6 +1503,7 @@ def _create_normal_agent_payment_if_missing(agent_code, due_date=None):
             }
 
         payment_doc.agent_operative_account = agent_operative_account
+        payment_doc.agent_saving_account = agent_saving_account
         payment_doc.gross_commission = gross_commission
         payment_doc.tds_amount = tds_amount
         payment_doc.security_deposit_amount = security_deposit_amount
@@ -1512,6 +1523,7 @@ def _create_normal_agent_payment_if_missing(agent_code, due_date=None):
         "doctype": "Commission Payment",
         "agent_code": agent_code,
         "agent_operative_account": agent_operative_account,
+        "agent_saving_account": agent_saving_account,
         "payment_type": "Normal",
         "payment_year": 1,
         "due_date": due_date,
@@ -1928,6 +1940,7 @@ def _create_deferred_payment_records(commission_doc):
             "commission": commission_doc.name,
             "agent_code": commission_doc.agent_code,
             "agent_operative_account": commission_doc.agent_operative_account,
+            "agent_saving_account": commission_doc.agent_saving_account,
             "payment_type": "Deferred",
             "payment_year": payment_year,
             "due_date": deferred_row.due_date,
