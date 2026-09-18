@@ -34,6 +34,7 @@
   "security_deposit",
   "cif",
   "agent_security_account",
+  "agent_saving_account",
   "final_net_pay",
   "section_break_vlms",
   "deferred_commission_details"
@@ -208,12 +209,17 @@
    "fieldname": "final_net_pay",
    "fieldtype": "Data",
    "label": "Final Net Pay"
+  },
+  {
+   "fieldname": "agent_saving_account",
+   "fieldtype": "Data",
+   "label": "Agent Saving Account"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-09 15:11:14.076577",
+ "modified": "2026-09-18 10:52:03.364572",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Commission",
