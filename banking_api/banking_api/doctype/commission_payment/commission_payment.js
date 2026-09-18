@@ -5,8 +5,12 @@ frappe.ui.form.on("Commission Payment", {
         if (frm.doc.payment_status === "Paid") return;
 
         frm.add_custom_button(__("Pay Now"), () => {
-            if (!frm.doc.agent_operative_account) {
-                frappe.msgprint(__("Agent Operative Account is required."));
+            // if (!frm.doc.agent_operative_account) {
+            //     frappe.msgprint(__("Agent Operative Account is required."));
+            //     return;
+            // }
+            if (!frm.doc.agent_saving_account) {
+                frappe.msgprint(__("Agent Saving Account is required."));
                 return;
             }
 
@@ -16,11 +20,13 @@ frappe.ui.form.on("Commission Payment", {
             }
 
             const amount = format_currency(frm.doc.final_netpay);
-            const account = frm.doc.agent_operative_account;
+            // const account = frm.doc.agent_operative_account;
+            const account = frm.doc.agent_saving_account;
 
             frappe.confirm(
                 __(
-                    "Initiate commission payment of {0} to operative account {1}?",
+                    // "Initiate commission payment of {0} to operative account {1}?",
+                    "Initiate commission payment of {0} to saving account {1}?",
                     [amount, account]
                 ),
                 () => {

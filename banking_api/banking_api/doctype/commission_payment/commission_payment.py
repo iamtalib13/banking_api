@@ -163,6 +163,10 @@ class CommissionPayment(Document):
             frappe.throw(
                 _("Agent Operative Account is required")
             )
+        if not self.agent_saving_account:
+            frappe.throw(
+                _("Agent Saving Account is required")
+            )
 
         if not self.payment_year or cint(self.payment_year) <= 0:
             frappe.throw(
@@ -813,7 +817,8 @@ def pay_now_commission_payment(payment_name):
         Commission Settings.debit_account_number
 
     Credit:
-        Commission Payment.agent_operative_account
+        # Commission Payment.agent_operative_account
+        Commission Payment.agent_saving_account
 
     Amount:
         Commission Payment.final_netpay
@@ -873,6 +878,10 @@ def pay_now_commission_payment(payment_name):
         frappe.throw(
             _("Agent Operative Account is required.")
         )
+    if not payment_doc.agent_saving_account:
+        frappe.throw(
+            _("Agent Saving Account is required.")
+        )
 
     payment_amount = _money(
         payment_doc.final_netpay
@@ -917,8 +926,11 @@ def pay_now_commission_payment(payment_name):
             settings.debit_account_number
         ).strip()
 
+        # credit_account = str(
+        #     payment_doc.agent_operative_account
+        # ).strip()
         credit_account = str(
-            payment_doc.agent_operative_account
+            payment_doc.agent_saving_account
         ).strip()
 
         if not debit_account:
