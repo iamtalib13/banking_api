@@ -1406,36 +1406,108 @@ def _create_normal_agent_payment_if_missing(agent_code, due_date=None):
     #     values,
     #     as_dict=True,
     # )
+#################################################################################################
+    # totals = frappe.db.sql(
+    #     f"""
+    # SELECT
+    #     MAX(NULLIF(TRIM(c.agent_operative_account), '')) AS agent_operative_account,
+    #     MAX(NULLIF(TRIM(c.agent_saving_account), '')) AS agent_saving_account,
+
+    #     COALESCE(
+    #         SUM(CAST(NULLIF(TRIM(c.commission_amount), '') AS DECIMAL(18,2))),
+    #         0
+    #     ) AS gross_commission,
+
+    #     COALESCE(
+    #         SUM(CAST(NULLIF(TRIM(c.tds), '') AS DECIMAL(18,2))),
+    #         0
+    #     ) AS tds_amount,
+
+    #     COALESCE(
+    #         SUM(CAST(NULLIF(TRIM(c.security_deposit), '') AS DECIMAL(18,2))),
+    #         0
+    #     ) AS security_deposit_amount,
+
+    #     COALESCE(
+    #         SUM(CAST(NULLIF(TRIM(c.netpay), '') AS DECIMAL(18,2))),
+    #         0
+    #     ) AS netpay_amount,
+
+    #     MAX(CAST(NULLIF(TRIM(c.deduction), '') AS DECIMAL(18,2))) AS deduction_amount,
+
+    #     MAX(CAST(NULLIF(TRIM(c.final_net_pay), '') AS DECIMAL(18,2))) AS finalnetpay
+
+    # FROM `tabCommission` c
+    # WHERE c.agent_code = %(agent_code)s
+    # AND c.docstatus < 2
+    # {deferred_condition}
+    # """,
+    #     values,
+    #     as_dict=True,
+    # )
 
     totals = frappe.db.sql(
         f"""
     SELECT
-        MAX(NULLIF(TRIM(c.agent_operative_account), '')) AS agent_operative_account,
-        MAX(NULLIF(TRIM(c.agent_saving_account), '')) AS agent_saving_account,
+        MAX(NULLIF(TRIM(c.agent_operative_account), ''))
+            AS agent_operative_account,
+
+        MAX(NULLIF(TRIM(c.agent_saving_account), ''))
+            AS agent_saving_account,
 
         COALESCE(
-            SUM(CAST(NULLIF(TRIM(c.commission_amount), '') AS DECIMAL(18,2))),
+            SUM(
+                CAST(
+                    NULLIF(TRIM(c.commission_amount), '')
+                    AS DECIMAL(18,2)
+                )
+            ),
             0
         ) AS gross_commission,
 
         COALESCE(
-            SUM(CAST(NULLIF(TRIM(c.tds), '') AS DECIMAL(18,2))),
+            SUM(
+                CAST(
+                    NULLIF(TRIM(c.tds), '')
+                    AS DECIMAL(18,2)
+                )
+            ),
             0
         ) AS tds_amount,
 
         COALESCE(
-            SUM(CAST(NULLIF(TRIM(c.security_deposit), '') AS DECIMAL(18,2))),
+            SUM(
+                CAST(
+                    NULLIF(TRIM(c.security_deposit), '')
+                    AS DECIMAL(18,2)
+                )
+            ),
             0
         ) AS security_deposit_amount,
 
         COALESCE(
-            SUM(CAST(NULLIF(TRIM(c.netpay), '') AS DECIMAL(18,2))),
+            SUM(
+                CAST(
+                    NULLIF(TRIM(c.netpay), '')
+                    AS DECIMAL(18,2)
+                )
+            ),
             0
         ) AS netpay_amount,
 
-        MAX(CAST(NULLIF(TRIM(c.deduction), '') AS DECIMAL(18,2))) AS deduction_amount,
+        MAX(
+            CAST(
+                NULLIF(TRIM(c.deduction), '')
+                AS DECIMAL(18,2)
+            )
+        ) AS deduction_amount,
 
-        MAX(CAST(NULLIF(TRIM(c.final_net_pay), '') AS DECIMAL(18,2))) AS finalnetpay
+        MAX(
+            CAST(
+                NULLIF(TRIM(c.final_net_pay), '')
+                AS DECIMAL(18,2)
+            )
+        ) AS finalnetpay
 
     FROM `tabCommission` c
     WHERE c.agent_code = %(agent_code)s
@@ -1446,11 +1518,25 @@ def _create_normal_agent_payment_if_missing(agent_code, due_date=None):
         as_dict=True,
     )
     totals = totals[0] if totals else {}
-    agent_operative_account = _safe_str(
-        totals.get("agent_operative_account")
+    # agent_operative_account = _safe_str(
+    #     totals.get("agent_operative_account")
+    # )
+    # agent_saving_account = _safe_str(
+    #     totals.get("agent_saving_account")
+    # )
+
+    agent_operative_account = (
+        _safe_str(
+            totals.get("agent_operative_account")
+        )
+        or "0"
     )
-    agent_saving_account = _safe_str(
-        totals.get("agent_saving_account")
+
+    agent_saving_account = (
+        _safe_str(
+            totals.get("agent_saving_account")
+        )
+        or "0"
     )
 
     if not agent_operative_account:
@@ -1502,8 +1588,15 @@ def _create_normal_agent_payment_if_missing(agent_code, due_date=None):
                 "reason": "Payment is already Processing or Paid",
             }
 
-        payment_doc.agent_operative_account = agent_operative_account
-        payment_doc.agent_saving_account = agent_saving_account
+        # payment_doc.agent_operative_account = agent_operative_account
+        # payment_doc.agent_saving_account = agent_saving_account
+        payment_doc.agent_operative_account = (
+            agent_operative_account
+        )
+
+        payment_doc.agent_saving_account = (
+            agent_saving_account
+        )
         payment_doc.gross_commission = gross_commission
         payment_doc.tds_amount = tds_amount
         payment_doc.security_deposit_amount = security_deposit_amount
@@ -1522,8 +1615,15 @@ def _create_normal_agent_payment_if_missing(agent_code, due_date=None):
     payment_doc = frappe.get_doc({
         "doctype": "Commission Payment",
         "agent_code": agent_code,
-        "agent_operative_account": agent_operative_account,
-        "agent_saving_account": agent_saving_account,
+        # "agent_operative_account": agent_operative_account,
+        # "agent_saving_account": agent_saving_account,
+        "agent_operative_account": (
+            agent_operative_account
+        ),
+
+        "agent_saving_account": (
+            agent_saving_account
+        ),
         "payment_type": "Normal",
         "payment_year": 1,
         "due_date": due_date,
