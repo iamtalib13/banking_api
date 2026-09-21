@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "DC-#",
+ "autoname": "DC-.#",
  "creation": "2026-08-14 12:39:50.820798",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -54,7 +54,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-21 14:32:59.292735",
+ "modified": "2026-09-21 15:24:51.031107",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Database Configuration",
