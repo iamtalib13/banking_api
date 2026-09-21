@@ -19,6 +19,7 @@
   "tds",
   "netpay",
   "pan_status",
+  "deduction",
   "column_break_ajmr",
   "agent_name",
   "customer_account_name",
@@ -33,6 +34,8 @@
   "security_deposit",
   "cif",
   "agent_security_account",
+  "agent_saving_account",
+  "final_net_pay",
   "section_break_vlms",
   "deferred_commission_details"
  ],
@@ -194,13 +197,29 @@
    "fieldname": "deferred_commission_details",
    "fieldtype": "Table",
    "label": "Deferred Commission Details",
-   "options": "Deferred Commission Detail"
+   "options": "Deferred Commission Detail",
+   "read_only": 1
+  },
+  {
+   "fieldname": "deduction",
+   "fieldtype": "Int",
+   "label": "Deduction"
+  },
+  {
+   "fieldname": "final_net_pay",
+   "fieldtype": "Data",
+   "label": "Final Net Pay"
+  },
+  {
+   "fieldname": "agent_saving_account",
+   "fieldtype": "Data",
+   "label": "Agent Saving Account"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-02 16:13:41.199933",
+ "modified": "2026-09-18 10:52:03.364572",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Commission",

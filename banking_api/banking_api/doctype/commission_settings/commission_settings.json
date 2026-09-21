@@ -1,0 +1,80 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-09-10 12:46:35.428535",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enable_commission_payment",
+  "finacle_api_url",
+  "debit_account_number",
+  "debit_particulars",
+  "credit_particulars",
+  "last_payment_run"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "fieldname": "enable_commission_payment",
+   "fieldtype": "Check",
+   "label": "Enable Commission Payment"
+  },
+  {
+   "fieldname": "finacle_api_url",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Finacle API URL",
+   "reqd": 1
+  },
+  {
+   "fieldname": "debit_account_number",
+   "fieldtype": "Data",
+   "label": "Debit Account Number",
+   "reqd": 1
+  },
+  {
+   "default": "Commission Payment Debited",
+   "fieldname": "debit_particulars",
+   "fieldtype": "Data",
+   "label": "Debit Account Particulars"
+  },
+  {
+   "default": "Agent Commission Credited",
+   "fieldname": "credit_particulars",
+   "fieldtype": "Data",
+   "label": "Credit Account Particulars"
+  },
+  {
+   "fieldname": "last_payment_run",
+   "fieldtype": "Datetime",
+   "label": "Last Payment Run",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-09-10 12:57:28.898504",
+ "modified_by": "Administrator",
+ "module": "Banking Api",
+ "name": "Commission Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

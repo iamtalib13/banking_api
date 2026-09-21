@@ -190,7 +190,8 @@ scheduler_events = {
         "banking_api.banking_api.doctype.database_integration.database_integration.execute_hourly_sync"
     ],
     "daily": [
-        "banking_api.banking_api.doctype.database_integration.database_integration.execute_daily_sync"
+        "banking_api.banking_api.doctype.database_integration.database_integration.execute_daily_sync",
+        "banking_api.banking_api.doctype.commission.commission.mark_due_deferred_commissions"
     ],
 
     "cron": {
