@@ -44,7 +44,9 @@
   "agent_deduction_amount",
   "agent_deduction_percentage",
   "agent_deduction_maximum",
-  "agent_deduction_operation"
+  "agent_deduction_operation",
+  "eligible_amount_scheme_groups_settings",
+  "eligible_amount_scheme_groups"
  ],
  "fields": [
   {
@@ -102,11 +104,11 @@
    "label": "Decimal Places"
   },
   {
-   "default": "Half Up",
+   "default": "Nearest",
    "fieldname": "calculation_rounding_method",
    "fieldtype": "Select",
    "label": "Rounding Method",
-   "options": "Half Up\nHalf Down\nDown\nUp\nCeiling\nFloor"
+   "options": "Nearest"
   },
   {
    "collapsible": 1,
@@ -288,13 +290,26 @@
    "fieldname": "tds_percentage_without_valid_pan",
    "fieldtype": "Percent",
    "label": "TDS Percentage Without Valid PAN"
+  },
+  {
+   "default": "\"\"",
+   "description": "One group per line. Separate scheme codes with commas. Example: 2015,2016,2017,2018",
+   "fieldname": "eligible_amount_scheme_groups",
+   "fieldtype": "Small Text",
+   "label": "Eligible Amount Scheme Groups"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "eligible_amount_scheme_groups_settings",
+   "fieldtype": "Section Break",
+   "label": "Eligible Amount Scheme Settings"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-09-23 16:25:08.492595",
+ "modified": "2026-09-25 12:33:43.832521",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Commission Settings",
