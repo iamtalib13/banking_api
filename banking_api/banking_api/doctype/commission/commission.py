@@ -2805,6 +2805,103 @@ def _calculate_commission_financial_values(
     }
 
 
+def _get_eligible_amount_scheme_groups():
+    """
+    Read scheme groups from Commission Settings.
+
+    Format:
+        2014
+        2015,2016,2017,2018
+        2019,2020
+
+    Returns:
+        {
+            "2014": ("2014",),
+            "2015": ("2015", "2016", "2017", "2018"),
+            "2016": ("2015", "2016", "2017", "2018"),
+            ...
+        }
+    """
+    settings = frappe.get_single(
+        "Commission Settings"
+    )
+
+    raw_groups = (
+        getattr(
+            settings,
+            "eligible_amount_scheme_groups",
+            None,
+        )
+        or ""
+    )
+
+    scheme_groups = {}
+    used_schemes = set()
+
+    for raw_line in str(raw_groups).splitlines():
+        line = raw_line.strip()
+
+        if not line:
+            continue
+
+        scheme_codes = [
+            scheme.strip()
+            for scheme in line.split(",")
+            if scheme.strip()
+        ]
+
+        if not scheme_codes:
+            continue
+
+        # Remove duplicates within a group while
+        # preserving the entered order.
+        group = tuple(
+            dict.fromkeys(scheme_codes)
+        )
+
+        for scheme_code in group:
+            if scheme_code in scheme_groups:
+                frappe.throw(
+                    _(
+                        "Scheme Code {0} is configured in "
+                        "more than one Eligible Amount Scheme Group."
+                    ).format(scheme_code)
+                )
+
+            scheme_groups[scheme_code] = group
+            used_schemes.add(scheme_code)
+
+    return scheme_groups
+
+
+def _get_eligible_amount_scheme_group(
+    scheme_code,
+):
+    """
+    Return the configured group for one scheme.
+
+    If the scheme is not configured in a group, it becomes
+    its own group.
+    """
+    scheme_code = str(
+        scheme_code or ""
+    ).strip()
+
+    if not scheme_code:
+        frappe.throw(
+            _("Scheme Code is required.")
+        )
+
+    scheme_groups = (
+        _get_eligible_amount_scheme_groups()
+    )
+
+    return scheme_groups.get(
+        scheme_code,
+        (scheme_code,),
+    )
+
+
 @frappe.whitelist()
 def calculate_commission_amount(docname):
     """
@@ -2964,41 +3061,111 @@ def calculate_commission_amount(docname):
                 ).format(product_name)
             )
 
-        agent_code = str(commission_doc.agent_code).strip()
+        # agent_code = str(commission_doc.agent_code).strip()
 
-        eligible_products = frappe.get_all(
-            "Product",
-            filters={"commission_type": "Eligible Amount Based"},
-            pluck="name",
+        # eligible_products = frappe.get_all(
+        #     "Product",
+        #     filters={"commission_type": "Eligible Amount Based"},
+        #     pluck="name",
+        # )
+
+        # if not eligible_products:
+        #     frappe.throw(
+        #         _(
+        #             "No Product found with commission_type = "
+        #             "'Eligible Amount Based'"
+        #         )
+        #     )
+
+        # in_clause = ", ".join(["%s"] * len(eligible_products))
+        # in_params = tuple(eligible_products)
+
+        # result = frappe.db.sql(
+        #     """
+        #     SELECT
+        #         COALESCE(SUM(c.eligible_amount), 0) AS total
+        #     FROM `tabCommission` c
+        #     WHERE c.agent_code = %s
+        #     AND c.docstatus < 2
+        #     AND c.scheme_code IN ({0})
+        #     """.format(in_clause),
+        #     tuple([agent_code] + list(in_params)),
+        #     as_dict=True,
+        # )
+
+        # agent_total = (
+        #     flt(result[0].total)
+        #     if result and result[0].total is not None
+        #     else 0
+        # )
+
+        # if agent_total <= 0:
+        #     frappe.throw(
+        #         _(
+        #             "Total eligible amount for Agent {0} "
+        #             "(Eligible Amount Based products) is zero or invalid"
+        #         ).format(agent_code)
+        #     )
+
+        # frappe.db.sql(
+        #     """
+        #     UPDATE `tabCommission`
+        #     SET agent_total_eligible_collection = %s
+        #     WHERE agent_code = %s
+        #     AND docstatus < 2
+        #     AND scheme_code IN ({0})
+        #     """.format(in_clause),
+        #     tuple([agent_total, agent_code] + list(in_params)),
+        # )
+
+        # commission_doc.agent_total_eligible_collection = agent_total
+
+        agent_code = str(
+            commission_doc.agent_code
+        ).strip()
+
+        current_scheme_code = str(
+            commission_doc.scheme_code
+        ).strip()
+
+        eligible_scheme_group = (
+            _get_eligible_amount_scheme_group(
+                current_scheme_code
+            )
         )
 
-        if not eligible_products:
-            frappe.throw(
-                _(
-                    "No Product found with commission_type = "
-                    "'Eligible Amount Based'"
-                )
-            )
+        group_placeholders = ", ".join(
+            ["%s"] * len(eligible_scheme_group)
+        )
 
-        in_clause = ", ".join(["%s"] * len(eligible_products))
-        in_params = tuple(eligible_products)
+        group_values = (
+            [agent_code]
+            + list(eligible_scheme_group)
+        )
 
         result = frappe.db.sql(
-            """
+            f"""
             SELECT
-                COALESCE(SUM(c.eligible_amount), 0) AS total
+                COALESCE(
+                    SUM(c.eligible_amount),
+                    0
+                ) AS total
             FROM `tabCommission` c
+            INNER JOIN `tabProduct` p
+                ON p.name = c.scheme_code
             WHERE c.agent_code = %s
             AND c.docstatus < 2
-            AND c.scheme_code IN ({0})
-            """.format(in_clause),
-            tuple([agent_code] + list(in_params)),
+            AND p.commission_type = 'Eligible Amount Based'
+            AND c.scheme_code IN ({group_placeholders})
+            """,
+            tuple(group_values),
             as_dict=True,
         )
 
         agent_total = (
             flt(result[0].total)
-            if result and result[0].total is not None
+            if result
+            and result[0].total is not None
             else 0
         )
 
@@ -3006,22 +3173,33 @@ def calculate_commission_amount(docname):
             frappe.throw(
                 _(
                     "Total eligible amount for Agent {0} "
-                    "(Eligible Amount Based products) is zero or invalid"
-                ).format(agent_code)
+                    "and Scheme Group {1} is zero or invalid."
+                ).format(
+                    agent_code,
+                    ", ".join(eligible_scheme_group),
+                )
             )
 
         frappe.db.sql(
-            """
-            UPDATE `tabCommission`
-            SET agent_total_eligible_collection = %s
-            WHERE agent_code = %s
-            AND docstatus < 2
-            AND scheme_code IN ({0})
-            """.format(in_clause),
-            tuple([agent_total, agent_code] + list(in_params)),
+            f"""
+            UPDATE `tabCommission` c
+            INNER JOIN `tabProduct` p
+                ON p.name = c.scheme_code
+            SET c.agent_total_eligible_collection = %s
+            WHERE c.agent_code = %s
+            AND c.docstatus < 2
+            AND p.commission_type = 'Eligible Amount Based'
+            AND c.scheme_code IN ({group_placeholders})
+            """,
+            tuple(
+                [agent_total, agent_code]
+                + list(eligible_scheme_group)
+            ),
         )
 
-        commission_doc.agent_total_eligible_collection = agent_total
+        commission_doc.agent_total_eligible_collection = (
+            agent_total
+        )
 
         if agent_total <= slab_1_limit:
             rate = flt(product.slab_1_rate)
