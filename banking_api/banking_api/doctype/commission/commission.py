@@ -13,12 +13,7 @@ from psycopg2.extras import RealDictCursor
 
 from decimal import (
     Decimal,
-    ROUND_CEILING,
-    ROUND_DOWN,
-    ROUND_FLOOR,
-    ROUND_HALF_DOWN,
     ROUND_HALF_UP,
-    ROUND_UP,
 )
 
 
@@ -1914,13 +1909,21 @@ def _get_commission_calculation_settings():
 
         "calculation_decimal_places": decimal_places,
 
+        # "calculation_rounding_method": (
+        #     getattr(
+        #         settings,
+        #         "calculation_rounding_method",
+        #         None,
+        #     )
+        #     or "Half Up"
+        # ),
         "calculation_rounding_method": (
             getattr(
                 settings,
                 "calculation_rounding_method",
                 None,
             )
-            or "Half Up"
+            or "Nearest"
         ),
 
         "enable_tds": cint(
@@ -2176,12 +2179,67 @@ def _decimal_amount(value):
     )
 
 
+# def _round_calculation_amount(
+#     value,
+#     calculation_settings,
+# ):
+#     """
+#     Round only when Round Calculated Amounts is enabled.
+#     """
+#     amount = _decimal_amount(value)
+
+#     if not calculation_settings[
+#         "round_calculated_amounts"
+#     ]:
+#         return amount
+
+#     rounding_map = {
+#         "Half Up": ROUND_HALF_UP,
+#         "Half Down": ROUND_HALF_DOWN,
+#         "Down": ROUND_DOWN,
+#         "Up": ROUND_UP,
+#         "Ceiling": ROUND_CEILING,
+#         "Floor": ROUND_FLOOR,
+#     }
+
+#     rounding_mode = rounding_map.get(
+#         calculation_settings[
+#             "calculation_rounding_method"
+#         ],
+#         ROUND_HALF_UP,
+#     )
+
+#     decimal_places = calculation_settings[
+#         "calculation_decimal_places"
+#     ]
+
+#     quantizer = Decimal("1").scaleb(
+#         -decimal_places
+#     )
+
+#     return amount.quantize(
+#         quantizer,
+#         rounding=rounding_mode,
+#     )
+
+
 def _round_calculation_amount(
     value,
     calculation_settings,
 ):
     """
-    Round only when Round Calculated Amounts is enabled.
+    Round using one rule only:
+
+    Decimal part < 0.5:
+        round down
+
+    Decimal part >= 0.5:
+        round up
+
+    Examples:
+        10.49 -> 10
+        10.50 -> 11
+        10.99 -> 11
     """
     amount = _decimal_amount(value)
 
@@ -2189,22 +2247,6 @@ def _round_calculation_amount(
         "round_calculated_amounts"
     ]:
         return amount
-
-    rounding_map = {
-        "Half Up": ROUND_HALF_UP,
-        "Half Down": ROUND_HALF_DOWN,
-        "Down": ROUND_DOWN,
-        "Up": ROUND_UP,
-        "Ceiling": ROUND_CEILING,
-        "Floor": ROUND_FLOOR,
-    }
-
-    rounding_mode = rounding_map.get(
-        calculation_settings[
-            "calculation_rounding_method"
-        ],
-        ROUND_HALF_UP,
-    )
 
     decimal_places = calculation_settings[
         "calculation_decimal_places"
@@ -2216,7 +2258,7 @@ def _round_calculation_amount(
 
     return amount.quantize(
         quantizer,
-        rounding=rounding_mode,
+        rounding=ROUND_HALF_UP,
     )
 
 
