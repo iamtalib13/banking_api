@@ -11,6 +11,16 @@ from frappe.utils import add_to_date, cint, flt, getdate
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
+from decimal import (
+    Decimal,
+    ROUND_CEILING,
+    ROUND_DOWN,
+    ROUND_FLOOR,
+    ROUND_HALF_DOWN,
+    ROUND_HALF_UP,
+    ROUND_UP,
+)
+
 
 class Commission(Document):
     pass
@@ -89,7 +99,7 @@ flow_data AS (
         ON tdt.acid = g.acid
         AND tdt.flow_code = 'NI'
     WHERE
-        tdt.flow_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-25'
+        tdt.flow_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-31'
     GROUP BY d.rm_id, g.foracid, g.schm_code
     HAVING SUM(tdt.flow_amt) > 0
 ),
@@ -108,14 +118,14 @@ tran_data AS (
         AND dtt.flow_code = 'NI'
     WHERE
         (
-            (dtt.tran_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-25'
+            (dtt.tran_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-31'
              AND dtt.value_date > DATE '2026-07-31')
             OR
             (dtt.tran_date > DATE '2026-08-25'
-             AND dtt.value_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-25')
+             AND dtt.value_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-31')
             OR
-            (dtt.value_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-25'
-             AND dtt.tran_date > DATE '2026-08-30')
+            (dtt.value_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-31'
+             AND dtt.tran_date > DATE '2026-08-31')
         )
     GROUP BY d.rm_id, g.foracid, g.schm_code
     HAVING SUM(dtt.tran_amt) > 0
@@ -159,7 +169,7 @@ SELECT
         COALESCE(td.total_tran_amt,0)
     ) AS commission_amount,
     CASE
-        WHEN ad.acct_opn_date + INTERVAL '1 year' >= DATE '2026-08-25' THEN 'YES'
+        WHEN ad.acct_opn_date + INTERVAL '1 year' >= DATE '2026-08-31' THEN 'YES'
         ELSE 'NO'
     END AS one_year_completed,
     ad.deposit_period_days,
@@ -1098,10 +1108,38 @@ def _create_deferred_commission_schedule(commission_doc, product_doc, eligible_a
         year_no = schedule["year_no"]
         rate = schedule["rate"]
 
-        gross_commission = (eligible_amount * rate) / 100
-        tds = gross_commission * 0.02
-        security_deposit = gross_commission * 0.10
-        netpay = gross_commission - (tds + security_deposit)
+        # gross_commission = (eligible_amount * rate) / 100
+        # tds = gross_commission * 0.02
+        # security_deposit = gross_commission * 0.10
+        # netpay = gross_commission - (tds + security_deposit)
+
+        gross_commission = (
+            eligible_amount * rate
+        ) / 100
+
+        financial_values = (
+            _calculate_commission_financial_values(
+                commission_amount=gross_commission,
+                eligible_amount=eligible_amount,
+                pan_status=commission_doc.pan_status,
+            )
+        )
+
+        gross_commission = flt(
+            financial_values["commission_amount"]
+        )
+
+        tds = flt(
+            financial_values["tds"]
+        )
+
+        security_deposit = flt(
+            financial_values["security_deposit"]
+        )
+
+        netpay = flt(
+            financial_values["netpay"]
+        )
 
         due_date = add_to_date(
             first_due_date,
@@ -1136,21 +1174,202 @@ def _create_deferred_commission_schedule(commission_doc, product_doc, eligible_a
     }
 
 
-def _update_agent_deduction_and_final_net_pay(agent_code):
-    """
-    Update deduction and final_net_pay in all Commission records
-    belonging to the same agent.
+# def _update_agent_deduction_and_final_net_pay(agent_code):
+#     """
+#     Update deduction and final_net_pay in all Commission records
+#     belonging to the same agent.
 
-    Rule:
-    - agent_total_netpay = sum of all active Commission.netpay values
-    - if agent_total_netpay > 1000:
-        deduction = 150
-        final_net_pay = agent_total_netpay - 150
-    - otherwise:
-        deduction = 0
-        final_net_pay = agent_total_netpay
-    """
+#     Rule:
+#     - agent_total_netpay = sum of all active Commission.netpay values
+#     - if agent_total_netpay > 1000:
+#         deduction = 150
+#         final_net_pay = agent_total_netpay - 150
+#     - otherwise:
+#         deduction = 0
+#         final_net_pay = agent_total_netpay
+#     """
 
+#     if not agent_code:
+#         return {
+#             "agent_code": None,
+#             "agent_total_netpay": 0,
+#             "deduction": 0,
+#             "final_net_pay": 0,
+#         }
+
+#     agent_code = str(agent_code).strip()
+
+#     result = frappe.db.sql(
+#         """
+#         SELECT
+#             COALESCE(
+#                 SUM(
+#                     CAST(NULLIF(TRIM(netpay), '') AS DECIMAL(18, 2))
+#                 ),
+#                 0
+#             ) AS agent_total_netpay
+#         FROM `tabCommission`
+#         WHERE agent_code = %s
+#         AND docstatus < 2
+#         """,
+#         (agent_code,),
+#         as_dict=True,
+#     )
+
+#     agent_total_netpay = (
+#         flt(result[0].agent_total_netpay)
+#         if result and result[0].agent_total_netpay is not None
+#         else 0
+#     )
+
+#     deduction = 150 if agent_total_netpay > 1000 else 0
+#     final_net_pay = agent_total_netpay - deduction
+
+#     frappe.db.sql(
+#         """
+#         UPDATE `tabCommission`
+#         SET
+#             deduction = %s,
+#             final_net_pay = %s
+#         WHERE agent_code = %s
+#         AND docstatus < 2
+#         """,
+#         (
+#             deduction,
+#             final_net_pay,
+#             agent_code,
+#         ),
+#     )
+
+#     return {
+#         "agent_code": agent_code,
+#         "agent_total_netpay": agent_total_netpay,
+#         "deduction": deduction,
+#         "final_net_pay": final_net_pay,
+#     }
+
+
+def _calculate_agent_deduction(
+    agent_total_netpay,
+    calculation_settings,
+):
+    """
+    Calculate agent deduction from Commission Settings.
+
+    Supported types:
+        Amount Above Limit
+        Percentage Above Limit
+        Fixed Amount
+        Percentage Of Total
+    """
+    if not calculation_settings[
+        "enable_agent_deduction"
+    ]:
+        return Decimal("0"), _decimal_amount(
+            agent_total_netpay
+        )
+
+    total_netpay = _decimal_amount(
+        agent_total_netpay
+    )
+
+    deduction_type = calculation_settings[
+        "agent_deduction_type"
+    ]
+
+    deduction_limit = _decimal_amount(
+        calculation_settings[
+            "agent_deduction_limit"
+        ]
+    )
+
+    deduction_amount = _decimal_amount(
+        calculation_settings[
+            "agent_deduction_amount"
+        ]
+    )
+
+    deduction_percentage = _decimal_amount(
+        calculation_settings[
+            "agent_deduction_percentage"
+        ]
+    )
+
+    if deduction_type == "Fixed Amount":
+        deduction = deduction_amount
+
+    elif deduction_type == "Percentage Of Total":
+        deduction = (
+            total_netpay
+            * deduction_percentage
+            / Decimal("100")
+        )
+
+    elif deduction_type == "Percentage Above Limit":
+        excess = max(
+            total_netpay - deduction_limit,
+            Decimal("0"),
+        )
+
+        deduction = (
+            excess
+            * deduction_percentage
+            / Decimal("100")
+        )
+
+    else:
+        # Amount Above Limit
+        deduction = (
+            deduction_amount
+            if total_netpay > deduction_limit
+            else Decimal("0")
+        )
+
+    maximum_deduction = calculation_settings[
+        "agent_deduction_maximum"
+    ]
+
+    if maximum_deduction is not None:
+        deduction = min(
+            deduction,
+            _decimal_amount(maximum_deduction),
+        )
+
+    deduction = _round_calculation_amount(
+        deduction,
+        calculation_settings,
+    )
+
+    if calculation_settings[
+        "agent_deduction_operation"
+    ] == "Add":
+        final_netpay = (
+            total_netpay + deduction
+        )
+    else:
+        final_netpay = (
+            total_netpay - deduction
+        )
+
+    final_netpay = _round_calculation_amount(
+        final_netpay,
+        calculation_settings,
+    )
+
+    return deduction, final_netpay
+
+
+def _update_agent_deduction_and_final_net_pay(
+    agent_code,
+):
+    """
+    Update deduction and final_net_pay on all active Commission
+    documents belonging to the same agent.
+
+    The calculation remains agent-level and is not changed.
+    Only the hardcoded calculation values are now read from
+    Commission Settings.
+    """
     if not agent_code:
         return {
             "agent_code": None,
@@ -1166,7 +1385,10 @@ def _update_agent_deduction_and_final_net_pay(agent_code):
         SELECT
             COALESCE(
                 SUM(
-                    CAST(NULLIF(TRIM(netpay), '') AS DECIMAL(18, 2))
+                    CAST(
+                        NULLIF(TRIM(netpay), '')
+                        AS DECIMAL(18, 2)
+                    )
                 ),
                 0
             ) AS agent_total_netpay
@@ -1180,12 +1402,21 @@ def _update_agent_deduction_and_final_net_pay(agent_code):
 
     agent_total_netpay = (
         flt(result[0].agent_total_netpay)
-        if result and result[0].agent_total_netpay is not None
+        if result
+        and result[0].agent_total_netpay is not None
         else 0
     )
 
-    deduction = 150 if agent_total_netpay > 1000 else 0
-    final_net_pay = agent_total_netpay - deduction
+    calculation_settings = (
+        _get_commission_calculation_settings()
+    )
+
+    deduction, final_net_pay = (
+        _calculate_agent_deduction(
+            agent_total_netpay=agent_total_netpay,
+            calculation_settings=calculation_settings,
+        )
+    )
 
     frappe.db.sql(
         """
@@ -1197,8 +1428,8 @@ def _update_agent_deduction_and_final_net_pay(agent_code):
         AND docstatus < 2
         """,
         (
-            deduction,
-            final_net_pay,
+            flt(deduction),
+            flt(final_net_pay),
             agent_code,
         ),
     )
@@ -1206,8 +1437,8 @@ def _update_agent_deduction_and_final_net_pay(agent_code):
     return {
         "agent_code": agent_code,
         "agent_total_netpay": agent_total_netpay,
-        "deduction": deduction,
-        "final_net_pay": final_net_pay,
+        "deduction": flt(deduction),
+        "final_net_pay": flt(final_net_pay),
     }
 
 
@@ -1645,6 +1876,935 @@ def _create_normal_agent_payment_if_missing(agent_code, due_date=None):
     }
 
 
+def _get_commission_calculation_settings():
+    """
+    Load all calculation settings from Commission Settings.
+
+    Defaults preserve the original calculation:
+        TDS = 2% of Commission Amount
+        Security Deposit = 10% of Commission Amount
+        Net Pay = Commission Amount - TDS - Security Deposit
+        Agent deduction = 150 when total net pay > 1000
+        No rounding
+    """
+    settings = frappe.get_single(
+        "Commission Settings"
+    )
+
+    decimal_places = cint(
+        getattr(
+            settings,
+            "calculation_decimal_places",
+            2,
+        )
+        or 2
+    )
+
+    if decimal_places < 0:
+        decimal_places = 0
+
+    return {
+        "round_calculated_amounts": cint(
+            getattr(
+                settings,
+                "round_calculated_amounts",
+                0,
+            )
+        ),
+
+        "calculation_decimal_places": decimal_places,
+
+        "calculation_rounding_method": (
+            getattr(
+                settings,
+                "calculation_rounding_method",
+                None,
+            )
+            or "Half Up"
+        ),
+
+        "enable_tds": cint(
+            getattr(
+                settings,
+                "enable_tds",
+                1,
+            )
+        ),
+
+        "tds_operation": (
+            getattr(
+                settings,
+                "tds_operation",
+                None,
+            )
+            or "Percentage"
+        ),
+
+        "tds_percentage": flt(
+            getattr(
+                settings,
+                "tds_percentage",
+                2,
+            )
+            if getattr(
+                settings,
+                "tds_percentage",
+                None,
+            )
+            not in (None, "")
+            else 2
+        ),
+
+        "tds_percentage_without_valid_pan": flt(
+            getattr(
+                settings,
+                "tds_percentage_without_valid_pan",
+                20,
+            )
+            if getattr(
+                settings,
+                "tds_percentage_without_valid_pan",
+                None,
+            )
+            not in (None, "")
+            else 20
+        ),
+
+        "tds_fixed_amount": flt(
+            getattr(
+                settings,
+                "tds_fixed_amount",
+                0,
+            )
+            or 0
+        ),
+
+        "tds_base": (
+            getattr(
+                settings,
+                "tds_base",
+                None,
+            )
+            or "Commission Amount"
+        ),
+
+        "tds_maximum_amount": (
+            flt(settings.tds_maximum_amount)
+            if getattr(
+                settings,
+                "tds_maximum_amount",
+                None,
+            )
+            not in (None, "")
+            else None
+        ),
+
+        "enable_security_deposit": cint(
+            getattr(
+                settings,
+                "enable_security_deposit",
+                1,
+            )
+        ),
+
+        "security_deposit_operation": (
+            getattr(
+                settings,
+                "security_deposit_operation",
+                None,
+            )
+            or "Percentage"
+        ),
+
+        "security_deposit_percentage": flt(
+            getattr(
+                settings,
+                "security_deposit_percentage",
+                10,
+            )
+            if getattr(
+                settings,
+                "security_deposit_percentage",
+                None,
+            )
+            not in (None, "")
+            else 10
+        ),
+
+        "security_deposit_fixed_amount": flt(
+            getattr(
+                settings,
+                "security_deposit_fixed_amount",
+                0,
+            )
+            or 0
+        ),
+
+        "security_deposit_base": (
+            getattr(
+                settings,
+                "security_deposit_base",
+                None,
+            )
+            or "Commission Amount"
+        ),
+
+        "security_deposit_maximum_amount": (
+            flt(settings.security_deposit_maximum_amount)
+            if getattr(
+                settings,
+                "security_deposit_maximum_amount",
+                None,
+            )
+            not in (None, "")
+            else None
+        ),
+
+        "net_pay_operation": (
+            getattr(
+                settings,
+                "net_pay_operation",
+                None,
+            )
+            or "Commission Amount - TDS - Security Deposit"
+        ),
+
+        "net_pay_fixed_adjustment": flt(
+            getattr(
+                settings,
+                "net_pay_fixed_adjustment",
+                0,
+            )
+            or 0
+        ),
+
+        "net_pay_minimum_amount": (
+            flt(settings.net_pay_minimum_amount)
+            if getattr(
+                settings,
+                "net_pay_minimum_amount",
+                None,
+            )
+            not in (None, "")
+            else None
+        ),
+
+        "net_pay_maximum_amount": (
+            flt(settings.net_pay_maximum_amount)
+            if getattr(
+                settings,
+                "net_pay_maximum_amount",
+                None,
+            )
+            not in (None, "")
+            else None
+        ),
+
+        "enable_agent_deduction": cint(
+            getattr(
+                settings,
+                "enable_agent_deduction",
+                1,
+            )
+        ),
+
+        "agent_deduction_type": (
+            getattr(
+                settings,
+                "agent_deduction_type",
+                None,
+            )
+            or "Amount Above Limit"
+        ),
+
+        "agent_deduction_limit": flt(
+            getattr(
+                settings,
+                "agent_deduction_limit",
+                1000,
+            )
+            or 1000
+        ),
+
+        "agent_deduction_amount": flt(
+            getattr(
+                settings,
+                "agent_deduction_amount",
+                150,
+            )
+            or 150
+        ),
+
+        "agent_deduction_percentage": flt(
+            getattr(
+                settings,
+                "agent_deduction_percentage",
+                0,
+            )
+            or 0
+        ),
+
+        "agent_deduction_maximum": (
+            flt(settings.agent_deduction_maximum)
+            if getattr(
+                settings,
+                "agent_deduction_maximum",
+                None,
+            )
+            not in (None, "")
+            else None
+        ),
+
+        "agent_deduction_operation": (
+            getattr(
+                settings,
+                "agent_deduction_operation",
+                None,
+            )
+            or "Subtract"
+        ),
+    }
+
+
+def _decimal_amount(value):
+    return Decimal(
+        str(
+            0
+            if value in (None, "")
+            else value
+        )
+    )
+
+
+def _round_calculation_amount(
+    value,
+    calculation_settings,
+):
+    """
+    Round only when Round Calculated Amounts is enabled.
+    """
+    amount = _decimal_amount(value)
+
+    if not calculation_settings[
+        "round_calculated_amounts"
+    ]:
+        return amount
+
+    rounding_map = {
+        "Half Up": ROUND_HALF_UP,
+        "Half Down": ROUND_HALF_DOWN,
+        "Down": ROUND_DOWN,
+        "Up": ROUND_UP,
+        "Ceiling": ROUND_CEILING,
+        "Floor": ROUND_FLOOR,
+    }
+
+    rounding_mode = rounding_map.get(
+        calculation_settings[
+            "calculation_rounding_method"
+        ],
+        ROUND_HALF_UP,
+    )
+
+    decimal_places = calculation_settings[
+        "calculation_decimal_places"
+    ]
+
+    quantizer = Decimal("1").scaleb(
+        -decimal_places
+    )
+
+    return amount.quantize(
+        quantizer,
+        rounding=rounding_mode,
+    )
+
+
+def _apply_amount_limit(
+    amount,
+    maximum_amount,
+):
+    amount = _decimal_amount(amount)
+
+    if maximum_amount is None:
+        return amount
+
+    return min(
+        amount,
+        _decimal_amount(maximum_amount),
+    )
+
+
+def _get_calculation_base(
+    base_name,
+    commission_amount,
+    eligible_amount,
+    tds=Decimal("0"),
+    security_deposit=Decimal("0"),
+):
+    """
+    Return the configured base amount.
+
+    Supported bases are the values in Commission Settings.
+    """
+    if base_name == "Eligible Amount":
+        return _decimal_amount(
+            eligible_amount
+        )
+
+    if base_name == "Net Pay Before TDS":
+        return (
+            _decimal_amount(commission_amount)
+            - _decimal_amount(security_deposit)
+        )
+
+    if base_name == "Net Pay Before Security Deposit":
+        return (
+            _decimal_amount(commission_amount)
+            - _decimal_amount(tds)
+        )
+
+    return _decimal_amount(
+        commission_amount
+    )
+
+
+def _calculate_base_percentage(
+    base_amount,
+    percentage,
+):
+    return (
+        _decimal_amount(base_amount)
+        * _decimal_amount(percentage)
+        / Decimal("100")
+    )
+
+
+def _has_valid_pan_status(pan_status):
+    """
+    Return True only for valid/active PAN status values.
+    """
+    normalized_status = str(
+        pan_status or ""
+    ).strip().casefold()
+
+    return normalized_status in {
+        "valid and operative".casefold(),
+        "active".casefold(),
+    }
+
+
+# def _calculate_tds(
+#     commission_amount,
+#     eligible_amount,
+#     calculation_settings,
+#     security_deposit=Decimal("0"),
+#     pan_status=None,
+# ):
+#     """
+#     Calculate TDS dynamically.
+
+#     Supported operations:
+#         Percentage
+#         Fixed Amount
+#         Percentage Plus Security Deposit
+#         Percentage Minus Security Deposit
+#     """
+#     if not calculation_settings["enable_tds"]:
+#         return Decimal("0")
+
+#     base_amount = _get_calculation_base(
+#         base_name=calculation_settings["tds_base"],
+#         commission_amount=commission_amount,
+#         eligible_amount=eligible_amount,
+#         security_deposit=security_deposit,
+#     )
+
+#     operation = calculation_settings[
+#         "tds_operation"
+#     ]
+
+#     # percentage_amount = _calculate_base_percentage(
+#     #     base_amount,
+#     #     calculation_settings["tds_percentage"],
+#     # )
+
+#     if _has_valid_pan_status(pan_status):
+#         applicable_tds_percentage = (
+#             calculation_settings["tds_percentage"]
+#         )
+#     else:
+#         applicable_tds_percentage = (
+#             calculation_settings[
+#                 "tds_percentage_without_valid_pan"
+#             ]
+#         )
+
+#     percentage_amount = _calculate_base_percentage(
+#         base_amount,
+#         applicable_tds_percentage,
+#     )
+
+#     if operation == "Fixed Amount":
+#         tds = _decimal_amount(
+#             calculation_settings["tds_fixed_amount"]
+#         )
+
+#     elif operation == "Percentage Plus Security Deposit":
+#         tds = (
+#             percentage_amount
+#             + _decimal_amount(security_deposit)
+#         )
+
+#     elif operation == "Percentage Minus Security Deposit":
+#         tds = (
+#             percentage_amount
+#             - _decimal_amount(security_deposit)
+#         )
+
+#     else:
+#         tds = percentage_amount
+
+#     if tds < 0:
+#         tds = Decimal("0")
+
+#     tds = _apply_amount_limit(
+#         tds,
+#         calculation_settings[
+#             "tds_maximum_amount"
+#         ],
+#     )
+
+#     return _round_calculation_amount(
+#         tds,
+#         calculation_settings,
+#     )
+
+
+def _calculate_tds(
+    commission_amount,
+    eligible_amount,
+    calculation_settings,
+    security_deposit=Decimal("0"),
+    pan_status=None,
+):
+    """
+    Calculate TDS dynamically.
+
+    Valid PAN status:
+        Uses tds_percentage.
+
+    Missing/invalid PAN status:
+        Uses tds_percentage_without_valid_pan.
+
+    The selected tds_operation logic remains unchanged.
+    """
+    if not calculation_settings["enable_tds"]:
+        return Decimal("0")
+
+    base_amount = _get_calculation_base(
+        base_name=calculation_settings["tds_base"],
+        commission_amount=commission_amount,
+        eligible_amount=eligible_amount,
+        security_deposit=security_deposit,
+    )
+
+    if _has_valid_pan_status(pan_status):
+        applicable_tds_percentage = (
+            calculation_settings["tds_percentage"]
+        )
+    else:
+        applicable_tds_percentage = (
+            calculation_settings[
+                "tds_percentage_without_valid_pan"
+            ]
+        )
+
+    percentage_amount = _calculate_base_percentage(
+        base_amount,
+        applicable_tds_percentage,
+    )
+
+    operation = calculation_settings[
+        "tds_operation"
+    ]
+
+    if operation == "Fixed Amount":
+        tds = _decimal_amount(
+            calculation_settings["tds_fixed_amount"]
+        )
+
+    elif operation == "Percentage Plus Security Deposit":
+        tds = (
+            percentage_amount
+            + _decimal_amount(security_deposit)
+        )
+
+    elif operation == "Percentage Minus Security Deposit":
+        tds = (
+            percentage_amount
+            - _decimal_amount(security_deposit)
+        )
+
+    else:
+        tds = percentage_amount
+
+    if tds < 0:
+        tds = Decimal("0")
+
+    tds = _apply_amount_limit(
+        tds,
+        calculation_settings["tds_maximum_amount"],
+    )
+
+    return _round_calculation_amount(
+        tds,
+        calculation_settings,
+    )
+
+
+def _calculate_security_deposit(
+    commission_amount,
+    eligible_amount,
+    tds,
+    calculation_settings,
+):
+    """
+    Calculate Security Deposit dynamically.
+
+    Supported operations:
+        Percentage
+        Fixed Amount
+        Percentage Plus TDS
+        Percentage Minus TDS
+    """
+    if not calculation_settings[
+        "enable_security_deposit"
+    ]:
+        return Decimal("0")
+
+    base_amount = _get_calculation_base(
+        base_name=calculation_settings[
+            "security_deposit_base"
+        ],
+        commission_amount=commission_amount,
+        eligible_amount=eligible_amount,
+        tds=tds,
+    )
+
+    operation = calculation_settings[
+        "security_deposit_operation"
+    ]
+
+    percentage_amount = _calculate_base_percentage(
+        base_amount,
+        calculation_settings[
+            "security_deposit_percentage"
+        ],
+    )
+
+    if operation == "Fixed Amount":
+        security_deposit = _decimal_amount(
+            calculation_settings[
+                "security_deposit_fixed_amount"
+            ]
+        )
+
+    elif operation == "Percentage Plus TDS":
+        security_deposit = (
+            percentage_amount
+            + _decimal_amount(tds)
+        )
+
+    elif operation == "Percentage Minus TDS":
+        security_deposit = (
+            percentage_amount
+            - _decimal_amount(tds)
+        )
+
+    else:
+        security_deposit = percentage_amount
+
+    if security_deposit < 0:
+        security_deposit = Decimal("0")
+
+    security_deposit = _apply_amount_limit(
+        security_deposit,
+        calculation_settings[
+            "security_deposit_maximum_amount"
+        ],
+    )
+
+    return _round_calculation_amount(
+        security_deposit,
+        calculation_settings,
+    )
+
+
+def _calculate_netpay(
+    commission_amount,
+    tds,
+    security_deposit,
+    calculation_settings,
+):
+    """
+    Calculate Net Pay dynamically from Net Pay Operation.
+    """
+    commission_amount = _decimal_amount(
+        commission_amount
+    )
+    tds = _decimal_amount(tds)
+    security_deposit = _decimal_amount(
+        security_deposit
+    )
+
+    operation = calculation_settings[
+        "net_pay_operation"
+    ]
+
+    if operation == "Commission Amount - TDS":
+        netpay = commission_amount - tds
+
+    elif operation == "Commission Amount - Security Deposit":
+        netpay = (
+            commission_amount
+            - security_deposit
+        )
+
+    elif operation == (
+        "Commission Amount + TDS - Security Deposit"
+    ):
+        netpay = (
+            commission_amount
+            + tds
+            - security_deposit
+        )
+
+    elif operation == (
+        "Commission Amount - TDS + Security Deposit"
+    ):
+        netpay = (
+            commission_amount
+            - tds
+            + security_deposit
+        )
+
+    elif operation == (
+        "Commission Amount + TDS + Security Deposit"
+    ):
+        netpay = (
+            commission_amount
+            + tds
+            + security_deposit
+        )
+
+    elif operation == "Commission Amount + Security Deposit":
+        netpay = (
+            commission_amount
+            + security_deposit
+        )
+
+    elif operation == "Commission Amount":
+        netpay = commission_amount
+
+    elif operation == "Custom Fixed Adjustment":
+        netpay = (
+            commission_amount
+            + _decimal_amount(
+                calculation_settings[
+                    "net_pay_fixed_adjustment"
+                ]
+            )
+        )
+
+    else:
+        netpay = (
+            commission_amount
+            - tds
+            - security_deposit
+        )
+
+    minimum_amount = calculation_settings[
+        "net_pay_minimum_amount"
+    ]
+
+    maximum_amount = calculation_settings[
+        "net_pay_maximum_amount"
+    ]
+
+    if minimum_amount is not None:
+        netpay = max(
+            netpay,
+            _decimal_amount(minimum_amount),
+        )
+
+    if maximum_amount is not None:
+        netpay = min(
+            netpay,
+            _decimal_amount(maximum_amount),
+        )
+
+    return _round_calculation_amount(
+        netpay,
+        calculation_settings,
+    )
+
+
+# def _calculate_commission_financial_values(
+#     commission_amount,
+#     eligible_amount,
+#     pan_status=None,
+# ):
+#     """
+#     Central financial calculation engine.
+
+#     The TDS/Security Deposit dependency is resolved in this order:
+#         1. Calculate preliminary TDS.
+#         2. Calculate Security Deposit.
+#         3. Recalculate TDS if it depends on Security Deposit.
+#         4. Calculate Net Pay.
+#     """
+#     calculation_settings = (
+#         _get_commission_calculation_settings()
+#     )
+
+#     commission_amount = _round_calculation_amount(
+#         commission_amount,
+#         calculation_settings,
+#     )
+
+#     tds_operation = calculation_settings[
+#         "tds_operation"
+#     ]
+
+#     # First pass: calculate TDS without security deposit.
+#     preliminary_tds = _calculate_tds(
+#         commission_amount=commission_amount,
+#         eligible_amount=eligible_amount,
+#         calculation_settings=calculation_settings,
+#         security_deposit=Decimal("0"),
+#         pan_status=pan_status,
+#     )
+
+#     security_deposit = _calculate_security_deposit(
+#         commission_amount=commission_amount,
+#         eligible_amount=eligible_amount,
+#         tds=preliminary_tds,
+#         calculation_settings=calculation_settings,
+#     )
+
+#     # Second pass: TDS operations involving Security Deposit.
+#     if tds_operation in (
+#         "Percentage Plus Security Deposit",
+#         "Percentage Minus Security Deposit",
+#     ):
+#         tds = _calculate_tds(
+#             commission_amount=commission_amount,
+#             eligible_amount=eligible_amount,
+#             calculation_settings=calculation_settings,
+#             security_deposit=security_deposit,
+#             pan_status=pan_status,
+#         )
+#     else:
+#         tds = preliminary_tds
+
+#     netpay = _calculate_netpay(
+#         commission_amount=commission_amount,
+#         tds=tds,
+#         security_deposit=security_deposit,
+#         calculation_settings=calculation_settings,
+#     )
+
+#     return {
+#         "commission_amount": commission_amount,
+#         "tds": tds,
+#         "security_deposit": security_deposit,
+#         "netpay": netpay,
+#         "calculation_settings": calculation_settings,
+#     }
+
+def _calculate_commission_financial_values(
+    commission_amount,
+    eligible_amount,
+    pan_status=None,
+):
+    """
+    Central financial calculation engine.
+
+    TDS percentage is selected using Commission.pan_status:
+
+    Valid and Operative / Active:
+        Commission Settings.tds_percentage
+
+    Missing or other PAN status:
+        Commission Settings.tds_percentage_without_valid_pan
+    """
+    calculation_settings = (
+        _get_commission_calculation_settings()
+    )
+
+    commission_amount = _round_calculation_amount(
+        commission_amount,
+        calculation_settings,
+    )
+
+    tds_operation = calculation_settings[
+        "tds_operation"
+    ]
+
+    preliminary_tds = _calculate_tds(
+        commission_amount=commission_amount,
+        eligible_amount=eligible_amount,
+        calculation_settings=calculation_settings,
+        security_deposit=Decimal("0"),
+        pan_status=pan_status,
+    )
+
+    security_deposit = _calculate_security_deposit(
+        commission_amount=commission_amount,
+        eligible_amount=eligible_amount,
+        tds=preliminary_tds,
+        calculation_settings=calculation_settings,
+    )
+
+    if tds_operation in (
+        "Percentage Plus Security Deposit",
+        "Percentage Minus Security Deposit",
+    ):
+        tds = _calculate_tds(
+            commission_amount=commission_amount,
+            eligible_amount=eligible_amount,
+            calculation_settings=calculation_settings,
+            security_deposit=security_deposit,
+            pan_status=pan_status,
+        )
+    else:
+        tds = preliminary_tds
+
+    netpay = _calculate_netpay(
+        commission_amount=commission_amount,
+        tds=tds,
+        security_deposit=security_deposit,
+        calculation_settings=calculation_settings,
+    )
+
+    return {
+        "commission_amount": commission_amount,
+        "tds": tds,
+        "security_deposit": security_deposit,
+        "netpay": netpay,
+        "calculation_settings": calculation_settings,
+        "pan_status": pan_status,
+        "tds_percentage_used": (
+            calculation_settings["tds_percentage"]
+            if _has_valid_pan_status(pan_status)
+            else calculation_settings[
+                "tds_percentage_without_valid_pan"
+            ]
+        ),
+    }
+
+
 @frappe.whitelist()
 def calculate_commission_amount(docname):
     """
@@ -1919,9 +3079,33 @@ def calculate_commission_amount(docname):
     if not is_deferred:
         commission_amount = (eligible_amount * rate) / 100
 
-    tds = commission_amount * 0.02
-    security_deposit = commission_amount * 0.10
-    netpay = commission_amount - (tds + security_deposit)
+    # tds = commission_amount * 0.02
+    # security_deposit = commission_amount * 0.10
+    # netpay = commission_amount - (tds + security_deposit)
+
+    financial_values = (
+        _calculate_commission_financial_values(
+            commission_amount=commission_amount,
+            eligible_amount=eligible_amount,
+            pan_status=commission_doc.pan_status,
+        )
+    )
+
+    commission_amount = flt(
+        financial_values["commission_amount"]
+    )
+
+    tds = flt(
+        financial_values["tds"]
+    )
+
+    security_deposit = flt(
+        financial_values["security_deposit"]
+    )
+
+    netpay = flt(
+        financial_values["netpay"]
+    )
 
     commission_doc.commission_amount = commission_amount
     commission_doc.tds = tds
