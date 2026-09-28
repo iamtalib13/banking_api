@@ -1552,6 +1552,36 @@ def create_commission_payment_records(commission_doc):
     }
 
 
+def _round_payment_amounts(payment_data):
+    """
+    Round all Commission Payment monetary values to whole numbers
+    when round_calculated_amounts is enabled.
+    """
+    calculation_settings = (
+        _get_commission_calculation_settings()
+    )
+
+    amount_fields = (
+        "gross_commission",
+        "tds_amount",
+        "security_deposit_amount",
+        "netpay_amount",
+        "deduction_amount",
+        "final_netpay",
+    )
+
+    for fieldname in amount_fields:
+        if fieldname in payment_data:
+            payment_data[fieldname] = flt(
+                _round_calculation_amount(
+                    payment_data[fieldname],
+                    calculation_settings,
+                )
+            )
+
+    return payment_data
+
+
 def _get_deferred_product_codes():
     """
     Return Product document names configured with Deferred commission type.
@@ -1814,8 +1844,37 @@ def _create_normal_agent_payment_if_missing(agent_code, due_date=None):
                 "reason": "Payment is already Processing or Paid",
             }
 
+        # old code
         # payment_doc.agent_operative_account = agent_operative_account
         # payment_doc.agent_saving_account = agent_saving_account
+
+        # new code
+        # payment_doc.agent_operative_account = (
+        #     agent_operative_account
+        # )
+
+        # payment_doc.agent_saving_account = (
+        #     agent_saving_account
+        # )
+        # payment_doc.gross_commission = gross_commission
+        # payment_doc.tds_amount = tds_amount
+        # payment_doc.security_deposit_amount = security_deposit_amount
+        # payment_doc.netpay_amount = netpay_amount
+        # payment_doc.deduction_amount = deduction_amount
+        # payment_doc.final_netpay = final_netpay
+        # payment_doc.payment_status = "Pending"
+
+        payment_data = _round_payment_amounts({
+            "gross_commission": gross_commission,
+            "tds_amount": tds_amount,
+            "security_deposit_amount": (
+                security_deposit_amount
+            ),
+            "netpay_amount": netpay_amount,
+            "deduction_amount": deduction_amount,
+            "final_netpay": final_netpay,
+        })
+
         payment_doc.agent_operative_account = (
             agent_operative_account
         )
@@ -1823,12 +1882,33 @@ def _create_normal_agent_payment_if_missing(agent_code, due_date=None):
         payment_doc.agent_saving_account = (
             agent_saving_account
         )
-        payment_doc.gross_commission = gross_commission
-        payment_doc.tds_amount = tds_amount
-        payment_doc.security_deposit_amount = security_deposit_amount
-        payment_doc.netpay_amount = netpay_amount
-        payment_doc.deduction_amount = deduction_amount
-        payment_doc.final_netpay = final_netpay
+
+        payment_doc.gross_commission = (
+            payment_data["gross_commission"]
+        )
+
+        payment_doc.tds_amount = (
+            payment_data["tds_amount"]
+        )
+
+        payment_doc.security_deposit_amount = (
+            payment_data[
+                "security_deposit_amount"
+            ]
+        )
+
+        payment_doc.netpay_amount = (
+            payment_data["netpay_amount"]
+        )
+
+        payment_doc.deduction_amount = (
+            payment_data["deduction_amount"]
+        )
+
+        payment_doc.final_netpay = (
+            payment_data["final_netpay"]
+        )
+
         payment_doc.payment_status = "Pending"
         payment_doc.save(ignore_permissions=True)
 
@@ -1838,15 +1918,36 @@ def _create_normal_agent_payment_if_missing(agent_code, due_date=None):
             "name": payment_doc.name,
         }
 
-    payment_doc = frappe.get_doc({
+    # payment_doc = frappe.get_doc({
+    #     "doctype": "Commission Payment",
+    #     "agent_code": agent_code,
+    #     # "agent_operative_account": agent_operative_account,
+    #     # "agent_saving_account": agent_saving_account,
+    #     "agent_operative_account": (
+    #         agent_operative_account
+    #     ),
+
+    #     "agent_saving_account": (
+    #         agent_saving_account
+    #     ),
+    #     "payment_type": "Normal",
+    #     "payment_year": 1,
+    #     "due_date": due_date,
+    #     "gross_commission": gross_commission,
+    #     "tds_amount": tds_amount,
+    #     "security_deposit_amount": security_deposit_amount,
+    #     "netpay_amount": netpay_amount,
+    #     "deduction_amount": deduction_amount,
+    #     "final_netpay": final_netpay,
+    #     "payment_status": "Pending",
+    # })
+
+    payment_data = {
         "doctype": "Commission Payment",
         "agent_code": agent_code,
-        # "agent_operative_account": agent_operative_account,
-        # "agent_saving_account": agent_saving_account,
         "agent_operative_account": (
             agent_operative_account
         ),
-
         "agent_saving_account": (
             agent_saving_account
         ),
@@ -1855,12 +1956,22 @@ def _create_normal_agent_payment_if_missing(agent_code, due_date=None):
         "due_date": due_date,
         "gross_commission": gross_commission,
         "tds_amount": tds_amount,
-        "security_deposit_amount": security_deposit_amount,
+        "security_deposit_amount": (
+            security_deposit_amount
+        ),
         "netpay_amount": netpay_amount,
         "deduction_amount": deduction_amount,
         "final_netpay": final_netpay,
         "payment_status": "Pending",
-    })
+    }
+
+    payment_data = _round_payment_amounts(
+        payment_data
+    )
+
+    payment_doc = frappe.get_doc(
+        payment_data
+    )
 
     payment_doc.insert(ignore_permissions=True)
 
@@ -1886,17 +1997,17 @@ def _get_commission_calculation_settings():
         "Commission Settings"
     )
 
-    decimal_places = cint(
-        getattr(
-            settings,
-            "calculation_decimal_places",
-            2,
-        )
-        or 2
-    )
+    # decimal_places = cint(
+    #     getattr(
+    #         settings,
+    #         "calculation_decimal_places",
+    #         2,
+    #     )
+    #     or 2
+    # )
 
-    if decimal_places < 0:
-        decimal_places = 0
+    # if decimal_places < 0:
+    #     decimal_places = 0
 
     return {
         "round_calculated_amounts": cint(
@@ -1907,24 +2018,24 @@ def _get_commission_calculation_settings():
             )
         ),
 
-        "calculation_decimal_places": decimal_places,
+        # "calculation_decimal_places": decimal_places,
 
+        # # "calculation_rounding_method": (
+        # #     getattr(
+        # #         settings,
+        # #         "calculation_rounding_method",
+        # #         None,
+        # #     )
+        # #     or "Half Up"
+        # # ),
         # "calculation_rounding_method": (
         #     getattr(
         #         settings,
         #         "calculation_rounding_method",
         #         None,
         #     )
-        #     or "Half Up"
+        #     or "Nearest"
         # ),
-        "calculation_rounding_method": (
-            getattr(
-                settings,
-                "calculation_rounding_method",
-                None,
-            )
-            or "Nearest"
-        ),
 
         "enable_tds": cint(
             getattr(
@@ -2223,23 +2334,68 @@ def _decimal_amount(value):
 #     )
 
 
+# def _round_calculation_amount(
+#     value,
+#     calculation_settings,
+# ):
+#     """
+#     Round using one rule only:
+
+#     Decimal part < 0.5:
+#         round down
+
+#     Decimal part >= 0.5:
+#         round up
+
+#     Examples:
+#         10.49 -> 10
+#         10.50 -> 11
+#         10.99 -> 11
+#     """
+#     amount = _decimal_amount(value)
+
+#     if not calculation_settings[
+#         "round_calculated_amounts"
+#     ]:
+#         return amount
+
+#     decimal_places = calculation_settings[
+#         "calculation_decimal_places"
+#     ]
+
+#     quantizer = Decimal("1").scaleb(
+#         -decimal_places
+#     )
+
+#     return amount.quantize(
+#         quantizer,
+#         rounding=ROUND_HALF_UP,
+#     )
+
+
 def _round_calculation_amount(
     value,
     calculation_settings,
 ):
     """
-    Round using one rule only:
+    Round calculated amounts to the nearest whole number.
 
-    Decimal part < 0.5:
-        round down
+    When disabled:
+        Keep the original decimal value.
 
-    Decimal part >= 0.5:
-        round up
+    When enabled:
+        Decimal part below 0.50 -> round down.
+        Decimal part 0.50 or above -> round up.
 
     Examples:
+        10.01 -> 10
+        10.30 -> 10
+        10.40 -> 10
         10.49 -> 10
         10.50 -> 11
-        10.99 -> 11
+        10.60 -> 11
+        10.78 -> 11
+        10.90 -> 11
     """
     amount = _decimal_amount(value)
 
@@ -2248,16 +2404,8 @@ def _round_calculation_amount(
     ]:
         return amount
 
-    decimal_places = calculation_settings[
-        "calculation_decimal_places"
-    ]
-
-    quantizer = Decimal("1").scaleb(
-        -decimal_places
-    )
-
     return amount.quantize(
-        quantizer,
+        Decimal("1"),
         rounding=ROUND_HALF_UP,
     )
 
@@ -3211,6 +3359,17 @@ def calculate_commission_amount(docname):
             else 0
         )
 
+        calculation_settings = (
+            _get_commission_calculation_settings()
+        )
+
+        agent_total = flt(
+            _round_calculation_amount(
+                agent_total,
+                calculation_settings,
+            )
+        )
+
         if agent_total <= 0:
             frappe.throw(
                 _(
@@ -3303,6 +3462,30 @@ def calculate_commission_amount(docname):
     # security_deposit = commission_amount * 0.10
     # netpay = commission_amount - (tds + security_deposit)
 
+    # financial_values = (
+    #     _calculate_commission_financial_values(
+    #         commission_amount=commission_amount,
+    #         eligible_amount=eligible_amount,
+    #         pan_status=commission_doc.pan_status,
+    #     )
+    # )
+
+    # commission_amount = flt(
+    #     financial_values["commission_amount"]
+    # )
+
+    # tds = flt(
+    #     financial_values["tds"]
+    # )
+
+    # security_deposit = flt(
+    #     financial_values["security_deposit"]
+    # )
+
+    # netpay = flt(
+    #     financial_values["netpay"]
+    # )
+
     financial_values = (
         _calculate_commission_financial_values(
             commission_amount=commission_amount,
@@ -3325,6 +3508,45 @@ def calculate_commission_amount(docname):
 
     netpay = flt(
         financial_values["netpay"]
+    )
+
+    calculation_settings = (
+        _get_commission_calculation_settings()
+    )
+
+    commission_amount = flt(
+        _round_calculation_amount(
+            commission_amount,
+            calculation_settings,
+        )
+    )
+
+    commission_doc.eligible_amount = flt(
+        _round_calculation_amount(
+            commission_doc.eligible_amount,
+            calculation_settings,
+        )
+    )
+
+    tds = flt(
+        _round_calculation_amount(
+            tds,
+            calculation_settings,
+        )
+    )
+
+    security_deposit = flt(
+        _round_calculation_amount(
+            security_deposit,
+            calculation_settings,
+        )
+    )
+
+    netpay = flt(
+        _round_calculation_amount(
+            netpay,
+            calculation_settings,
+        )
     )
 
     commission_doc.commission_amount = commission_amount
@@ -3439,30 +3661,75 @@ def _create_deferred_payment_records(commission_doc):
             })
             continue
 
-        payment_doc = frappe.get_doc({
+        # payment_doc = frappe.get_doc({
+        #     "doctype": "Commission Payment",
+        #     "commission": commission_doc.name,
+        #     "agent_code": commission_doc.agent_code,
+        #     "agent_operative_account": commission_doc.agent_operative_account,
+        #     "agent_saving_account": commission_doc.agent_saving_account,
+        #     "payment_type": "Deferred",
+        #     "payment_year": payment_year,
+        #     "due_date": deferred_row.due_date,
+        #     "source_deferred_detail": deferred_row.name,
+        #     "gross_commission": flt(deferred_row.gross_commission),
+        #     "tds_amount": flt(deferred_row.tds),
+        #     "security_deposit_amount": flt(
+        #         deferred_row.security_deposit
+        #     ),
+        #     "netpay_amount": flt(deferred_row.netpay),
+        #     "deduction_amount": 0,
+        #     "final_netpay": flt(deferred_row.netpay),
+        #     "payment_status": (
+        #         "Due"
+        #         if deferred_row.status == "Due"
+        #         else "Pending"
+        #     ),
+        # })
+
+        payment_data = {
             "doctype": "Commission Payment",
             "commission": commission_doc.name,
             "agent_code": commission_doc.agent_code,
-            "agent_operative_account": commission_doc.agent_operative_account,
-            "agent_saving_account": commission_doc.agent_saving_account,
+            "agent_operative_account": (
+                commission_doc.agent_operative_account
+            ),
+            "agent_saving_account": (
+                commission_doc.agent_saving_account
+            ),
             "payment_type": "Deferred",
             "payment_year": payment_year,
             "due_date": deferred_row.due_date,
             "source_deferred_detail": deferred_row.name,
-            "gross_commission": flt(deferred_row.gross_commission),
-            "tds_amount": flt(deferred_row.tds),
+            "gross_commission": flt(
+                deferred_row.gross_commission
+            ),
+            "tds_amount": flt(
+                deferred_row.tds
+            ),
             "security_deposit_amount": flt(
                 deferred_row.security_deposit
             ),
-            "netpay_amount": flt(deferred_row.netpay),
+            "netpay_amount": flt(
+                deferred_row.netpay
+            ),
             "deduction_amount": 0,
-            "final_netpay": flt(deferred_row.netpay),
+            "final_netpay": flt(
+                deferred_row.netpay
+            ),
             "payment_status": (
                 "Due"
                 if deferred_row.status == "Due"
                 else "Pending"
             ),
-        })
+        }
+
+        payment_data = _round_payment_amounts(
+            payment_data
+        )
+
+        payment_doc = frappe.get_doc(
+            payment_data
+        )
 
         payment_doc.insert(ignore_permissions=True)
 
@@ -3606,10 +3873,38 @@ def _generate_deferred_commission_schedule(commission_doc, product_doc, eligible
         year_no = schedule["year_no"]
         rate = schedule["commission_rate"]
 
-        gross_commission = (eligible_amount * rate) / 100
-        tds = gross_commission * 0.02
-        security_deposit = gross_commission * 0.10
-        netpay = gross_commission - (tds + security_deposit)
+        # gross_commission = (eligible_amount * rate) / 100
+        # tds = gross_commission * 0.02
+        # security_deposit = gross_commission * 0.10
+        # netpay = gross_commission - (tds + security_deposit)
+
+        gross_commission = (
+            eligible_amount * rate
+        ) / 100
+
+        financial_values = (
+            _calculate_commission_financial_values(
+                commission_amount=gross_commission,
+                eligible_amount=eligible_amount,
+                pan_status=commission_doc.pan_status,
+            )
+        )
+
+        gross_commission = flt(
+            financial_values["commission_amount"]
+        )
+
+        tds = flt(
+            financial_values["tds"]
+        )
+
+        security_deposit = flt(
+            financial_values["security_deposit"]
+        )
+
+        netpay = flt(
+            financial_values["netpay"]
+        )
 
         due_date = add_to_date(
             first_due_date,
