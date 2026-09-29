@@ -125,18 +125,62 @@
     }
 
 
+    // function normalizeExcelDate(value) {
+    //     if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    //         const day = String(value.getDate()).padStart(2, "0");
+    //         const month = String(value.getMonth() + 1).padStart(2, "0");
+    //         const year = String(value.getFullYear());
+
+    //         return `${day}${month}${year}`;
+    //     }
+
+    //     return String(value || "").trim();
+    // }
+
     function normalizeExcelDate(value) {
+        // Case 1: Excel date object (Date instance)
         if (value instanceof Date && !Number.isNaN(value.getTime())) {
             const day = String(value.getDate()).padStart(2, "0");
             const month = String(value.getMonth() + 1).padStart(2, "0");
             const year = String(value.getFullYear());
 
-            return `${day}${month}${year}`;
+            return `${day}-${month}-${year}`; // DD-MM-YYYY
         }
 
-        return String(value || "").trim();
-    }
+        // Case 2: String value from Excel
+        const raw = String(value ?? "").trim();
 
+        if (!raw) {
+            return "";
+        }
+
+        // Accept both '-' and '/' as separators
+        const parts = raw.split(/[-/]/);
+
+        if (parts.length !== 3) {
+            // If not in expected format, return as-is (validation will catch it later)
+            return raw;
+        }
+
+        let [dayStr, monthStr, yearStr] = parts;
+
+        // Remove any leading/trailing spaces just in case
+        dayStr = String(dayStr).trim();
+        monthStr = String(monthStr).trim();
+        yearStr = String(yearStr).trim();
+
+        // Pad day and month to 2 digits if they are numeric
+        if (/^\d+$/.test(dayStr)) {
+            dayStr = dayStr.padStart(2, "0");
+        }
+
+        if (/^\d+$/.test(monthStr)) {
+            monthStr = monthStr.padStart(2, "0");
+        }
+
+        // Final format: DD-MM-YYYY
+        return `${dayStr}-${monthStr}-${yearStr}`;
+    }
 
     function padRight(value, length) {
         const finalValue = String(value ?? "");
