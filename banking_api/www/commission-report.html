@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token }}">
     <title>Commission Report Download</title>
     <link rel="stylesheet" href="./commission-report.css">
 </head>
@@ -145,7 +146,6 @@
     </main>
 
     <script>
-
         const filterState = {
             sol_id: {
                 values: [],
@@ -324,17 +324,50 @@
                     renderOptions(type, searchInput.value);
                 });
         }
+        async function apiCall(method, args = {}) {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
+                || getCookie("csrf_token")
+                || getCookie("X-Frappe-CSRF-Token");
+
+            const queryString = new URLSearchParams(args).toString();
+            const url = queryString ? `/api/method/${method}?${queryString}` : `/api/method/${method}`;
+
+            const response = await fetch(url, {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Frappe-CSRF-Token": csrfToken
+                },
+                credentials: "same-origin"
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.message || result.exc || "API call failed");
+            }
+
+            return result.message;
+        }
+
+        function getCookie(name) {
+            const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+            return match ? match[2] : null;
+        }
 
         async function loadFilterOptions() {
             try {
                 clearError();
                 downloadBtn.disabled = true;
 
-                const result = await apiCall(
-                    "banking_api.api.commission_report.get_commission_report_options",
-                    {}
-                );
+                // const result = await apiCall(
+                //     "banking_api.api.commission_report.get_commission_report_options",
+                //     {}
+                // );
 
+                const result = await apiCall(
+                    "banking_api.www.commission-report.get_commission_report_options"
+                );
                 const options = result || {};
 
                 filterState.sol_id.values = Array.isArray(options.sol_ids)
@@ -403,7 +436,7 @@
             });
 
             window.location.href =
-                "/api/method/banking_api.api.commission_report.download_commission_report?"
+                "/api/method/banking_api.www.commission_report.download_commission_report?"
                 + params.toString();
 
             updateProgress(75, "Generating report...");
