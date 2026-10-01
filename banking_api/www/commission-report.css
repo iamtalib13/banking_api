@@ -420,3 +420,38 @@ input {
 		min-width: 100%;
 	}
 }
+
+.date-input-wrap {
+	position: relative;
+	width: 100%;
+}
+
+.date-input-wrap input {
+	width: 100%;
+	height: 45px;
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	padding: 0 12px;
+	background: #ffffff;
+	color: var(--text);
+	outline: none;
+	transition:
+		border-color 0.15s ease,
+		box-shadow 0.15s ease;
+	cursor: pointer;
+}
+
+.date-input-wrap input::-webkit-calendar-picker-indicator {
+	width: 100%;
+	height: 100%;
+	position: absolute;
+	top: 0;
+	right: 0;
+	cursor: pointer;
+	opacity: 0;
+}
+
+.date-input-wrap input:focus {
+	border-color: var(--primary);
+	box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
+}
