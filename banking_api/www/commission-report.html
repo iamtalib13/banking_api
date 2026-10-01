@@ -243,6 +243,51 @@
             });
         }
 
+        // function renderOptions(type, searchText = "") {
+        //     const optionList = document.getElementById(`${type}_options`);
+        //     const query = searchText.trim().toLowerCase();
+
+        //     const matchingValues = filterState[type].values.filter(value =>
+        //         value.toLowerCase().includes(query)
+        //     );
+
+        //     optionList.innerHTML = "";
+
+        //     if (!matchingValues.length) {
+        //         optionList.innerHTML = '<div class="empty-options">No matching values found.</div>';
+        //         return;
+        //     }
+
+        //     matchingValues.forEach(value => {
+        //         const label = document.createElement("label");
+        //         label.className = "option-row";
+
+        //         const checkbox = document.createElement("input");
+        //         checkbox.type = "checkbox";
+        //         checkbox.value = value;
+        //         checkbox.checked = filterState[type].selected.has(value);
+
+        //         checkbox.addEventListener("change", function () {
+        //             if (checkbox.checked) {
+        //                 filterState[type].selected.add(value);
+        //             } else {
+        //                 filterState[type].selected.delete(value);
+        //             }
+
+        //             updateHiddenInput(type);
+        //             updateSelectedDisplay(type);
+        //         });
+
+        //         const text = document.createElement("span");
+        //         text.textContent = value;
+
+        //         label.appendChild(checkbox);
+        //         label.appendChild(text);
+        //         optionList.appendChild(label);
+        //     });
+        // }
+
+
         function renderOptions(type, searchText = "") {
             const optionList = document.getElementById(`${type}_options`);
             const query = searchText.trim().toLowerCase();
@@ -259,13 +304,15 @@
             }
 
             matchingValues.forEach(value => {
-                const label = document.createElement("label");
+                const label = document.createElement("div");
                 label.className = "option-row";
+                label.style.cursor = "pointer";
 
                 const checkbox = document.createElement("input");
                 checkbox.type = "checkbox";
                 checkbox.value = value;
                 checkbox.checked = filterState[type].selected.has(value);
+                checkbox.style.pointerEvents = "none";
 
                 checkbox.addEventListener("change", function () {
                     if (checkbox.checked) {
@@ -280,9 +327,20 @@
 
                 const text = document.createElement("span");
                 text.textContent = value;
+                text.style.flex = "1";
 
                 label.appendChild(checkbox);
                 label.appendChild(text);
+
+                // Click anywhere on the row toggles selection
+                label.addEventListener("click", function (event) {
+                    event.stopPropagation();
+                    event.preventDefault();
+
+                    checkbox.checked = !checkbox.checked;
+                    checkbox.dispatchEvent(new Event("change"));
+                });
+
                 optionList.appendChild(label);
             });
         }
@@ -295,14 +353,74 @@
             });
         }
 
+        // function setupMultiSelect(type) {
+        //     const toggle = document.querySelector(`[data-toggle="${type}"]`);
+        //     const panel = document.getElementById(`${type}_panel`);
+        //     const searchInput = document.getElementById(`${type}_search`);
+
+        //     toggle.addEventListener("click", function () {
+        //         const willOpen = panel.hidden;
+
+        //         closeAllDropdowns(type);
+        //         panel.hidden = !willOpen;
+
+        //         if (willOpen) {
+        //             searchInput.focus();
+        //             renderOptions(type, searchInput.value);
+        //         }
+        //     });
+
+        //     searchInput.addEventListener("input", function () {
+        //         renderOptions(type, searchInput.value);
+        //     });
+
+        //     document.querySelector(`[data-select-all="${type}"]`)
+        //         .addEventListener("click", function () {
+        //             filterState[type].values.forEach(value => {
+        //                 filterState[type].selected.add(value);
+        //             });
+
+        //             updateHiddenInput(type);
+        //             updateSelectedDisplay(type);
+        //             renderOptions(type, searchInput.value);
+        //         });
+
+        //     document.querySelector(`[data-clear-all="${type}"]`)
+        //         .addEventListener("click", function () {
+        //             filterState[type].selected.clear();
+
+        //             updateHiddenInput(type);
+        //             updateSelectedDisplay(type);
+        //             renderOptions(type, searchInput.value);
+        //         });
+        // }
+
         function setupMultiSelect(type) {
+            const multiSelect = document.querySelector(`.multi-select[data-filter="${type}"]`);
             const toggle = document.querySelector(`[data-toggle="${type}"]`);
             const panel = document.getElementById(`${type}_panel`);
             const searchInput = document.getElementById(`${type}_search`);
 
-            toggle.addEventListener("click", function () {
-                const willOpen = panel.hidden;
+            // Click anywhere on the multi-select field opens dropdown
+            multiSelect.addEventListener("click", function (event) {
+                // Don't open if clicking on already selected tag's remove button
+                if (event.target.classList.contains("tag-remove")) {
+                    return;
+                }
 
+                const willOpen = panel.hidden;
+                closeAllDropdowns(type);
+                panel.hidden = !willOpen;
+
+                if (willOpen) {
+                    searchInput.focus();
+                    renderOptions(type, searchInput.value);
+                }
+            });
+
+            toggle.addEventListener("click", function (event) {
+                event.stopPropagation();
+                const willOpen = panel.hidden;
                 closeAllDropdowns(type);
                 panel.hidden = !willOpen;
 
