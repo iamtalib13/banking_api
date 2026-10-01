@@ -416,6 +416,7 @@
 
                 if (willOpen) {
                     searchInput.focus();
+                    searchInput.select();
                     renderOptions(type, searchInput.value);
                 }
             });
@@ -428,12 +429,26 @@
 
                 if (willOpen) {
                     searchInput.focus();
+                    searchInput.select();
                     renderOptions(type, searchInput.value);
                 }
             });
 
+            searchInput.addEventListener("click", function (event) {
+                event.stopPropagation();
+            });
+
             searchInput.addEventListener("input", function () {
                 renderOptions(type, searchInput.value);
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener("click", function (event) {
+                if (!multiSelect.contains(event.target)) {
+                    panel.hidden = true;
+                    searchInput.value = "";
+                    renderOptions(type, "");
+                }
             });
 
             document.querySelector(`[data-select-all="${type}"]`)
@@ -456,7 +471,6 @@
                     renderOptions(type, searchInput.value);
                 });
         }
-
         async function apiCall(method, args = {}) {
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
                 || getCookie("csrf_token")
