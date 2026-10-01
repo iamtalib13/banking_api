@@ -13,7 +13,7 @@
     <main class="page">
         <section class="report-card">
             <div class="report-header">
-                <div class="header-icon">↓</div>
+                <!-- <div class="header-icon">CR</div> -->
                 <div>
                     <h1>Commission Report</h1>
                     <p>Choose the date range and optional filters, then download the report.</p>
@@ -27,14 +27,16 @@
                     <div class="form-group">
                         <label for="from_date">From Date <span>*</span></label>
                         <div class="date-input-wrap">
-                            <input type="text" id="from_date" name="from_date" placeholder="DD-MM-YYYY" required>
+                            <!-- <input type="text" id="from_date" name="from_date" placeholder="DD-MM-YYYY" required> -->
+                            <input type="date" id="from_date" name="from_date" required>
                         </div>
                     </div>
 
                     <div class="form-group">
                         <label for="to_date">To Date <span>*</span></label>
                         <div class="date-input-wrap">
-                            <input type="text" id="to_date" name="to_date" placeholder="DD-MM-YYYY" required>
+                            <!-- <input type="text" id="to_date" name="to_date" placeholder="DD-MM-YYYY" required> -->
+                            <input type="date" id="to_date" name="to_date" required>
                         </div>
                     </div>
                 </div>
@@ -128,7 +130,7 @@
 
                 <button type="submit" id="download-btn" class="download-btn" disabled>
                     <span>Download Report</span>
-                    <span class="download-arrow">↓</span>
+                    <!-- <span class="download-arrow">↓</span> -->
                 </button>
             </form>
 
@@ -572,10 +574,63 @@
             }
         });
 
-        setupDateInput("from_date");
-        setupDateInput("to_date");
+        // setupDateInput("from_date");
+        // setupDateInput("to_date");
 
         ["sol_id", "agent_code", "scheme_code"].forEach(setupMultiSelect);
+
+
+
+        // form.addEventListener("submit", function (event) {
+        //     event.preventDefault();
+        //     clearError();
+
+        //     const fromDate = document.getElementById("from_date").value;
+        //     const toDate = document.getElementById("to_date").value;
+
+        //     if (!fromDate || !toDate) {
+        //         showError("Please select both From Date and To Date.");
+        //         return;
+        //     }
+
+        //     const fromDateISO = parseDDMMYYYY(fromDate);
+        //     const toDateISO = parseDDMMYYYY(toDate);
+
+        //     if (!fromDateISO || !toDateISO) {
+        //         showError("Invalid date format. Please use DD-MM-YYYY.");
+        //         return;
+        //     }
+
+        //     if (fromDateISO > toDateISO) {
+        //         showError("From Date cannot be later than To Date.");
+        //         return;
+        //     }
+
+        //     downloadBtn.disabled = true;
+        //     progressSection.hidden = false;
+
+        //     updateProgress(20, "Preparing report...");
+
+        //     const params = new URLSearchParams({
+        //         from_date: fromDateISO,
+        //         to_date: toDateISO,
+        //         sol_id: document.getElementById("sol_id").value,
+        //         agent_code: document.getElementById("agent_code").value,
+        //         scheme_code: document.getElementById("scheme_code").value
+        //     });
+
+        //     window.location.href =
+        //         "/api/method/banking_api.www.commission_report.download_commission_report?"
+        //         + params.toString();
+
+        //     updateProgress(75, "Generating report...");
+
+        //     updateProgress(100, "Download started.");
+
+        //     setTimeout(() => {
+        //         downloadBtn.disabled = false;
+        //     }, 1200);
+        // });
 
         form.addEventListener("submit", function (event) {
             event.preventDefault();
@@ -589,15 +644,13 @@
                 return;
             }
 
-            const fromDateISO = parseDDMMYYYY(fromDate);
-            const toDateISO = parseDDMMYYYY(toDate);
+            // Convert YYYY-MM-DD to DD-MM-YYYY for backend
+            const fromParts = fromDate.split("-");
+            const toParts = toDate.split("-");
+            const fromDateDDMMYYYY = `${fromParts[2]}-${fromParts[1]}-${fromParts[0]}`;
+            const toDateDDMMYYYY = `${toParts[2]}-${toParts[1]}-${toParts[0]}`;
 
-            if (!fromDateISO || !toDateISO) {
-                showError("Invalid date format. Please use DD-MM-YYYY.");
-                return;
-            }
-
-            if (fromDateISO > toDateISO) {
+            if (fromDate > toDate) {
                 showError("From Date cannot be later than To Date.");
                 return;
             }
@@ -608,8 +661,8 @@
             updateProgress(20, "Preparing report...");
 
             const params = new URLSearchParams({
-                from_date: fromDateISO,
-                to_date: toDateISO,
+                from_date: fromDateDDMMYYYY,
+                to_date: toDateDDMMYYYY,
                 sol_id: document.getElementById("sol_id").value,
                 agent_code: document.getElementById("agent_code").value,
                 scheme_code: document.getElementById("scheme_code").value
