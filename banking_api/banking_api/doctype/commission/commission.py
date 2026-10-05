@@ -1024,6 +1024,8 @@ def fetch_and_create_commission():
         conn = db_connection()
 
         # Query 2 first, preserving current logic
+        # _run_query(conn, QUERY_1)
+        # _run_query(conn, QUERY_2)
         query_2_rows = _run_query(
             conn,
             get_query_2(),
