@@ -1111,6 +1111,7 @@ def run_fetch_and_create_commission_with_progress(limit=None):
     Each document is inserted and committed individually.
     """
     frappe.only_for(("System Manager",))
+    # _validate_commission_calculation_enabled()
 
     conn = None
     inserted_docs = []
@@ -3444,6 +3445,32 @@ def _get_eligible_amount_scheme_group(
     )
 
 
+def _validate_commission_calculation_enabled():
+    """
+    Stop commission calculation unless enabled in Commission Settings.
+    """
+    settings = frappe.get_single(
+        "Commission Settings"
+    )
+
+    if not cint(
+        getattr(
+            settings,
+            "calculate_commission",
+            0,
+        )
+    ):
+        frappe.throw(
+            _(
+                "Commission calculation is disabled. "
+                "Enable 'Calculate Commission' in Commission Settings "
+                "before calculating commission."
+            )
+        )
+
+    return settings
+
+
 @frappe.whitelist()
 def calculate_commission_amount(docname):
     """
@@ -3462,6 +3489,8 @@ def calculate_commission_amount(docname):
     - Agent-level deduction/final_net_pay is updated for every record
       with the same agent_code.
     """
+
+    _validate_commission_calculation_enabled()
 
     if not docname:
         frappe.throw(_("Commission document name is required"))
@@ -4298,6 +4327,7 @@ def calculate_commission_for_all():
     Calls calculate_commission_amount(docname) for each document.
     """
     frappe.only_for(("System Manager",))
+    _validate_commission_calculation_enabled()
 
     # Get all Commission names
     commission_names = frappe.get_all(
