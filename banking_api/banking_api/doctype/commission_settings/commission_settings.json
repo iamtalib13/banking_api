@@ -13,6 +13,8 @@
   "credit_particulars",
   "last_payment_run",
   "commission_calculation",
+  "enable_commission_calculation_section",
+  "calculate_commission",
   "round_off_settings",
   "round_calculated_amounts",
   "tds_settings",
@@ -288,13 +290,24 @@
    "fieldname": "eligible_amount_scheme_groups_settings",
    "fieldtype": "Section Break",
    "label": "Eligible Amount Scheme Settings"
+  },
+  {
+   "default": "0",
+   "fieldname": "calculate_commission",
+   "fieldtype": "Check",
+   "label": "Calculate Commission"
+  },
+  {
+   "fieldname": "enable_commission_calculation_section",
+   "fieldtype": "Section Break",
+   "label": "Enable Commission Calculation"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-09-28 15:59:40.905392",
+ "modified": "2026-10-05 13:45:18.993412",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Commission Settings",
