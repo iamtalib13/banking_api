@@ -116,7 +116,7 @@ tran_data AS (
             (dtt.tran_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-31'
              AND dtt.value_date > DATE '2026-07-31')
             OR
-            (dtt.tran_date > DATE '2026-08-25'
+            (dtt.tran_date > DATE '2026-08-31'
              AND dtt.value_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-31')
             OR
             (dtt.value_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-31'
