@@ -4321,22 +4321,85 @@ def _generate_deferred_commission_schedule(commission_doc, product_doc, eligible
 
 
 @frappe.whitelist()
-def calculate_commission_for_all():
+def calculate_commission_for_all(batch_size=5000):
     """
-    Calculate commission on ALL Commission documents.
-    Calls calculate_commission_amount(docname) for each document.
+    High-Performance Bulk Commission Calculation Engine for large datasets (e.g. 300,000+ records).
+    1. Pre-caches Product metadata, settings, and group totals in memory (O(1) lookups).
+    2. Calculates records in fast memory chunks and batch-updates database (eliminates N+1 & ORM overhead).
+    3. Executes agent-level deduction & consolidated payment generation only once per agent.
     """
     frappe.only_for(("System Manager",))
     _validate_commission_calculation_enabled()
 
-    # Get all Commission names
-    commission_names = frappe.get_all(
-        "Commission",
-        filters={"docstatus": ("<", 2)},  # ignore cancelled if any
-        pluck="name",
+    batch_size = cint(batch_size) or 5000
+    if batch_size <= 0:
+        batch_size = 5000
+
+    # 1. In-memory pre-fetching: Commission Settings & Scheme Groups
+    calculation_settings = _get_commission_calculation_settings()
+    scheme_groups = _get_eligible_amount_scheme_groups()
+
+    # 2. In-memory pre-fetching: All Products
+    products_data = frappe.db.get_all(
+        "Product",
+        fields=[
+            "name",
+            "commission_type",
+            "commission_rate",
+            "commission_rate_upto_one_year",
+            "commission_rate_above_one_year",
+            "slab_1_limit",
+            "slab_1_rate",
+            "slab_2_limit",
+            "slab_2_rate",
+            "slab_3_rate",
+        ],
+    )
+    product_map = {str(p.name).strip(): p for p in products_data}
+
+    # 3. Pre-aggregate Eligible Amount Based scheme totals per agent & group in a single SQL query
+    group_totals = {}
+    eligible_group_rows = frappe.db.sql(
+        """
+        SELECT c.agent_code, c.scheme_code, COALESCE(SUM(c.eligible_amount), 0) AS total
+        FROM `tabCommission` c
+        INNER JOIN `tabProduct` p ON p.name = c.scheme_code
+        WHERE c.docstatus < 2 AND p.commission_type = 'Eligible Amount Based'
+        GROUP BY c.agent_code, c.scheme_code
+        """,
+        as_dict=True,
     )
 
-    if not commission_names:
+    scheme_totals_by_agent = {}
+    for r in eligible_group_rows:
+        ag = str(r.agent_code or "").strip()
+        sc = str(r.scheme_code or "").strip()
+        scheme_totals_by_agent.setdefault(ag, {})[sc] = flt(r.total)
+
+    def get_agent_group_total(agent_code, scheme_code):
+        ag = str(agent_code or "").strip()
+        sc = str(scheme_code or "").strip()
+        group = scheme_groups.get(sc, (sc,))
+        total = sum(scheme_totals_by_agent.get(ag, {}).get(s, 0.0) for s in group)
+        return flt(_round_calculation_amount(total, calculation_settings))
+
+    # 4. Fetch all active Commission documents
+    records = frappe.db.get_all(
+        "Commission",
+        filters={"docstatus": ("<", 2)},
+        fields=[
+            "name",
+            "scheme_code",
+            "eligible_amount",
+            "agent_code",
+            "remarks",
+            "pan_status",
+        ],
+        order_by="name asc",
+    )
+
+    total_records = len(records)
+    if not total_records:
         return {
             "status": "completed",
             "total_processed": 0,
@@ -4345,33 +4408,170 @@ def calculate_commission_for_all():
             "errors": [],
         }
 
+    has_rate_field = frappe.get_meta("Commission").has_field("applied_commission_rate")
+    has_type_field = frappe.get_meta("Commission").has_field("commission_type_applied")
+
     success_count = 0
     error_count = 0
     errors = []
+    affected_agents = set()
 
-    for docname in commission_names:
-        try:
-            # Call existing method
-            calculate_commission_amount(docname)
+    # 5. Process in memory chunks and batch update
+    for i in range(0, total_records, batch_size):
+        chunk = records[i : i + batch_size]
+        update_params = []
+        deferred_docs = []
+
+        for row in chunk:
+            docname = row.name
+            product_name = str(row.scheme_code or "").strip()
+            product = product_map.get(product_name)
+
+            if not product or not product.commission_type:
+                error_count += 1
+                errors.append(f"{docname}: Product or commission_type missing for {product_name}")
+                continue
+
+            commission_type = product.commission_type
+
+            # Deferred products require child schedules; handle via standard controller
+            if commission_type == "Deferred":
+                deferred_docs.append(docname)
+                continue
+
+            eligible_amount = flt(row.eligible_amount)
+            if eligible_amount < 0:
+                eligible_amount = 0.0
+
+            rate = None
+            agent_total_eligible = None
+
+            if commission_type == "Fixed Rate":
+                rate = flt(product.commission_rate)
+
+            elif commission_type == "Age Based":
+                rem = _safe_str(row.remarks).upper()
+                if rem == "YES":
+                    rate = flt(product.commission_rate_upto_one_year)
+                else:
+                    rate = flt(product.commission_rate_above_one_year)
+
+            elif commission_type == "Eligible Amount Based":
+                slab_1_limit = flt(product.slab_1_limit)
+                slab_2_limit = flt(product.slab_2_limit)
+                agent_total = get_agent_group_total(row.agent_code, product_name)
+                agent_total_eligible = agent_total
+
+                if agent_total <= slab_1_limit:
+                    rate = flt(product.slab_1_rate)
+                elif agent_total <= slab_2_limit:
+                    rate = flt(product.slab_2_rate)
+                else:
+                    rate = flt(product.slab_3_rate)
+
+            if rate is None or rate < 0:
+                rate = 0.0
+
+            commission_amount = (eligible_amount * rate) / 100
+
+            # Central financial values calculation
+            financial_values = _calculate_commission_financial_values(
+                commission_amount=commission_amount,
+                eligible_amount=eligible_amount,
+                pan_status=row.pan_status,
+            )
+
+            c_amt = flt(_round_calculation_amount(financial_values["commission_amount"], calculation_settings))
+            e_amt = flt(_round_calculation_amount(eligible_amount, calculation_settings))
+            tds = flt(_round_calculation_amount(financial_values["tds"], calculation_settings))
+            sd = flt(_round_calculation_amount(financial_values["security_deposit"], calculation_settings))
+            netpay = flt(_round_calculation_amount(financial_values["netpay"], calculation_settings))
+
+            update_params.append({
+                "name": docname,
+                "commission_amount": c_amt,
+                "eligible_amount": e_amt,
+                "tds": tds,
+                "security_deposit": sd,
+                "netpay": netpay,
+                "applied_rate": rate,
+                "commission_type": commission_type,
+                "agent_total_eligible": agent_total_eligible,
+            })
+
+            if row.agent_code:
+                affected_agents.add(str(row.agent_code).strip())
+
             success_count += 1
+
+        # Batch SQL UPDATE for current chunk
+        if update_params:
+            for p in update_params:
+                extra_sets = []
+                extra_args = []
+                if has_rate_field:
+                    extra_sets.append("applied_commission_rate = %s")
+                    extra_args.append(p["applied_rate"])
+                if has_type_field:
+                    extra_sets.append("commission_type_applied = %s")
+                    extra_args.append(p["commission_type"])
+                if p["agent_total_eligible"] is not None:
+                    extra_sets.append("agent_total_eligible_collection = %s")
+                    extra_args.append(p["agent_total_eligible"])
+
+                extra_sql = (", " + ", ".join(extra_sets)) if extra_sets else ""
+
+                sql = f"""
+                    UPDATE `tabCommission`
+                    SET commission_amount = %s,
+                        eligible_amount = %s,
+                        tds = %s,
+                        security_deposit = %s,
+                        netpay = %s
+                        {extra_sql}
+                    WHERE name = %s
+                """
+                args = [
+                    p["commission_amount"],
+                    p["eligible_amount"],
+                    p["tds"],
+                    p["security_deposit"],
+                    p["netpay"],
+                ] + extra_args + [p["name"]]
+
+                frappe.db.sql(sql, tuple(args))
+
+        # Process deferred rows if any in this chunk
+        for dname in deferred_docs:
+            try:
+                calculate_commission_amount(dname)
+                success_count += 1
+            except Exception:
+                error_count += 1
+                errors.append(f"{dname}: {frappe.get_traceback()}")
+
+        frappe.db.commit()
+
+    # 6. Pass 2: Single-pass consolidated Agent-level updates & Payments
+    for agent_code in affected_agents:
+        if not agent_code:
+            continue
+        try:
+            _update_agent_deduction_and_final_net_pay(agent_code)
+            _create_normal_agent_payment_if_missing(agent_code)
         except Exception:
-            error_count += 1
-            errors.append(
-                f"{docname}: {frappe.get_traceback()}"
-            )
-            # Optionally log
-            frappe.log_error(
-                frappe.get_traceback(),
-                f"Commission Calculation Error - {docname}",
-            )
+            errors.append(f"Agent {agent_code} payment/deduction error: {frappe.get_traceback()}")
+
+    frappe.db.commit()
 
     return {
         "status": "completed",
-        "total_processed": len(commission_names),
+        "total_processed": total_records,
         "success_count": success_count,
         "error_count": error_count,
-        "errors": errors,
+        "errors": errors[:50],
     }
+
 
 
 @frappe.whitelist()
