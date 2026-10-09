@@ -16,6 +16,9 @@ from decimal import (
     ROUND_HALF_UP,
 )
 
+from datetime import date, datetime
+from dateutil.relativedelta import relativedelta
+
 
 class Commission(Document):
     pass
@@ -44,7 +47,354 @@ def db_connection():
         frappe.throw(_("Database Connection Error"))
 
 
-QUERY_1 = """
+def get_commission_query_dates():
+    """
+    Return dynamic reporting dates based on today's date.
+
+    Example for 2026-09-04:
+        present_date         = 2026-09-04
+        current_month_start  = 2026-09-01
+        current_month_end    = 2026-09-30
+        previous_month_start = 2026-08-01
+        previous_month_end   = 2026-08-31
+    """
+    present_date = date.today()
+
+    current_month_start = present_date.replace(
+        day=1
+    )
+
+    current_month_end = (
+        current_month_start
+        + relativedelta(months=1)
+        - relativedelta(days=1)
+    )
+
+    previous_month_start = (
+        current_month_start
+        - relativedelta(months=1)
+    )
+
+    previous_month_end = (
+        current_month_start
+        - relativedelta(days=1)
+    )
+
+    return {
+        "present_date": present_date.isoformat(),
+        "current_month_start": (
+            current_month_start.isoformat()
+        ),
+        "current_month_end": (
+            current_month_end.isoformat()
+        ),
+        "previous_month_start": (
+            previous_month_start.isoformat()
+        ),
+        "previous_month_end": (
+            previous_month_end.isoformat()
+        ),
+    }
+
+
+# QUERY_1 = """
+# WITH account_data AS (
+#     SELECT
+#         d.rm_id,
+#         g2.emp_name AS rm_name,
+#         d2.operacc,
+#         g.cif_id,
+#         g.acct_opn_date,
+#         a2.relationshipopeningdate AS cif_id_opening_date,
+#         g.foracid,
+#         g.sol_id,
+#         sol.sol_desc,
+#         g.schm_code AS scheme_code,
+#         gsp.schm_desc,
+#         tam.deposit_period_days,
+#         tam.deposit_period_mths,
+#         tam.deposit_amount,
+#         /* ADDED - ACCOUNT NAME FROM GAM */
+#         g.acct_name
+#     FROM custom.dsamap d
+#     INNER JOIN tbaadm.gam g
+#         ON g.foracid = d.account_number
+#         AND g.schm_code IN ('2004','2005','2006','2010','2011','2012','2013','2014','2015')
+#     LEFT JOIN tbaadm.tam tam
+#         ON tam.acid = g.acid
+#     LEFT JOIN crmuser.accounts a2
+#         ON g.cif_id = a2.orgkey
+#     LEFT JOIN tbaadm.sol sol
+#         ON g.sol_id = sol.sol_id
+#     LEFT JOIN tbaadm.gsp gsp
+#         ON g.schm_code = gsp.schm_code
+#     LEFT JOIN custom.dsaauth d2
+#         ON d.rm_id = d2.user_id
+#     LEFT JOIN tbaadm.get g2
+#         ON d2.user_id = g2.emp_id
+# ),
+# flow_data AS (
+#     SELECT
+#         d.rm_id,
+#         g.foracid,
+#         g.schm_code,
+#         SUM(tdt.flow_amt) AS total_flow_amount
+#     FROM custom.dsamap d
+#     INNER JOIN tbaadm.gam g
+#         ON g.foracid = d.account_number
+#         AND g.schm_code IN ('2004','2005','2006','2010','2011','2012','2013','2014','2015')
+#     INNER JOIN tbaadm.tdt tdt
+#         ON tdt.acid = g.acid
+#         AND tdt.flow_code = 'NI'
+#     WHERE
+#         tdt.flow_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-31'    // curr start date and present date
+#     GROUP BY d.rm_id, g.foracid, g.schm_code
+#     HAVING SUM(tdt.flow_amt) > 0
+# ),
+# tran_data AS (
+#     SELECT
+#         d.rm_id,
+#         g.foracid,
+#         g.schm_code,
+#         SUM(dtt.tran_amt) AS total_tran_amt
+#     FROM custom.dsamap d
+#     INNER JOIN tbaadm.gam g
+#         ON g.foracid = d.account_number
+#         AND g.schm_code IN ('2004','2005','2006','2010','2011','2012','2013','2014','2015')
+#     INNER JOIN tbaadm.dtt dtt
+#         ON dtt.acid = g.acid
+#         AND dtt.flow_code = 'NI'
+#     WHERE
+#         (
+#             (dtt.tran_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-31'    // curr start date and present date
+#              AND dtt.value_date > DATE '2026-07-31')     // previous month end date
+#             OR
+#             (dtt.tran_date > DATE '2026-08-31'
+#              AND dtt.value_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-31')    // curr start date and present date
+#             OR
+#             (dtt.value_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-31'    // curr start date and present date
+#              AND dtt.tran_date > DATE '2026-08-31')      // current month end date
+#         )
+#     GROUP BY d.rm_id, g.foracid, g.schm_code
+#     HAVING SUM(dtt.tran_amt) > 0
+# ),
+# reference_data AS (
+#     SELECT
+#         ed.referencenumber,
+#         da.user_id AS rm_id
+#     FROM crmuser.entitydocument ed
+#     INNER JOIN tbaadm.gam g
+#         ON ed.orgkey = g.cif_id
+#     INNER JOIN custom.dsaauth da
+#         ON g.foracid = da.operacc
+#     WHERE ed.doccode = 'PAN'
+# )
+# SELECT
+#     ad.rm_id,
+#     ad.rm_name,
+#     ad.operacc,
+#     ad.cif_id,
+#     ad.acct_opn_date,
+#     ad.acct_opn_date,
+#     ad.cif_id_opening_date,
+#     ad.foracid,
+#     /* ADDED - ACCOUNT NAME */
+#     ad.acct_name,
+#     ad.deposit_amount,
+#     COALESCE(fd.total_flow_amount,0) AS total_flow_amount,
+#     /* CHANGED - SCHEME 2004 KA FLOW AMT SAME RAHEGA
+#        SCHEME 2005-2015 KA * 3 HOGA */
+#     CASE
+#         WHEN ad.scheme_code = '2004'
+#             THEN COALESCE(fd.total_flow_amount,0)
+#         WHEN ad.scheme_code IN ('2005','2006','2010','2011','2012','2013','2014','2015')
+#             THEN COALESCE(fd.total_flow_amount,0) * 3
+#         ELSE COALESCE(fd.total_flow_amount,0)
+#     END AS adjusted_flow_amount,
+#     COALESCE(td.total_tran_amt,0) AS total_tran_amt,
+#     LEAST(
+#         COALESCE(fd.total_flow_amount,0),
+#         COALESCE(td.total_tran_amt,0)
+#     ) AS commission_amount,
+#     CASE
+#         WHEN ad.acct_opn_date + INTERVAL '1 year' >= DATE '2026-08-31' THEN 'YES'     // current month end date
+#         ELSE 'NO'
+#     END AS one_year_completed,
+#     ad.deposit_period_days,
+#     ad.deposit_period_mths,
+#     COALESCE(rd.referencenumber,'N/A') AS referencenumber,
+#     ad.scheme_code,
+#     ad.schm_desc,
+#     ad.sol_id,
+#     ad.sol_desc
+# FROM account_data ad
+# LEFT JOIN flow_data fd
+#     ON ad.rm_id = fd.rm_id
+#     AND ad.foracid = fd.foracid
+#     AND ad.scheme_code = fd.schm_code
+# LEFT JOIN tran_data td
+#     ON ad.rm_id = td.rm_id
+#     AND ad.foracid = td.foracid
+#     AND ad.scheme_code = td.schm_code
+# LEFT JOIN reference_data rd
+#     ON ad.rm_id = rd.rm_id
+# WHERE
+#     COALESCE(td.total_tran_amt,0) > 0
+#     -- ADDED: SIRF RDDSA AUR DDDSA PREFIX WALE RM_ID
+# AND (
+#     UPPER(ad.rm_id) LIKE 'RDDSA%'
+#     OR UPPER(ad.rm_id) LIKE 'DDDSA%'
+# )
+# ORDER BY
+#     ad.foracid,
+#     ad.rm_id,
+#     ad.scheme_code;
+
+# """
+# QUERY_2 = """
+# --COMMITION QUERY 2 -- COUNT 6,563
+
+# WITH account_data AS (
+# SELECT
+# ds.rm_id,
+# g2.emp_name AS rm_name,
+# d2.operacc,
+# g.foracid,
+# g.acct_name,                    /* ADDED - ACCOUNT NAME FROM GAM */
+# g.acct_opn_date,
+# tam.deposit_amount,
+# tam.deposit_period_mths,
+# tam.deposit_period_days,
+# COUNT(DISTINCT g.acid) AS count_acid_gam,
+# SUM(dtt.tran_amt) AS total_tran_amt_dtt,
+# SUM(tdt.flow_amt) AS total_flow_amt_tdt,
+# g.sol_id,
+# sol.sol_desc,
+# g.schm_code AS scheme_code,
+# gsp.schm_desc
+# FROM custom.dsamap AS ds
+# LEFT JOIN tbaadm.gam AS g
+# ON g.foracid = ds.account_number
+# AND g.schm_code IN (
+# '2001','2002','2003',
+# '2018','2019','2020','2021','2022','2023','2024','2025','2026','2027','2028','2029','2030','2031','2032','2033','2034','2035',
+# '2101','2102','2103','2104','2105','2106',
+# '2201','2202','2203',
+# '9001','9002'
+# )
+# AND g.acct_opn_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-31'    // curr month start date and present date
+# AND g.acct_cls_flg = 'N'
+# LEFT JOIN tbaadm.tam AS tam
+# ON tam.acid = g.acid
+# LEFT JOIN tbaadm.dtt AS dtt
+# ON dtt.acid = g.acid
+# AND dtt.flow_code = 'PI'
+# AND dtt.tran_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-31'       // curr month start date and present date
+# AND NOT (
+# dtt.value_date >= DATE '2026-07-01'    // prev month start date
+# AND dtt.value_date < DATE '2026-08-01'    // curr month start date
+# )
+# LEFT JOIN tbaadm.tdt AS tdt
+# ON tdt.acid = g.acid
+# AND tdt.flow_code = 'PI'
+# AND tdt.flow_date BETWEEN DATE '2026-08-01' AND DATE '2026-08-31'       // curr month start date and present date
+# LEFT JOIN custom.dsaauth AS d2
+# ON UPPER(ds.rm_id) = UPPER(d2.user_id)
+# LEFT JOIN tbaadm.get AS g2
+# ON d2.user_id = g2.emp_id
+# LEFT JOIN tbaadm.sol AS sol
+# ON g.sol_id = sol.sol_id
+# LEFT JOIN tbaadm.gsp AS gsp
+# ON gsp.schm_code = g.schm_code
+# GROUP BY
+# ds.rm_id,
+# g2.emp_name,
+# d2.operacc,
+# g.foracid,
+# g.acct_name,                    /* ADDED */
+# g.acct_opn_date,
+# tam.deposit_amount,
+# tam.deposit_period_mths,
+# tam.deposit_period_days,
+# g.sol_id,
+# sol.sol_desc,
+# g.schm_code,
+# gsp.schm_desc
+# ),
+# reference_data AS (
+# SELECT
+# ed.referencenumber,
+# da.user_id AS rm_id
+# FROM crmuser.entitydocument AS ed
+# JOIN tbaadm.gam AS g
+# ON ed.orgkey = g.cif_id
+# JOIN custom.dsaauth AS da
+# ON g.foracid = da.operacc
+# WHERE ed.doccode = 'PAN'
+# )
+# SELECT
+# ad.rm_id,
+# ad.rm_name,
+# ad.operacc,
+# ad.foracid,
+# ad.acct_name,                   /* ADDED - ACCOUNT NAME */
+# ad.acct_opn_date,
+# ad.deposit_amount,
+# ad.deposit_period_mths,
+# ad.deposit_period_days,
+# ad.sol_id,
+# ad.sol_desc,
+# ad.scheme_code,
+# ad.schm_desc,
+# SUM(ad.total_tran_amt_dtt)      AS total_tran_amt_dtt,
+# SUM(ad.total_flow_amt_tdt)      AS total_flow_amt_tdt,
+# SUM(ad.total_flow_amt_tdt)      AS adjusted_flow_amount,
+# LEAST(
+# COALESCE(SUM(ad.total_tran_amt_dtt),0),
+# COALESCE(SUM(ad.total_flow_amt_tdt),0)
+# ) AS commission_amount,
+# CASE
+# WHEN ad.acct_opn_date + INTERVAL '1 year' <= DATE '2026-08-31' THEN 'YES'    // curr month end date
+# ELSE 'NO'
+# END AS one_year_completed,
+# MAX(COALESCE(rd.referencenumber,'N/A')) AS referencenumber
+# FROM account_data AS ad
+# LEFT JOIN reference_data AS rd
+# ON UPPER(ad.rm_id) = UPPER(rd.rm_id)
+# WHERE ad.total_tran_amt_dtt > 0
+# -- ADDED: SIRF RDDSA AUR DDDSA PREFIX WALE RM_ID
+# AND (
+#     UPPER(ad.rm_id) LIKE 'RDDSA%'
+#     OR UPPER(ad.rm_id) LIKE 'DDDSA%'
+# )
+# GROUP BY
+# ad.rm_id,
+# ad.rm_name,
+# ad.operacc,
+# ad.foracid,
+# ad.acct_name,                   /* ADDED */
+# ad.acct_opn_date,
+# ad.deposit_amount,
+# ad.deposit_period_mths,
+# ad.deposit_period_days,
+# ad.sol_id,
+# ad.sol_desc,
+# ad.scheme_code,
+# ad.schm_desc
+# ORDER BY
+# ad.sol_id,
+# ad.rm_id,
+# ad.scheme_code,
+# ad.deposit_period_mths;
+
+
+# """
+
+
+def get_query_1():
+    dates = get_commission_query_dates()
+
+    return f"""
 WITH account_data AS (
     SELECT
         d.rm_id,
@@ -61,12 +411,14 @@ WITH account_data AS (
         tam.deposit_period_days,
         tam.deposit_period_mths,
         tam.deposit_amount,
-        /* ADDED - ACCOUNT NAME FROM GAM */
         g.acct_name
     FROM custom.dsamap d
     INNER JOIN tbaadm.gam g
         ON g.foracid = d.account_number
-        AND g.schm_code IN ('2004','2005','2006','2010','2011','2012','2013','2014','2015')
+        AND g.schm_code IN (
+            '2004','2005','2006','2010','2011',
+            '2012','2013','2014','2015'
+        )
     LEFT JOIN tbaadm.tam tam
         ON tam.acid = g.acid
     LEFT JOIN crmuser.accounts a2
@@ -89,13 +441,20 @@ flow_data AS (
     FROM custom.dsamap d
     INNER JOIN tbaadm.gam g
         ON g.foracid = d.account_number
-        AND g.schm_code IN ('2004','2005','2006','2010','2011','2012','2013','2014','2015')
+        AND g.schm_code IN (
+            '2004','2005','2006','2010','2011',
+            '2012','2013','2014','2015'
+        )
     INNER JOIN tbaadm.tdt tdt
         ON tdt.acid = g.acid
         AND tdt.flow_code = 'NI'
-    WHERE
-        tdt.flow_date BETWEEN DATE '2026-09-01' AND DATE '2026-09-30'
-    GROUP BY d.rm_id, g.foracid, g.schm_code
+    WHERE tdt.flow_date BETWEEN
+        DATE '{dates["current_month_start"]}'
+        AND DATE '{dates["present_date"]}'
+    GROUP BY
+        d.rm_id,
+        g.foracid,
+        g.schm_code
     HAVING SUM(tdt.flow_amt) > 0
 ),
 tran_data AS (
@@ -107,22 +466,43 @@ tran_data AS (
     FROM custom.dsamap d
     INNER JOIN tbaadm.gam g
         ON g.foracid = d.account_number
-        AND g.schm_code IN ('2004','2005','2006','2010','2011','2012','2013','2014','2015')
+        AND g.schm_code IN (
+            '2004','2005','2006','2010','2011',
+            '2012','2013','2014','2015'
+        )
     INNER JOIN tbaadm.dtt dtt
         ON dtt.acid = g.acid
         AND dtt.flow_code = 'NI'
     WHERE
         (
-            (dtt.tran_date BETWEEN DATE '2026-09-01' AND DATE '2026-09-30'
-             AND dtt.value_date > DATE '2026-08-31')
+            (
+                dtt.tran_date BETWEEN
+                    DATE '{dates["current_month_start"]}'
+                    AND DATE '{dates["present_date"]}'
+                AND dtt.value_date >
+                    DATE '{dates["previous_month_end"]}'
+            )
             OR
-            (dtt.tran_date > DATE '2026-09-30'
-             AND dtt.value_date BETWEEN DATE '2026-09-01' AND DATE '2026-09-30')
+            (
+                dtt.tran_date >
+                    DATE '{dates["current_month_end"]}'
+                AND dtt.value_date BETWEEN
+                    DATE '{dates["current_month_start"]}'
+                    AND DATE '{dates["present_date"]}'
+            )
             OR
-            (dtt.value_date BETWEEN DATE '2026-09-01' AND DATE '2026-09-30'
-             AND dtt.tran_date > DATE '2026-09-30')
+            (
+                dtt.value_date BETWEEN
+                    DATE '{dates["current_month_start"]}'
+                    AND DATE '{dates["present_date"]}'
+                AND dtt.tran_date >
+                    DATE '{dates["current_month_end"]}'
+            )
         )
-    GROUP BY d.rm_id, g.foracid, g.schm_code
+    GROUP BY
+        d.rm_id,
+        g.foracid,
+        g.schm_code
     HAVING SUM(dtt.tran_amt) > 0
 ),
 reference_data AS (
@@ -145,31 +525,36 @@ SELECT
     ad.acct_opn_date,
     ad.cif_id_opening_date,
     ad.foracid,
-    /* ADDED - ACCOUNT NAME */
     ad.acct_name,
     ad.deposit_amount,
-    COALESCE(fd.total_flow_amount,0) AS total_flow_amount,
-    /* CHANGED - SCHEME 2004 KA FLOW AMT SAME RAHEGA
-       SCHEME 2005-2015 KA * 3 HOGA */
+    COALESCE(fd.total_flow_amount, 0)
+        AS total_flow_amount,
     CASE
         WHEN ad.scheme_code = '2004'
-            THEN COALESCE(fd.total_flow_amount,0)
-        WHEN ad.scheme_code IN ('2005','2006','2010','2011','2012','2013','2014','2015')
-            THEN COALESCE(fd.total_flow_amount,0) * 3
-        ELSE COALESCE(fd.total_flow_amount,0)
+            THEN COALESCE(fd.total_flow_amount, 0)
+        WHEN ad.scheme_code IN (
+            '2005','2006','2010','2011',
+            '2012','2013','2014','2015'
+        )
+            THEN COALESCE(fd.total_flow_amount, 0) * 3
+        ELSE COALESCE(fd.total_flow_amount, 0)
     END AS adjusted_flow_amount,
-    COALESCE(td.total_tran_amt,0) AS total_tran_amt,
+    COALESCE(td.total_tran_amt, 0)
+        AS total_tran_amt,
     LEAST(
-        COALESCE(fd.total_flow_amount,0),
-        COALESCE(td.total_tran_amt,0)
+        COALESCE(fd.total_flow_amount, 0),
+        COALESCE(td.total_tran_amt, 0)
     ) AS commission_amount,
     CASE
-        WHEN ad.acct_opn_date + INTERVAL '1 year' >= DATE '2026-09-30' THEN 'YES'
+        WHEN ad.acct_opn_date + INTERVAL '1 year' >=
+            DATE '{dates["current_month_end"]}'
+            THEN 'YES'
         ELSE 'NO'
     END AS one_year_completed,
     ad.deposit_period_days,
     ad.deposit_period_mths,
-    COALESCE(rd.referencenumber,'N/A') AS referencenumber,
+    COALESCE(rd.referencenumber, 'N/A')
+        AS referencenumber,
     ad.scheme_code,
     ad.schm_desc,
     ad.sol_id,
@@ -185,9 +570,7 @@ LEFT JOIN tran_data td
     AND ad.scheme_code = td.schm_code
 LEFT JOIN reference_data rd
     ON ad.rm_id = rd.rm_id
-WHERE
-    COALESCE(td.total_tran_amt,0) > 0
-    -- ADDED: SIRF RDDSA AUR DDDSA PREFIX WALE RM_ID
+WHERE COALESCE(td.total_tran_amt, 0) > 0
 AND (
     UPPER(ad.rm_id) LIKE 'RDDSA%'
     OR UPPER(ad.rm_id) LIKE 'DDDSA%'
@@ -195,146 +578,163 @@ AND (
 ORDER BY
     ad.foracid,
     ad.rm_id,
-    ad.scheme_code;
- 
+    ad.scheme_code
 """
-QUERY_2 = """
---COMMITION QUERY 2 -- COUNT 6,563
- 
+
+
+def get_query_2():
+    dates = get_commission_query_dates()
+
+    return f"""
 WITH account_data AS (
-SELECT
-ds.rm_id,
-g2.emp_name AS rm_name,
-d2.operacc,
-g.foracid,
-g.acct_name,                    /* ADDED - ACCOUNT NAME FROM GAM */
-g.acct_opn_date,
-tam.deposit_amount,
-tam.deposit_period_mths,
-tam.deposit_period_days,
-COUNT(DISTINCT g.acid) AS count_acid_gam,
-SUM(dtt.tran_amt) AS total_tran_amt_dtt,
-SUM(tdt.flow_amt) AS total_flow_amt_tdt,
-g.sol_id,
-sol.sol_desc,
-g.schm_code AS scheme_code,
-gsp.schm_desc
-FROM custom.dsamap AS ds
-LEFT JOIN tbaadm.gam AS g
-ON g.foracid = ds.account_number
-AND g.schm_code IN (
-'2001','2002','2003',
-'2018','2019','2020','2021','2022','2023','2024','2025','2026','2027','2028','2029','2030','2031','2032','2033','2034','2035',
-'2101','2102','2103','2104','2105','2106',
-'2201','2202','2203',
-'9001','9002'
-)
-AND g.acct_opn_date BETWEEN DATE '2026-09-01' AND DATE '2026-09-30'
-AND g.acct_cls_flg = 'N'
-LEFT JOIN tbaadm.tam AS tam
-ON tam.acid = g.acid
-LEFT JOIN tbaadm.dtt AS dtt
-ON dtt.acid = g.acid
-AND dtt.flow_code = 'PI'
-AND dtt.tran_date BETWEEN DATE '2026-09-01' AND DATE '2026-09-30'
-AND NOT (
-dtt.value_date >= DATE '2026-08-01'
-AND dtt.value_date < DATE '2026-09-01'
-)
-LEFT JOIN tbaadm.tdt AS tdt
-ON tdt.acid = g.acid
-AND tdt.flow_code = 'PI'
-AND tdt.flow_date BETWEEN DATE '2026-09-01' AND DATE '2026-09-30'
-LEFT JOIN custom.dsaauth AS d2
-ON UPPER(ds.rm_id) = UPPER(d2.user_id)
-LEFT JOIN tbaadm.get AS g2
-ON d2.user_id = g2.emp_id
-LEFT JOIN tbaadm.sol AS sol
-ON g.sol_id = sol.sol_id
-LEFT JOIN tbaadm.gsp AS gsp
-ON gsp.schm_code = g.schm_code
-GROUP BY
-ds.rm_id,
-g2.emp_name,
-d2.operacc,
-g.foracid,
-g.acct_name,                    /* ADDED */
-g.acct_opn_date,
-tam.deposit_amount,
-tam.deposit_period_mths,
-tam.deposit_period_days,
-g.sol_id,
-sol.sol_desc,
-g.schm_code,
-gsp.schm_desc
+    SELECT
+        ds.rm_id,
+        g2.emp_name AS rm_name,
+        d2.operacc,
+        g.foracid,
+        g.acct_name,
+        g.acct_opn_date,
+        tam.deposit_amount,
+        tam.deposit_period_mths,
+        tam.deposit_period_days,
+        COUNT(DISTINCT g.acid) AS count_acid_gam,
+        SUM(dtt.tran_amt) AS total_tran_amt_dtt,
+        SUM(tdt.flow_amt) AS total_flow_amt_tdt,
+        g.sol_id,
+        sol.sol_desc,
+        g.schm_code AS scheme_code,
+        gsp.schm_desc
+    FROM custom.dsamap AS ds
+    LEFT JOIN tbaadm.gam AS g
+        ON g.foracid = ds.account_number
+        AND g.schm_code IN (
+            '2001','2002','2003',
+            '2018','2019','2020','2021','2022',
+            '2023','2024','2025','2026','2027',
+            '2028','2029','2030','2031','2032',
+            '2033','2034','2035',
+            '2101','2102','2103','2104','2105','2106',
+            '2201','2202','2203',
+            '9001','9002'
+        )
+        AND g.acct_opn_date BETWEEN
+            DATE '{dates["current_month_start"]}'
+            AND DATE '{dates["present_date"]}'
+        AND g.acct_cls_flg = 'N'
+    LEFT JOIN tbaadm.tam AS tam
+        ON tam.acid = g.acid
+    LEFT JOIN tbaadm.dtt AS dtt
+        ON dtt.acid = g.acid
+        AND dtt.flow_code = 'PI'
+        AND dtt.tran_date BETWEEN
+            DATE '{dates["current_month_start"]}'
+            AND DATE '{dates["present_date"]}'
+        AND NOT (
+            dtt.value_date >=
+                DATE '{dates["previous_month_start"]}'
+            AND dtt.value_date <
+                DATE '{dates["current_month_start"]}'
+        )
+    LEFT JOIN tbaadm.tdt AS tdt
+        ON tdt.acid = g.acid
+        AND tdt.flow_code = 'PI'
+        AND tdt.flow_date BETWEEN
+            DATE '{dates["current_month_start"]}'
+            AND DATE '{dates["present_date"]}'
+    LEFT JOIN custom.dsaauth AS d2
+        ON UPPER(ds.rm_id) = UPPER(d2.user_id)
+    LEFT JOIN tbaadm.get AS g2
+        ON d2.user_id = g2.emp_id
+    LEFT JOIN tbaadm.sol AS sol
+        ON g.sol_id = sol.sol_id
+    LEFT JOIN tbaadm.gsp AS gsp
+        ON gsp.schm_code = g.schm_code
+    GROUP BY
+        ds.rm_id,
+        g2.emp_name,
+        d2.operacc,
+        g.foracid,
+        g.acct_name,
+        g.acct_opn_date,
+        tam.deposit_amount,
+        tam.deposit_period_mths,
+        tam.deposit_period_days,
+        g.sol_id,
+        sol.sol_desc,
+        g.schm_code,
+        gsp.schm_desc
 ),
 reference_data AS (
-SELECT
-ed.referencenumber,
-da.user_id AS rm_id
-FROM crmuser.entitydocument AS ed
-JOIN tbaadm.gam AS g
-ON ed.orgkey = g.cif_id
-JOIN custom.dsaauth AS da
-ON g.foracid = da.operacc
-WHERE ed.doccode = 'PAN'
+    SELECT
+        ed.referencenumber,
+        da.user_id AS rm_id
+    FROM crmuser.entitydocument AS ed
+    JOIN tbaadm.gam AS g
+        ON ed.orgkey = g.cif_id
+    JOIN custom.dsaauth AS da
+        ON g.foracid = da.operacc
+    WHERE ed.doccode = 'PAN'
 )
 SELECT
-ad.rm_id,
-ad.rm_name,
-ad.operacc,
-ad.foracid,
-ad.acct_name,                   /* ADDED - ACCOUNT NAME */
-ad.acct_opn_date,
-ad.deposit_amount,
-ad.deposit_period_mths,
-ad.deposit_period_days,
-ad.sol_id,
-ad.sol_desc,
-ad.scheme_code,
-ad.schm_desc,
-SUM(ad.total_tran_amt_dtt)      AS total_tran_amt_dtt,
-SUM(ad.total_flow_amt_tdt)      AS total_flow_amt_tdt,
-SUM(ad.total_flow_amt_tdt)      AS adjusted_flow_amount,
-LEAST(
-COALESCE(SUM(ad.total_tran_amt_dtt),0),
-COALESCE(SUM(ad.total_flow_amt_tdt),0)
-) AS commission_amount,
-CASE
-WHEN ad.acct_opn_date + INTERVAL '1 year' <= DATE '2026-09-30' THEN 'YES'
-ELSE 'NO'
-END AS one_year_completed,
-MAX(COALESCE(rd.referencenumber,'N/A')) AS referencenumber
+    ad.rm_id,
+    ad.rm_name,
+    ad.operacc,
+    ad.foracid,
+    ad.acct_name,
+    ad.acct_opn_date,
+    ad.deposit_amount,
+    ad.deposit_period_mths,
+    ad.deposit_period_days,
+    ad.sol_id,
+    ad.sol_desc,
+    ad.scheme_code,
+    ad.schm_desc,
+    SUM(ad.total_tran_amt_dtt)
+        AS total_tran_amt_dtt,
+    SUM(ad.total_flow_amt_tdt)
+        AS total_flow_amt_tdt,
+    SUM(ad.total_flow_amt_tdt)
+        AS adjusted_flow_amount,
+    LEAST(
+        COALESCE(SUM(ad.total_tran_amt_dtt), 0),
+        COALESCE(SUM(ad.total_flow_amt_tdt), 0)
+    ) AS commission_amount,
+    CASE
+        WHEN ad.acct_opn_date + INTERVAL '1 year' <=
+            DATE '{dates["current_month_end"]}'
+            THEN 'YES'
+        ELSE 'NO'
+    END AS one_year_completed,
+    MAX(
+        COALESCE(rd.referencenumber, 'N/A')
+    ) AS referencenumber
 FROM account_data AS ad
 LEFT JOIN reference_data AS rd
-ON UPPER(ad.rm_id) = UPPER(rd.rm_id)
+    ON UPPER(ad.rm_id) = UPPER(rd.rm_id)
 WHERE ad.total_tran_amt_dtt > 0
--- ADDED: SIRF RDDSA AUR DDDSA PREFIX WALE RM_ID
 AND (
     UPPER(ad.rm_id) LIKE 'RDDSA%'
     OR UPPER(ad.rm_id) LIKE 'DDDSA%'
 )
 GROUP BY
-ad.rm_id,
-ad.rm_name,
-ad.operacc,
-ad.foracid,
-ad.acct_name,                   /* ADDED */
-ad.acct_opn_date,
-ad.deposit_amount,
-ad.deposit_period_mths,
-ad.deposit_period_days,
-ad.sol_id,
-ad.sol_desc,
-ad.scheme_code,
-ad.schm_desc
+    ad.rm_id,
+    ad.rm_name,
+    ad.operacc,
+    ad.foracid,
+    ad.acct_name,
+    ad.acct_opn_date,
+    ad.deposit_amount,
+    ad.deposit_period_mths,
+    ad.deposit_period_days,
+    ad.sol_id,
+    ad.sol_desc,
+    ad.scheme_code,
+    ad.schm_desc
 ORDER BY
-ad.sol_id,
-ad.rm_id,
-ad.scheme_code,
-ad.deposit_period_mths;
-
-
+    ad.sol_id,
+    ad.rm_id,
+    ad.scheme_code,
+    ad.deposit_period_mths
 """
 
 
@@ -427,77 +827,6 @@ def _get_agent_details(agent_code):
         ),
     }
 
-
-# def _create_commission_from_query_1(row):
-#     doc = frappe.get_doc({
-#         "doctype": "Commission",
-
-#         "agent_code": _safe_str(row.get("rm_id")),
-#         "agent_name": _safe_str(row.get("rm_name")),
-#         # "agent_operative_account": _safe_str(row.get("operacc")),
-#         "customer_account_number": _safe_str(row.get("foracid")),
-#         "customer_account_name": _safe_str(row.get("acct_name")),
-#         "deposit_amount": _safe_int(row.get("deposit_amount")),
-
-#         "tenure_months": _safe_int(row.get("deposit_period_mths")),
-#         "tenure_days": _safe_int(row.get("deposit_period_days")),
-
-#         # "demand": _safe_int(row.get("total_flow_amount")),
-#         "demand": _safe_int(row.get("adjusted_flow_amount")),
-#         "collection": _safe_int(row.get("total_tran_amt")),
-
-#         # New fields
-#         "eligible_amount": _safe_int(row.get("commission_amount")),
-#         "account_opening_date": row.get("acct_opn_date"),
-#         "remarks": _safe_str(row.get("one_year_completed")),
-
-#         "pan_card": _safe_str(row.get("referencenumber")),
-#         "scheme_code": _safe_str(row.get("scheme_code")),
-#         "scheme_description": _safe_str(row.get("schm_desc")),
-#         "sol_id": _safe_str(row.get("sol_id")),
-#         "sol_description": _safe_str(row.get("sol_desc")),
-#     })
-
-#     doc.insert(ignore_permissions=True)
-#     frappe.db.commit()
-
-#     return doc.name
-
-
-# def _create_commission_from_query_2(row):
-#     doc = frappe.get_doc({
-#         "doctype": "Commission",
-
-#         "agent_code": _safe_str(row.get("rm_id")),
-#         "agent_name": _safe_str(row.get("rm_name")),
-#         # "agent_operative_account": _safe_str(row.get("operacc")),
-#         "customer_account_number": _safe_str(row.get("foracid")),
-#         "customer_account_name": _safe_str(row.get("acct_name")),
-#         "deposit_amount": _safe_int(row.get("deposit_amount")),
-
-#         "tenure_months": _safe_int(row.get("deposit_period_mths")),
-#         "tenure_days": _safe_int(row.get("deposit_period_days")),
-
-#         # "demand": _safe_int(row.get("total_flow_amt_tdt")),
-#         "demand": _safe_int(row.get("adjusted_flow_amount")),
-#         "collection": _safe_int(row.get("total_tran_amt_dtt")),
-
-#         # New fields
-#         "eligible_amount": _safe_int(row.get("commission_amount")),
-#         "account_opening_date": row.get("acct_opn_date"),
-#         "remarks": _safe_str(row.get("one_year_completed")),
-
-#         "pan_card": _safe_str(row.get("referencenumber")),
-#         "scheme_code": _safe_str(row.get("scheme_code")),
-#         "scheme_description": _safe_str(row.get("schm_desc")),
-#         "sol_id": _safe_str(row.get("sol_id")),
-#         "sol_description": _safe_str(row.get("sol_desc")),
-#     })
-
-#     doc.insert(ignore_permissions=True)
-#     frappe.db.commit()
-
-#     return doc.name
 
 def _create_commission_from_query_1(row):
     agent_code = _safe_str(row.get("rm_id")) or "0"
@@ -695,7 +1024,12 @@ def fetch_and_create_commission():
         conn = db_connection()
 
         # Query 2 first, preserving current logic
-        query_2_rows = _run_query(conn, QUERY_2)
+        # _run_query(conn, QUERY_1)
+        # _run_query(conn, QUERY_2)
+        query_2_rows = _run_query(
+            conn,
+            get_query_2(),
+        )
 
         for row in query_2_rows:
             try:
@@ -718,7 +1052,10 @@ def fetch_and_create_commission():
                 errors.append(error_message)
 
         # Query 1 second, preserving current logic
-        query_1_rows = _run_query(conn, QUERY_1)
+        query_1_rows = _run_query(
+            conn,
+            get_query_1(),
+        )
 
         for row in query_1_rows:
             try:
@@ -774,6 +1111,7 @@ def run_fetch_and_create_commission_with_progress(limit=None):
     Each document is inserted and committed individually.
     """
     frappe.only_for(("System Manager",))
+    # _validate_commission_calculation_enabled()
 
     conn = None
     inserted_docs = []
@@ -790,8 +1128,14 @@ def run_fetch_and_create_commission_with_progress(limit=None):
 
         conn = db_connection()
 
-        query_1_rows = _run_query(conn, QUERY_1)
-        query_2_rows = _run_query(conn, QUERY_2)
+        query_1_rows = _run_query(
+            conn,
+            get_query_1(),
+        )
+        query_2_rows = _run_query(
+            conn,
+            get_query_2(),
+        )
 
         total_available = len(query_1_rows) + len(query_2_rows)
         total_to_process = (
@@ -910,8 +1254,14 @@ def debug_fetch_commission_data():
     try:
         conn = db_connection()
 
-        query_1_rows = _run_query(conn, QUERY_1)
-        query_2_rows = _run_query(conn, QUERY_2)
+        query_1_rows = _run_query(
+            conn,
+            get_query_1(),
+        )
+        query_2_rows = _run_query(
+            conn,
+            get_query_2(),
+        )
 
         print("\n===== COMMISSION DEBUG FETCH =====")
         print(f"QUERY 1 ROW COUNT: {len(query_1_rows)}")
@@ -956,7 +1306,10 @@ def debug_create_one_commission():
 
     try:
         conn = db_connection()
-        query_1_rows = _run_query(conn, QUERY_1)
+        query_1_rows = _run_query(
+            conn,
+            get_query_1(),
+        )
 
         if not query_1_rows:
             return {"status": "no_data"}
@@ -3092,6 +3445,32 @@ def _get_eligible_amount_scheme_group(
     )
 
 
+def _validate_commission_calculation_enabled():
+    """
+    Stop commission calculation unless enabled in Commission Settings.
+    """
+    settings = frappe.get_single(
+        "Commission Settings"
+    )
+
+    if not cint(
+        getattr(
+            settings,
+            "calculate_commission",
+            0,
+        )
+    ):
+        frappe.throw(
+            _(
+                "Commission calculation is disabled. "
+                "Enable 'Calculate Commission' in Commission Settings "
+                "before calculating commission."
+            )
+        )
+
+    return settings
+
+
 @frappe.whitelist()
 def calculate_commission_amount(docname):
     """
@@ -3110,6 +3489,8 @@ def calculate_commission_amount(docname):
     - Agent-level deduction/final_net_pay is updated for every record
       with the same agent_code.
     """
+
+    _validate_commission_calculation_enabled()
 
     if not docname:
         frappe.throw(_("Commission document name is required"))
@@ -3948,6 +4329,7 @@ def calculate_commission_for_all(batch_size=5000):
     3. Executes agent-level deduction & consolidated payment generation only once per agent.
     """
     frappe.only_for(("System Manager",))
+    _validate_commission_calculation_enabled()
 
     batch_size = cint(batch_size) or 5000
     if batch_size <= 0:

@@ -209,7 +209,18 @@ scheduler_events = {
         # retry share application payment
         "0 10,16 * * 1-6": [
             "banking_api.banking_api.doctype.share_application_settings.share_application_settings.retry_share_application_payment"
-        ]
+        ],
+
+        # "30 10 * * *": [
+        #     "banking_api.banking_api.doctype.commission.commission.fetch_and_create_commission"
+        # ],
+
+
+        # "0 11 * * *": [
+        #     "banking_api.banking_api.doctype.commission.commission.calculate_commission_for_all"
+        # ]
+
+
     }
 }
 

@@ -11,7 +11,7 @@ COMMISSION_DOCTYPE = "Commission"
 
 ALLOWED_EXPORT_FIELDS = [
     "name",
-    "posting_date",
+    "creation",
     "sol_id",
     "sol_description",
     "agent_code",
@@ -31,15 +31,27 @@ ALLOWED_EXPORT_FIELDS = [
 ]
 
 
+# def parse_date(value, field_label):
+#     if not value:
+#         frappe.throw(_("{0} is required.").format(field_label))
+
+#     try:
+#         return datetime.strptime(value.strip(), "%Y-%m-%d").date()
+#     except ValueError:
+#         frappe.throw(
+#             _("{0} must be a valid date.").format(field_label)
+#         )
+
 def parse_date(value, field_label):
     if not value:
         frappe.throw(_("{0} is required.").format(field_label))
 
     try:
-        return datetime.strptime(value.strip(), "%Y-%m-%d").date()
+        # Parse DD-MM-YYYY format
+        return datetime.strptime(value.strip(), "%d-%m-%Y").date()
     except ValueError:
         frappe.throw(
-            _("{0} must be a valid date.").format(field_label)
+            _("{0} must be in DD-MM-YYYY format.").format(field_label)
         )
 
 
@@ -70,7 +82,7 @@ def get_report_filters(from_date, to_date, sol_id=None, agent_code=None, scheme_
         frappe.throw(_("From Date cannot be greater than To Date."))
 
     filters = {
-        "posting_date": ["between", [from_date, to_date]]
+        "creation": ["between", [from_date, to_date]]
     }
 
     sol_ids = parse_csv_values(sol_id)
@@ -139,7 +151,7 @@ def download_commission_report(
         COMMISSION_DOCTYPE,
         filters=filters,
         fields=ALLOWED_EXPORT_FIELDS,
-        order_by="posting_date asc, sol_id asc, agent_code asc, scheme_code asc",
+        order_by="creation asc, sol_id asc, agent_code asc, scheme_code asc",
         limit_page_length=0,
     )
 
@@ -170,7 +182,7 @@ def download_commission_report(
     for row in records:
         writer.writerow([
             row.get("name") or "",
-            row.get("posting_date") or "",
+            row.get("creation") or "",
             row.get("sol_id") or "",
             row.get("sol_description") or "",
             row.get("agent_code") or "",
