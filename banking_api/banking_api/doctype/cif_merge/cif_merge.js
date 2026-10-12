@@ -263,17 +263,19 @@ frappe.ui.form.on("CIF Merge", {
 
 			<!-- Table 2: User Other Details -->
 			<div class="mb-3">
-				<h6 class="text-secondary font-weight-bold mb-1" style="font-size: 13px;"><i class="fa fa-id-card-o mr-1 text-info"></i> 2. CIF User Other Details</h6>
+				<h6 class="text-secondary font-weight-bold mb-1" style="font-size: 13px;"><i class="fa fa-id-card-o mr-1 text-info"></i> 2. CIF User Full Details</h6>
 				<div class="table-responsive border rounded">
 					<table class="table table-sm table-hover table-bordered m-0" style="vertical-align: middle;">
 						<thead class="thead-light small">
 							<tr>
 								<th style="width: 40px;" class="text-center">#</th>
 								<th style="min-width: 120px;">CIF ID</th>
+								<th style="min-width: 130px;">First Name</th>
 								<th style="min-width: 120px;">Middle Name</th>
+								<th style="min-width: 130px;">Last Name</th>
 								<th style="min-width: 110px;">Date of Birth</th>
 								<th style="min-width: 110px;">Mobile</th>
-								<th style="min-width: 90px;">Sol ID</th>
+								<th style="width: 70px;" class="text-center">Sol ID</th>
 								<th style="min-width: 110px;">Creation Date</th>
 								<th style="min-width: 180px;">Address</th>
 							</tr>
@@ -300,7 +302,9 @@ frappe.ui.form.on("CIF Merge", {
 											${row.merge ? '<span class="badge ml-1" style="background:#9333ea; color:white;">MERGE</span>' : ''}
 											${row.re_kyc ? '<span class="badge badge-warning ml-1">RE-KYC</span>' : ''}
 										</td>
+										<td>${escape_html(row.first_name || '-')}</td>
 										<td>${escape_html(row.middle_name || '-')}</td>
+										<td>${escape_html(row.last_name || '-')}</td>
 										<td>${escape_html(row.date_of_birth || '-')}</td>
 										<td>${escape_html(row.mobile || '-')}</td>
 										<td><span class="badge badge-light border">${escape_html(row.sol_id || '-')}</span></td>
