@@ -49,61 +49,275 @@ frappe.ui.form.on("CIF Merge", {
 		wrapper.empty();
 
 		let data = frm.doc.cif_details || [];
-		
-		// 1. Compute token counts across First & Last names
-		let token_counts = {};
-		data.forEach(r => {
-			let fn = (r.first_name || '').trim().toLowerCase();
-			let ln = (r.last_name || '').trim().toLowerCase();
-			if (fn.length >= 2) token_counts[fn] = (token_counts[fn] || 0) + 1;
-			if (ln.length >= 2) token_counts[ln] = (token_counts[ln] || 0) + 1;
+		if (!data.length) {
+			wrapper.html(`
+				<div class="p-4 text-center border rounded bg-light text-muted small">
+					<i class="fa fa-info-circle mr-1"></i> Search Aadhar or PAN to load and match CIF records.
+				</div>
+			`);
+			return;
+		}
+
+		// Collect individual word tokens as well as full names
+		let counts = {};
+		data.forEach(row => {
+			let fn = (row.first_name || '').trim().toLowerCase();
+			let ln = (row.last_name || '').trim().toLowerCase();
+			
+			let words = [...fn.split(/\s+/), ...ln.split(/\s+/)].filter(w => w.length >= 2);
+			words.forEach(w => {
+				counts[w] = (counts[w] || 0) + 1;
+			});
 		});
 
-		let dup_tokens = Object.keys(token_counts).filter(t => token_counts[t] >= 2);
+		let color_themes = [
+			{ bg: '#dcfce7', text: '#15803d', border: '#86efac' },
+			{ bg: '#e0e7ff', text: '#4338ca', border: '#a5b4fc' },
+			{ bg: '#ffedd5', text: '#c2410c', border: '#fdba74' },
+			{ bg: '#fce7f3', text: '#be185d', border: '#f9a8d4' },
+			{ bg: '#e0f2fe', text: '#0369a1', border: '#7dd3fc' },
+			{ bg: '#ccfbf1', text: '#0f766e', border: '#5eead4' },
+			{ bg: '#fae8ff', text: '#86198f', border: '#f0abfc' },
+			{ bg: '#fef9c3', text: '#854d0e', border: '#fde047' }
+		];
+
+		let token_map = {};
+		let c_idx = 0;
+		// Sort longer tokens first so larger substrings match first
+		let sorted_tokens = Object.keys(counts).filter(t => counts[t] >= 2).sort((a, b) => b.length - a.length);
+
+		sorted_tokens.forEach(token => {
+			token_map[token] = {
+				theme: color_themes[c_idx % color_themes.length],
+				count: counts[token]
+			};
+			c_idx++;
+		});
+
+		let escape_html = (str) => frappe.utils.escape_html(str || '');
+
+		let render_token_name = (name) => {
+			if (!name) return '<span class="text-muted font-italic small">Empty</span>';
+			let clean = name.trim();
+			let words = clean.split(/(\s+)/); // keep whitespace separators
+
+			return words.map(chunk => {
+				let lower = chunk.toLowerCase();
+				if (token_map[lower]) {
+					let t = token_map[lower].theme;
+					return `
+						<span class="cif-token-badge font-weight-bold" 
+							data-token="${lower}"
+							style="background:${t.bg}; color:${t.text}; border:1px solid ${t.border}; padding: 2px 6px; border-radius: 4px; display: inline-block; cursor: pointer; transition: all 0.2s;"
+							title="Matched substring/word '${lower}' across ${token_map[lower].count} rows">
+							${escape_html(chunk)}
+						</span>
+					`;
+				}
+				// Partial substring inside a chunk
+				let sub_token = sorted_tokens.find(st => st.length >= 3 && lower.includes(st));
+				if (sub_token) {
+					let t = token_map[sub_token].theme;
+					let regex = new RegExp(`(${sub_token})`, 'gi');
+					return escape_html(chunk).replace(regex, `<span class="cif-token-badge font-weight-bold" data-token="${sub_token}" style="background:${t.bg}; color:${t.text}; border:1px solid ${t.border}; padding: 1px 5px; border-radius: 3px;" title="Substring match '${sub_token}'">$1</span>`);
+				}
+				return escape_html(chunk);
+			}).join('');
+		};
+
 		let primary_count = data.filter(r => r.primary).length;
 		let merge_count = data.filter(r => r.merge).length;
 		let rekyc_count = data.filter(r => r.re_kyc).length;
 
-		let badge_colors = ['primary', 'info', 'warning', 'danger', 'secondary', 'dark'];
-		let token_badges_html = dup_tokens.length > 0
-			? dup_tokens.map((t, i) => `<span class="badge badge-${badge_colors[i % badge_colors.length]} mr-1 px-2 py-1">${t} (${token_counts[t]})</span>`).join('')
-			: `<span class="text-muted font-italic">No duplicate name tokens detected</span>`;
+		let legend_pills = Object.keys(token_map).map(token => {
+			let item = token_map[token];
+			let t = item.theme;
+			return `
+				<span class="cif-token-badge font-weight-bold mr-1 mb-1" 
+					data-token="${token}"
+					style="background:${t.bg}; color:${t.text}; border:1px solid ${t.border}; padding: 3px 8px; border-radius: 4px; display: inline-block; font-size: 11px; cursor: pointer;">
+					${token.toUpperCase()} <span style="opacity: 0.8; font-weight: normal;">(${item.count})</span>
+				</span>
+			`;
+		}).join('') || '<span class="text-muted font-italic small">No duplicate string tokens detected</span>';
+
+		let rows_html = data.map((row, idx) => {
+			let row_style = "";
+			let row_class = "";
+			if (row.primary) {
+				row_class = "table-success";
+				row_style = "border-left: 5px solid #16a34a; background-color: #f0fdf4;";
+			} else if (row.merge) {
+				row_style = "border-left: 5px solid #9333ea; background-color: #faf5ff;";
+			} else if (row.re_kyc) {
+				row_style = "border-left: 5px solid #d97706; background-color: #fffbeb;";
+			}
+
+			return `
+				<tr class="${row_class}" style="${row_style}" data-idx="${idx}">
+					<td class="text-center text-muted small">${idx + 1}</td>
+					<td>
+						<span class="font-weight-bold">${escape_html(row.cif_id)}</span>
+						${row.primary ? '<span class="badge badge-success ml-1">PRIMARY</span>' : ''}
+						${row.merge ? '<span class="badge ml-1" style="background:#9333ea; color:white;">MERGE</span>' : ''}
+						${row.re_kyc ? '<span class="badge badge-warning ml-1">RE-KYC</span>' : ''}
+					</td>
+					<td>${render_token_name(row.first_name)}</td>
+					<td>${render_token_name(row.last_name)}</td>
+					<td class="text-muted small">${escape_html(row.cif_creation || '-')}</td>
+					<td class="text-center">
+						<input type="checkbox" class="cif-primary-chk" data-idx="${idx}" ${row.primary ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px;">
+					</td>
+					<td class="text-center">
+						<input type="checkbox" class="cif-merge-chk" data-idx="${idx}" ${row.merge ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px;">
+					</td>
+					<td class="text-center">
+						<input type="checkbox" class="cif-rekyc-chk" data-idx="${idx}" ${row.re_kyc ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px;">
+					</td>
+				</tr>
+			`;
+		}).join('');
 
 		let widget_html = `
-		<div class="p-3 bg-white border rounded shadow-sm mb-3">
-			<div class="d-flex justify-content-between align-items-center mb-2">
-				<h6 class="m-0 font-weight-bold text-primary">CIF Search Summary & Duplicate Tokens</h6>
+		<div class="cif-table-control-container p-3 bg-white border rounded shadow-sm mb-3">
+			<!-- Header & Action Status -->
+			<div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom flex-wrap gap-2">
 				<div>
+					<h6 class="m-0 font-weight-bold text-dark"><i class="fa fa-users text-primary mr-1"></i> CIF Deduplication & Table Control</h6>
+					<small class="text-muted">Multi-color tokens highlight duplicate names and substrings across records.</small>
+				</div>
+				<div class="d-flex align-items-center gap-2">
 					<span class="badge badge-success px-2 py-1">Primary: ${primary_count}</span>
-					<span class="badge badge-purple px-2 py-1 style="background-color: #6f42c1; color: white;">Merge: ${merge_count}</span>
+					<span class="badge px-2 py-1" style="background-color: #9333ea; color: white;">Merge: ${merge_count}</span>
 					<span class="badge badge-warning px-2 py-1">Re-KYC: ${rekyc_count}</span>
 				</div>
 			</div>
-			<div class="d-flex align-items-center flex-wrap gap-2 mb-2">
-				<strong class="text-secondary mr-2">Duplicate Substrings:</strong>
-				${token_badges_html}
+
+			<!-- Active Duplicate Token Legends -->
+			<div class="p-2 mb-3 rounded bg-light border d-flex align-items-center flex-wrap gap-1">
+				<strong class="text-secondary small mr-2"><i class="fa fa-tags mr-1"></i> Duplicate Tokens:</strong>
+				<div class="d-flex flex-wrap align-items-center">${legend_pills}</div>
+			</div>
+
+			<!-- Dynamic Table -->
+			<div class="table-responsive border rounded mb-2">
+				<table class="table table-sm table-bordered m-0" style="vertical-align: middle;">
+					<thead class="thead-light small">
+						<tr>
+							<th style="width: 40px;" class="text-center">#</th>
+							<th style="min-width: 120px;">CIF ID</th>
+							<th style="min-width: 140px;">First Name</th>
+							<th style="min-width: 140px;">Last Name</th>
+							<th style="min-width: 100px;">Creation Date</th>
+							<th style="width: 90px;" class="text-center bg-success text-white">Primary</th>
+							<th style="width: 90px;" class="text-center text-white" style="background:#9333ea;">Merge</th>
+							<th style="width: 90px;" class="text-center bg-warning text-dark">Re KYC</th>
+						</tr>
+					</thead>
+					<tbody>${rows_html}</tbody>
+				</table>
+			</div>
+
+			<!-- Minimal Checklist Pill Bar -->
+			<div class="d-flex justify-content-between align-items-center flex-wrap pt-2 mt-2 border-top text-muted" style="font-size: 11.5px;">
+				<div class="d-flex align-items-center flex-wrap gap-2">
+					<span class="text-uppercase font-weight-bold tracking-wider text-secondary mr-1" style="font-size: 10px; letter-spacing: 0.5px;">Checklist:</span>
+
+					<!-- Primary Pill -->
+					<span class="d-inline-flex align-items-center px-2 py-0.5 rounded-pill border ${primary_count === 1 ? 'border-success text-success bg-white font-weight-bold' : 'border-light text-muted bg-light'}" style="transition: all 0.2s;">
+						<i class="fa ${primary_count === 1 ? 'fa-check text-success' : 'fa-circle-thin text-muted'} mr-1" style="font-size: 10px;"></i>
+						1 Primary
+						<span class="badge ${primary_count === 1 ? 'badge-success text-white' : 'badge-light text-muted border'} ml-1 px-1.5 py-0.2" style="font-size: 9.5px;">${primary_count}/1</span>
+					</span>
+
+					<!-- Merge Pill -->
+					<span class="d-inline-flex align-items-center px-2 py-0.5 rounded-pill border ${merge_count > 0 ? 'bg-white font-weight-bold' : 'border-light text-muted bg-light'}" style="${merge_count > 0 ? 'border-color: #9333ea; color: #9333ea;' : ''}; transition: all 0.2s;">
+						<i class="fa ${merge_count > 0 ? 'fa-check' : 'fa-circle-thin text-muted'} mr-1" style="font-size: 10px;"></i>
+						Merge
+						<span class="badge ml-1 px-1.5 py-0.2" style="${merge_count > 0 ? 'background-color: #9333ea; color: white;' : 'background-color: #e9ecef; color: #6c757d;'}; font-size: 9.5px;">${merge_count}</span>
+					</span>
+
+					<!-- Re-KYC Pill -->
+					<span class="d-inline-flex align-items-center px-2 py-0.5 rounded-pill border ${rekyc_count > 0 ? 'border-warning text-dark bg-white font-weight-bold' : 'border-light text-muted bg-light'}" style="transition: all 0.2s;">
+						<i class="fa ${rekyc_count > 0 ? 'fa-check text-warning' : 'fa-circle-thin text-muted'} mr-1" style="font-size: 10px;"></i>
+						Re-KYC
+						<span class="badge ${rekyc_count > 0 ? 'badge-warning text-dark' : 'badge-light text-muted border'} ml-1 px-1.5 py-0.2" style="font-size: 9.5px;">${rekyc_count}</span>
+					</span>
+				</div>
+				<div class="text-muted" style="font-size: 11px;">
+					<i class="fa fa-info-circle mr-1"></i>Merge aur Re-KYC mutually exclusive hain
+				</div>
 			</div>
 		</div>`;
 
 		wrapper.html(widget_html);
-	}
-});
 
-// Color-coding child table rows based on selection
-frappe.ui.form.on("CIF Details", {
-	form_render(frm, cdt, cdn) {
-		let row = locals[cdt][cdn];
-		let grid_row = frm.fields_dict.cif_details.grid.get_row(cdn);
-		if (!grid_row) return;
+		// Event: Hover highlights across table
+		wrapper.find('.cif-token-badge').hover(
+			function() {
+				let tk = $(this).attr('data-token');
+				if (!tk) return;
+				wrapper.find(`.cif-token-badge[data-token="${tk}"]`).css({
+					"transform": "scale(1.08)",
+					"box-shadow": "0 2px 6px rgba(0,0,0,0.25)"
+				});
+			},
+			function() {
+				let tk = $(this).attr('data-token');
+				if (!tk) return;
+				wrapper.find(`.cif-token-badge[data-token="${tk}"]`).css({
+					"transform": "",
+					"box-shadow": ""
+				});
+			}
+		);
 
-		$(grid_row.wrapper).removeClass("table-success table-purple table-warning");
-		if (row.primary) {
-			$(grid_row.wrapper).addClass("table-success");
-		} else if (row.merge) {
-			$(grid_row.wrapper).css("background-color", "#f3e8ff");
-		} else if (row.re_kyc) {
-			$(grid_row.wrapper).addClass("table-warning");
-		}
+		// Event: Primary Checkbox (Strictly single selection)
+		wrapper.find('.cif-primary-chk').on('change', function() {
+			let idx = $(this).data('idx');
+			let is_checked = $(this).is(':checked');
+			frm.doc.cif_details.forEach((r, i) => {
+				r.primary = (i === idx && is_checked) ? 1 : 0;
+				if (r.primary) {
+					r.merge = 0;
+					r.re_kyc = 0;
+				}
+			});
+			frm.refresh_field("cif_details");
+			frm.trigger("render_custom_table");
+		});
+
+		// Event: Merge Checkbox (Mutually exclusive with Re-KYC & Primary)
+		wrapper.find('.cif-merge-chk').on('change', function() {
+			let idx = $(this).data('idx');
+			let is_checked = $(this).is(':checked');
+			let row = frm.doc.cif_details[idx];
+			if (is_checked) {
+				row.merge = 1;
+				row.re_kyc = 0;
+				row.primary = 0;
+			} else {
+				row.merge = 0;
+			}
+			frm.refresh_field("cif_details");
+			frm.trigger("render_custom_table");
+		});
+
+		// Event: Re-KYC Checkbox (Mutually exclusive with Merge & Primary)
+		wrapper.find('.cif-rekyc-chk').on('change', function() {
+			let idx = $(this).data('idx');
+			let is_checked = $(this).is(':checked');
+			let row = frm.doc.cif_details[idx];
+			if (is_checked) {
+				row.re_kyc = 1;
+				row.merge = 0;
+				row.primary = 0;
+			} else {
+				row.re_kyc = 0;
+			}
+			frm.refresh_field("cif_details");
+			frm.trigger("render_custom_table");
+		});
 	}
 });
 
