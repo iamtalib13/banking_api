@@ -216,7 +216,7 @@ frappe.ui.form.on("CIF Merge", {
 								<th style="min-width: 140px;">First Name</th>
 								<th style="min-width: 140px;">Last Name</th>
 								<th style="width: 90px;" class="text-center bg-success text-white">Primary</th>
-								<th style="width: 90px;" class="text-center text-white" style="background:#9333ea;">Merge</th>
+								<th style="width: 90px;" class="text-center text-dark" style="background:#9333ea;">Merge</th>
 								<th style="width: 90px;" class="text-center bg-warning text-dark">Re KYC</th>
 							</tr>
 						</thead>
