@@ -68,26 +68,31 @@
   {
    "fieldname": "middle_name",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "Middle Name"
   },
   {
    "fieldname": "date_of_birth",
    "fieldtype": "Date",
+   "in_list_view": 1,
    "label": "Date of Birth"
   },
   {
    "fieldname": "mobile",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "mobile"
   },
   {
    "fieldname": "adress",
    "fieldtype": "Small Text",
+   "in_list_view": 1,
    "label": "Adress"
   },
   {
    "fieldname": "sol_id",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "Sol ID"
   }
  ],
@@ -95,7 +100,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-10-12 11:57:36.920379",
+ "modified": "2026-10-12 12:06:09.320303",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "CIF Details",
