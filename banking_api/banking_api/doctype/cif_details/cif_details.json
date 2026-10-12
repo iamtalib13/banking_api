@@ -8,11 +8,16 @@
  "field_order": [
   "cif_id",
   "first_name",
+  "middle_name",
   "last_name",
   "cif_creation",
+  "date_of_birth",
+  "mobile",
+  "sol_id",
   "primary",
   "merge",
-  "re_kyc"
+  "re_kyc",
+  "adress"
  ],
  "fields": [
   {
@@ -59,13 +64,38 @@
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "Re KYC"
+  },
+  {
+   "fieldname": "middle_name",
+   "fieldtype": "Data",
+   "label": "Middle Name"
+  },
+  {
+   "fieldname": "date_of_birth",
+   "fieldtype": "Date",
+   "label": "Date of Birth"
+  },
+  {
+   "fieldname": "mobile",
+   "fieldtype": "Data",
+   "label": "mobile"
+  },
+  {
+   "fieldname": "adress",
+   "fieldtype": "Small Text",
+   "label": "Adress"
+  },
+  {
+   "fieldname": "sol_id",
+   "fieldtype": "Data",
+   "label": "Sol ID"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-10-12 11:32:40.757502",
+ "modified": "2026-10-12 11:57:36.920379",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "CIF Details",
