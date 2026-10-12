@@ -31,8 +31,13 @@ frappe.ui.form.on("CIF Merge", {
 						let child = frm.add_child("cif_details");
 						child.cif_id = row.cif_id;
 						child.first_name = row.first_name;
+						child.middle_name = row.middle_name;
 						child.last_name = row.last_name;
 						child.cif_creation = row.cif_creation;
+						child.date_of_birth = row.date_of_birth;
+						child.mobile = row.mobile;
+						child.adress = row.adress;
+						child.sol_id = row.sol_id;
 						child.primary = row.primary || 0;
 						child.merge = row.merge || 0;
 						child.re_kyc = row.re_kyc || 0;
@@ -199,23 +204,118 @@ frappe.ui.form.on("CIF Merge", {
 				<div class="d-flex flex-wrap align-items-center">${legend_pills}</div>
 			</div>
 
-			<!-- Dynamic Table -->
-			<div class="table-responsive border rounded mb-2">
-				<table class="table table-sm table-bordered m-0" style="vertical-align: middle;">
-					<thead class="thead-light small">
-						<tr>
-							<th style="width: 40px;" class="text-center">#</th>
-							<th style="min-width: 120px;">CIF ID</th>
-							<th style="min-width: 140px;">First Name</th>
-							<th style="min-width: 140px;">Last Name</th>
-							<th style="min-width: 100px;">Creation Date</th>
-							<th style="width: 90px;" class="text-center bg-success text-white">Primary</th>
-							<th style="width: 90px;" class="text-center text-white" style="background:#9333ea;">Merge</th>
-							<th style="width: 90px;" class="text-center bg-warning text-dark">Re KYC</th>
-						</tr>
-					</thead>
-					<tbody>${rows_html}</tbody>
-				</table>
+			<!-- Table 1: Actions & Deduplication Control -->
+			<div class="mb-3">
+				<h6 class="text-secondary font-weight-bold mb-1" style="font-size: 13px;"><i class="fa fa-sliders mr-1 text-primary"></i> 1. CIF Selection & Deduplication Table</h6>
+				<div class="table-responsive border rounded">
+					<table class="table table-sm table-bordered m-0" style="vertical-align: middle;">
+						<thead class="thead-light small">
+							<tr>
+								<th style="width: 40px;" class="text-center">#</th>
+								<th style="min-width: 120px;">CIF ID</th>
+								<th style="min-width: 140px;">First Name</th>
+								<th style="min-width: 140px;">Last Name</th>
+								<th style="width: 90px;" class="text-center bg-success text-white">Primary</th>
+								<th style="width: 90px;" class="text-center text-dark" style="background:#9333ea;">Merge</th>
+								<th style="width: 90px;" class="text-center bg-warning text-dark">Re KYC</th>
+							</tr>
+						</thead>
+						<tbody>
+							${data.map((row, idx) => {
+								let row_style = "";
+								let row_class = "";
+								if (row.primary) {
+									row_class = "table-success";
+									row_style = "border-left: 5px solid #16a34a; background-color: #f0fdf4;";
+								} else if (row.merge) {
+									row_style = "border-left: 5px solid #9333ea; background-color: #faf5ff;";
+								} else if (row.re_kyc) {
+									row_style = "border-left: 5px solid #d97706; background-color: #fffbeb;";
+								}
+
+								return `
+									<tr class="${row_class}" style="${row_style}" data-idx="${idx}">
+										<td class="text-center text-muted small">${idx + 1}</td>
+										<td>
+											<span class="font-weight-bold">${escape_html(row.cif_id)}</span>
+											${row.primary ? '<span class="badge badge-success ml-1">PRIMARY</span>' : ''}
+											${row.merge ? '<span class="badge ml-1" style="background:#9333ea; color:white;">MERGE</span>' : ''}
+											${row.re_kyc ? '<span class="badge badge-warning ml-1">RE-KYC</span>' : ''}
+										</td>
+										<td>${render_token_name(row.first_name)}</td>
+										<td>${render_token_name(row.last_name)}</td>
+										<td class="text-center">
+											<input type="checkbox" class="cif-primary-chk" data-idx="${idx}" ${row.primary ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px;">
+										</td>
+										<td class="text-center">
+											<input type="checkbox" class="cif-merge-chk" data-idx="${idx}" ${row.merge ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px;">
+										</td>
+										<td class="text-center">
+											<input type="checkbox" class="cif-rekyc-chk" data-idx="${idx}" ${row.re_kyc ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px;">
+										</td>
+									</tr>
+								`;
+							}).join('')}
+						</tbody>
+					</table>
+				</div>
+			</div>
+
+			<!-- Table 2: User Other Details -->
+			<div class="mb-3">
+				<h6 class="text-secondary font-weight-bold mb-1" style="font-size: 13px;"><i class="fa fa-id-card-o mr-1 text-info"></i> 2. CIF User Full Details</h6>
+				<div class="table-responsive border rounded">
+					<table class="table table-sm table-hover table-bordered m-0" style="vertical-align: middle;">
+						<thead class="thead-light small">
+							<tr>
+								<th style="width: 40px;" class="text-center">#</th>
+								<th style="min-width: 120px;">CIF ID</th>
+								<th style="min-width: 130px;">First Name</th>
+								<th style="min-width: 120px;">Middle Name</th>
+								<th style="min-width: 130px;">Last Name</th>
+								<th style="min-width: 110px;">Date of Birth</th>
+								<th style="min-width: 110px;">Mobile</th>
+								<th style="width: 70px;" class="text-center">Sol ID</th>
+								<th style="min-width: 110px;">Creation Date</th>
+								<th style="min-width: 180px;">Address</th>
+							</tr>
+						</thead>
+						<tbody>
+							${data.map((row, idx) => {
+								let row_style = "";
+								let row_class = "";
+								if (row.primary) {
+									row_class = "table-success";
+									row_style = "border-left: 5px solid #16a34a; background-color: #f0fdf4;";
+								} else if (row.merge) {
+									row_style = "border-left: 5px solid #9333ea; background-color: #faf5ff;";
+								} else if (row.re_kyc) {
+									row_style = "border-left: 5px solid #d97706; background-color: #fffbeb;";
+								}
+
+								return `
+									<tr class="${row_class}" style="${row_style}">
+										<td class="text-center text-muted small">${idx + 1}</td>
+										<td>
+											<span class="font-weight-bold">${escape_html(row.cif_id)}</span>
+											${row.primary ? '<span class="badge badge-success ml-1">PRIMARY</span>' : ''}
+											${row.merge ? '<span class="badge ml-1" style="background:#9333ea; color:white;">MERGE</span>' : ''}
+											${row.re_kyc ? '<span class="badge badge-warning ml-1">RE-KYC</span>' : ''}
+										</td>
+										<td>${escape_html(row.first_name || '-')}</td>
+										<td>${escape_html(row.middle_name || '-')}</td>
+										<td>${escape_html(row.last_name || '-')}</td>
+										<td>${escape_html(row.date_of_birth || '-')}</td>
+										<td>${escape_html(row.mobile || '-')}</td>
+										<td><span class="badge badge-light border">${escape_html(row.sol_id || '-')}</span></td>
+										<td class="text-muted small">${escape_html(row.cif_creation || '-')}</td>
+										<td class="small text-muted">${escape_html(row.adress || '-')}</td>
+									</tr>
+								`;
+							}).join('')}
+						</tbody>
+					</table>
+				</div>
 			</div>
 
 			<!-- Minimal Checklist Pill Bar -->
