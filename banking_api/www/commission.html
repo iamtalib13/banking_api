@@ -581,10 +581,17 @@
                 this.fetchRecords(true);
             },
 
+            // clearAutocomplete(type) {
+            //     this.autocomplete[type].query = '';
+            //     this.filters[type] = '';
+            //     this.autocomplete[type].open = false;
+            //     this.fetchRecords(true);
+            // },
+
             clearAutocomplete(type) {
                 this.autocomplete[type].query = '';
                 this.filters[type] = '';
-                this.autocomplete[type].open = false;
+                this.autocomplete[type].open = true;
                 this.fetchRecords(true);
             },
             // -------------------------------------------
