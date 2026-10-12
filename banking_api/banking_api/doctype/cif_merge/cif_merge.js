@@ -279,18 +279,36 @@ frappe.ui.form.on("CIF Merge", {
 							</tr>
 						</thead>
 						<tbody>
-							${data.map((row, idx) => `
-								<tr>
-									<td class="text-center text-muted small">${idx + 1}</td>
-									<td class="font-weight-bold">${escape_html(row.cif_id)}</td>
-									<td>${escape_html(row.middle_name || '-')}</td>
-									<td>${escape_html(row.date_of_birth || '-')}</td>
-									<td>${escape_html(row.mobile || '-')}</td>
-									<td><span class="badge badge-light border">${escape_html(row.sol_id || '-')}</span></td>
-									<td class="text-muted small">${escape_html(row.cif_creation || '-')}</td>
-									<td class="small text-muted">${escape_html(row.adress || '-')}</td>
-								</tr>
-							`).join('')}
+							${data.map((row, idx) => {
+								let row_style = "";
+								let row_class = "";
+								if (row.primary) {
+									row_class = "table-success";
+									row_style = "border-left: 5px solid #16a34a; background-color: #f0fdf4;";
+								} else if (row.merge) {
+									row_style = "border-left: 5px solid #9333ea; background-color: #faf5ff;";
+								} else if (row.re_kyc) {
+									row_style = "border-left: 5px solid #d97706; background-color: #fffbeb;";
+								}
+
+								return `
+									<tr class="${row_class}" style="${row_style}">
+										<td class="text-center text-muted small">${idx + 1}</td>
+										<td>
+											<span class="font-weight-bold">${escape_html(row.cif_id)}</span>
+											${row.primary ? '<span class="badge badge-success ml-1">PRIMARY</span>' : ''}
+											${row.merge ? '<span class="badge ml-1" style="background:#9333ea; color:white;">MERGE</span>' : ''}
+											${row.re_kyc ? '<span class="badge badge-warning ml-1">RE-KYC</span>' : ''}
+										</td>
+										<td>${escape_html(row.middle_name || '-')}</td>
+										<td>${escape_html(row.date_of_birth || '-')}</td>
+										<td>${escape_html(row.mobile || '-')}</td>
+										<td><span class="badge badge-light border">${escape_html(row.sol_id || '-')}</span></td>
+										<td class="text-muted small">${escape_html(row.cif_creation || '-')}</td>
+										<td class="small text-muted">${escape_html(row.adress || '-')}</td>
+									</tr>
+								`;
+							}).join('')}
 						</tbody>
 					</table>
 				</div>
