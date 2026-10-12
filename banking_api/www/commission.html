@@ -191,8 +191,10 @@
                                 <th>SOL Name</th>
                                 <th>Agent Code</th>
                                 <th>Agent Name</th>
-                                <th>Scheme Code</th>
-                                <th>Scheme Description</th>
+                                <!-- <th>Scheme Code</th>
+                                <th>Scheme Description</th> -->
+                                <th v-if="showSchemeColumns">Scheme Code</th>
+                                <th v-if="showSchemeColumns">Scheme Description</th>
                                 <th>PAN</th>
                                 <th>PAN Status</th>
                                 <th>CIF</th>
@@ -211,7 +213,8 @@
                         </thead>
                         <tbody v-if="loading">
                             <tr class="skeleton-row" v-for="n in 6" :key="n">
-                                <td colspan="20">
+                                <!-- <td colspan="20"> -->
+                                <td :colspan="showSchemeColumns ? 20 : 18">
                                     <div class="skeleton-bar"></div>
                                 </td>
                             </tr>
@@ -256,9 +259,14 @@
                                 <td>[[ row.sol_description || '—' ]]</td>
                                 <td>[[ row.agent_code || '—' ]]</td>
                                 <td>[[ row.agent_name || '—' ]]</td>
-                                <td><span class="chip" v-if="row.scheme_code">[[ row.scheme_code ]]</span><span
+                                <!-- <td><span class="chip" v-if="row.scheme_code">[[ row.scheme_code ]]</span><span
                                         v-else>—</span></td>
-                                <td>[[ row.scheme_description || '—' ]]</td>
+                                <td>[[ row.scheme_description || '—' ]]</td> -->
+                                <td v-if="showSchemeColumns">
+                                    <span class="chip" v-if="row.scheme_code">[[ row.scheme_code ]]</span>
+                                    <span v-else>—</span>
+                                </td>
+                                <td v-if="showSchemeColumns">[[ row.scheme_description || '—' ]]</td>
                                 <td>[[ row.pan_card || '—' ]]</td>
                                 <td>[[ row.pan_status || '—' ]]</td>
                                 <td>[[ row.cif || '—' ]]</td>
@@ -277,7 +285,8 @@
                         </tbody>
                         <tbody v-if="!loading && records.length === 0">
                             <tr>
-                                <td colspan="20" class="empty-state">
+                                <!-- <td colspan="20" class="empty-state"> -->
+                                <td :colspan="showSchemeColumns ? 20 : 18" class="empty-state">
                                     <div class="empty-icon">📄</div>
                                     No commission records found for the selected filters.
                                 </td>
@@ -532,6 +541,10 @@
                 if (this.filters.agent_code) chips.push({ key: 'agent_code', label: 'Agent: ' + this.filters.agent_code });
                 if (this.filters.agent_operative_account) chips.push({ key: 'agent_operative_account', label: 'Account: ' + this.filters.agent_operative_account });
                 return chips;
+            },
+
+            get showSchemeColumns() {
+                return !!(this.filters.scheme_code && String(this.filters.scheme_code).trim());
             },
 
             // ---------- Autocomplete helpers ----------
