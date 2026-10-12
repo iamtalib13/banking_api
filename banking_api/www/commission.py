@@ -18,6 +18,48 @@ def _build_conditions(filters):
     return where_clause, values
 
 
+# @frappe.whitelist()
+# def get_commission_grouped(filters=None, limit_start=0, limit_page_length=10):
+#     """Returns one consolidated row per agent_code, with SUM'd amount fields."""
+#     filters = frappe.parse_json(filters) if filters else []
+#     limit_start = int(limit_start)
+#     limit_page_length = int(limit_page_length)
+
+#     where_clause, values = _build_conditions(filters)
+
+#     rows = frappe.db.sql(
+#         f"""
+#             SELECT
+#                 agent_code,
+#                 MAX(agent_name) AS agent_name,
+#                 MAX(sol_id) AS sol_id,
+#                 MAX(sol_description) AS sol_description,
+#                 MAX(scheme_code) AS scheme_code,
+#                 MAX(scheme_description) AS scheme_description,
+#                 MAX(pan_card) AS pan_card,
+#                 MAX(pan_status) AS pan_status,
+#                 MAX(cif) AS cif,
+#                 MAX(agent_security_account) AS security_account,
+#                 MAX(agent_operative_account) AS operative_account,
+#                 COUNT(name) AS record_count,
+#                 COALESCE(SUM(CAST(NULLIF(TRIM(eligible_amount), '') AS DECIMAL(18,2))), 0) AS eligible_amount,
+#                 COALESCE(SUM(CAST(NULLIF(TRIM(commission_amount), '') AS DECIMAL(18,2))), 0) AS commission_amount,
+#                 COALESCE(SUM(CAST(NULLIF(TRIM(tds), '') AS DECIMAL(18,2))), 0) AS tds,
+#                 COALESCE(SUM(CAST(NULLIF(TRIM(security_deposit), '') AS DECIMAL(18,2))), 0) AS security_deposit,
+#                 COALESCE(SUM(CAST(NULLIF(TRIM(netpay), '') AS DECIMAL(18,2))), 0) AS netpay
+#             FROM `tabCommission`
+#             WHERE {where_clause}
+#             GROUP BY agent_code
+#             ORDER BY agent_code ASC
+#             LIMIT %(limit_page_length)s OFFSET %(limit_start)s
+#         """,
+#         {**values, "limit_start": limit_start,
+#             "limit_page_length": limit_page_length},
+#         as_dict=True,
+#     )
+#     return rows
+
+
 @frappe.whitelist()
 def get_commission_grouped(filters=None, limit_start=0, limit_page_length=10):
     """Returns one consolidated row per agent_code, with SUM'd amount fields."""
@@ -39,9 +81,10 @@ def get_commission_grouped(filters=None, limit_start=0, limit_page_length=10):
                 MAX(pan_card) AS pan_card,
                 MAX(pan_status) AS pan_status,
                 MAX(cif) AS cif,
+                MAX(agent_saving_account) AS agent_saving_account,
                 MAX(agent_security_account) AS security_account,
                 MAX(agent_operative_account) AS operative_account,
-                COUNT(name) AS record_count,
+                COALESCE(SUM(CAST(NULLIF(TRIM(collection), '') AS DECIMAL(18,2))), 0) AS collection,
                 COALESCE(SUM(CAST(NULLIF(TRIM(eligible_amount), '') AS DECIMAL(18,2))), 0) AS eligible_amount,
                 COALESCE(SUM(CAST(NULLIF(TRIM(commission_amount), '') AS DECIMAL(18,2))), 0) AS commission_amount,
                 COALESCE(SUM(CAST(NULLIF(TRIM(tds), '') AS DECIMAL(18,2))), 0) AS tds,
