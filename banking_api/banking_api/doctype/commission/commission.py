@@ -813,6 +813,20 @@ def _sync_agent_fetch_from_fields():
     frappe.db.commit()
 
 
+def _get_existing_commission_keys():
+    """
+    Get existing (customer_account_number, scheme_code) keys created in the current month.
+    This guarantees zero duplicates on daily runs.
+    """
+    return set(
+        frappe.db.sql("""
+            SELECT CONCAT(COALESCE(customer_account_number, ''), '_', COALESCE(scheme_code, ''))
+            FROM `tabCommission`
+            WHERE creation >= DATE_FORMAT(NOW(), '%%Y-%%m-01')
+        """, pluck=True)
+    )
+
+
 def _build_commission_tuple(row, is_query_2, now_ts):
     collection_val = row.get("total_tran_amt_dtt") if is_query_2 else row.get("total_tran_amt")
 
@@ -1001,8 +1015,10 @@ def fetch_and_create_commission():
     """
     Execute Query 2 first, then Query 1.
     Uses bulk_insert for lightning-fast performance across 80,000+ records.
+    Filters existing accounts created in the current month to prevent duplicates on daily runs.
     """
-    frappe.only_for(("System Manager",))
+    if not frappe.flags.in_scheduler and not frappe.flags.in_test:
+        frappe.only_for(("System Manager",))
 
     conn = None
     errors = []
@@ -1011,31 +1027,43 @@ def fetch_and_create_commission():
         conn = db_connection()
 
         now_ts = now_datetime()
+        existing_keys = _get_existing_commission_keys()
 
-        # Query 2 first, preserving current logic
+        # Fetch rows from external Postgres immediately while connection is fresh
         query_2_rows = _run_query(
             conn,
             get_query_2(),
         )
 
-        q2_tuples = [
-            _build_commission_tuple(row, True, now_ts)
-            for row in query_2_rows
-        ]
-        if q2_tuples:
-            frappe.db.bulk_insert("Commission", COMMISSION_BULK_FIELDS, q2_tuples, chunk_size=5000)
-            frappe.db.commit()
-
-        # Query 1 second, preserving current logic
         query_1_rows = _run_query(
             conn,
             get_query_1(),
         )
 
-        q1_tuples = [
-            _build_commission_tuple(row, False, now_ts)
-            for row in query_1_rows
-        ]
+        # Close Postgres connection early to avoid holding standby slots
+        conn.close()
+        conn = None
+
+        q2_tuples = []
+        for row in query_2_rows:
+            key = f"{row.get('foracid') or ''}_{row.get('scheme_code') or ''}"
+            if key in existing_keys:
+                continue
+            existing_keys.add(key)
+            q2_tuples.append(_build_commission_tuple(row, True, now_ts))
+
+        if q2_tuples:
+            frappe.db.bulk_insert("Commission", COMMISSION_BULK_FIELDS, q2_tuples, chunk_size=5000)
+            frappe.db.commit()
+
+        q1_tuples = []
+        for row in query_1_rows:
+            key = f"{row.get('foracid') or ''}_{row.get('scheme_code') or ''}"
+            if key in existing_keys:
+                continue
+            existing_keys.add(key)
+            q1_tuples.append(_build_commission_tuple(row, False, now_ts))
+
         if q1_tuples:
             frappe.db.bulk_insert("Commission", COMMISSION_BULK_FIELDS, q1_tuples, chunk_size=5000)
             frappe.db.commit()
@@ -1098,6 +1126,7 @@ def run_fetch_and_create_commission_with_progress(limit=None):
                 query_1_rows = query_1_rows[:rem]
 
         now_ts = now_datetime()
+        existing_keys = _get_existing_commission_keys()
 
         total_to_process = len(query_2_rows) + len(query_1_rows)
         progress = tqdm(total=total_to_process, desc="Creating Commission Docs", unit="doc")
@@ -1106,6 +1135,11 @@ def run_fetch_and_create_commission_with_progress(limit=None):
             # Process Query 2
             q2_tuples = []
             for row in query_2_rows:
+                key = f"{row.get('foracid') or ''}_{row.get('scheme_code') or ''}"
+                if key in existing_keys:
+                    progress.update(1)
+                    continue
+                existing_keys.add(key)
                 q2_tuples.append(_build_commission_tuple(row, True, now_ts))
                 if len(q2_tuples) >= 2000:
                     frappe.db.bulk_insert("Commission", COMMISSION_BULK_FIELDS, q2_tuples, chunk_size=2000)
@@ -1120,6 +1154,11 @@ def run_fetch_and_create_commission_with_progress(limit=None):
             # Process Query 1
             q1_tuples = []
             for row in query_1_rows:
+                key = f"{row.get('foracid') or ''}_{row.get('scheme_code') or ''}"
+                if key in existing_keys:
+                    progress.update(1)
+                    continue
+                existing_keys.add(key)
                 q1_tuples.append(_build_commission_tuple(row, False, now_ts))
                 if len(q1_tuples) >= 2000:
                     frappe.db.bulk_insert("Commission", COMMISSION_BULK_FIELDS, q1_tuples, chunk_size=2000)
@@ -1130,6 +1169,8 @@ def run_fetch_and_create_commission_with_progress(limit=None):
                 frappe.db.bulk_insert("Commission", COMMISSION_BULK_FIELDS, q1_tuples, chunk_size=2000)
                 frappe.db.commit()
                 progress.update(len(q1_tuples))
+
+            _sync_agent_fetch_from_fields()
 
         finally:
             progress.close()
