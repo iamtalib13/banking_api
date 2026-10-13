@@ -36,6 +36,9 @@
 
 
 frappe.listview_settings["Commission"] = {
+    hide_name_column: true,
+    hide_name_filter: true,
+
     onload(listview) {
         // Row-level button example (optional – you can remove this whole block if not needed)
         // button: { ... } is shown here only as reference from your Share Application code.
