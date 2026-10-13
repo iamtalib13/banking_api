@@ -1,3 +1,4 @@
+import time
 import frappe
 from frappe.model.document import Document
 from custom_report.db_connection import get_dr_connection
@@ -324,56 +325,76 @@ def sync_all_cif_merge_records(batch_size=5000):
 
 	for label, sql in queries:
 		print(f"\n[INFO] Processing {label} CIF Records...")
-		conn = None
-		try:
-			conn = get_dr_connection()
-			with conn.cursor() as setup_cur:
-				try:
-					setup_cur.execute("SET statement_timeout = 0;")
-					setup_cur.execute("SET idle_in_transaction_session_timeout = 0;")
-				except Exception:
-					pass
+		batch_count = 0
+		max_retries = 10
+		retry_count = 0
 
-			cursor_name = f"cif_cur_{label.lower()}"
-			with conn.cursor(name=cursor_name, cursor_factory=RealDictCursor) as cur:
-				cur.itersize = batch_size
-				cur.execute(sql)
+		while retry_count < max_retries:
+			conn = None
+			try:
+				conn = get_dr_connection()
+				with conn.cursor() as setup_cur:
+					try:
+						setup_cur.execute("SET statement_timeout = 0;")
+						setup_cur.execute("SET idle_in_transaction_session_timeout = 0;")
+					except Exception:
+						pass
 
-				batch_count = 0
-				while True:
-					rows = cur.fetchmany(batch_size)
-					if not rows:
-						break
+				cursor_name = f"cif_stream_{label.lower()}_{retry_count}"
+				with conn.cursor(name=cursor_name, cursor_factory=RealDictCursor) as cur:
+					cur.itersize = batch_size
+					cur.execute(sql)
 
-					# Group rows by Aadhaar number
-					grouped = {}
-					for r in rows:
-						aadhaar = (r.get("AADHAAR NUMBER") or "").strip()
-						if not aadhaar:
-							continue
-						if aadhaar not in grouped:
-							grouped[aadhaar] = []
-						grouped[aadhaar].append(r)
+					# Agar retry hua hai to already processed records ko fast-skip karein
+					if batch_count > 0:
+						print(f"[RECOVERY] Skipping {batch_count} already processed rows...")
+						cur.scroll(batch_count, mode='absolute')
 
-					for aadhaar, cif_list in grouped.items():
-						_upsert_cif_merge(aadhaar, cif_list)
+					while True:
+						rows = cur.fetchmany(batch_size)
+						if not rows:
+							break
 
-					frappe.db.commit()
-					batch_count += len(rows)
-					total_processed += len(rows)
-					print(f"[PROGRESS] {label}: {batch_count} records processed so far...")
+						# Group rows by Aadhaar number
+						grouped = {}
+						for r in rows:
+							aadhaar = (r.get("AADHAAR NUMBER") or "").strip()
+							if not aadhaar:
+								continue
+							if aadhaar not in grouped:
+								grouped[aadhaar] = []
+							grouped[aadhaar].append(r)
 
-		except Exception as e:
-			frappe.db.rollback()
-			frappe.log_error(message=frappe.get_traceback(), title=f"Bulk CIF Sync Failed on {label}")
-			print(f"[ERROR] Sync failed on {label}: {str(e)}")
-			raise e
-		finally:
-			if conn:
-				try:
-					conn.close()
-				except Exception:
-					pass
+						for aadhaar, cif_list in grouped.items():
+							_upsert_cif_merge(aadhaar, cif_list)
+
+						frappe.db.commit()
+						batch_count += len(rows)
+						total_processed += len(rows)
+						print(f"[PROGRESS] {label}: {batch_count} records processed so far...")
+
+				# Agar complete ho gaya without error to break retry loop
+				break
+
+			except Exception as e:
+				frappe.db.rollback()
+				retry_count += 1
+				err_msg = str(e)
+				print(f"\n[WARNING] Disconnected at {batch_count} rows. Error: {err_msg}")
+				if retry_count < max_retries:
+					wait_sec = retry_count * 5
+					print(f"[RETRY {retry_count}/{max_retries}] Reconnecting in {wait_sec}s and resuming from row {batch_count}...")
+					time.sleep(wait_sec)
+				else:
+					frappe.log_error(message=frappe.get_traceback(), title=f"Bulk CIF Sync Failed on {label}")
+					print(f"[ERROR] Max retries reached on {label}: {err_msg}")
+					raise e
+			finally:
+				if conn:
+					try:
+						conn.close()
+					except Exception:
+						pass
 
 	print(f"\n--- Bulk CIF Merge Sync Completed! Total processed: {total_processed} ---")
 
