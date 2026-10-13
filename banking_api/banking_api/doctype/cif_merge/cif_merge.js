@@ -101,6 +101,17 @@ frappe.ui.form.on("CIF Merge", {
 
 		let escape_html = (str) => frappe.utils.escape_html(str || '');
 
+		let format_date = (d) => {
+			if (!d) return '-';
+			let s = String(d).trim();
+			// Agar YYYY-MM-DD ya YYYY-MM-DD HH:mm:ss format ho
+			let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+			if (m) {
+				return `${m[3]}/${m[2]}/${m[1]}`;
+			}
+			return escape_html(frappe.datetime.str_to_user ? frappe.datetime.str_to_user(s) : s);
+		};
+
 		let render_token_name = (name) => {
 			if (!name) return '<span class="text-muted font-italic small">Empty</span>';
 			let clean = name.trim();
@@ -169,7 +180,7 @@ frappe.ui.form.on("CIF Merge", {
 					</td>
 					<td>${render_token_name(row.first_name)}</td>
 					<td>${render_token_name(row.last_name)}</td>
-					<td class="text-muted small">${escape_html(row.cif_creation || '-')}</td>
+					<td class="text-muted small">${format_date(row.cif_creation)}</td>
 					<td class="text-center">
 						<input type="checkbox" class="cif-primary-chk" data-idx="${idx}" ${row.primary ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px;">
 					</td>
@@ -305,10 +316,10 @@ frappe.ui.form.on("CIF Merge", {
 										<td>${escape_html(row.first_name || '-')}</td>
 										<td>${escape_html(row.middle_name || '-')}</td>
 										<td>${escape_html(row.last_name || '-')}</td>
-										<td>${escape_html(row.date_of_birth || '-')}</td>
+										<td>${format_date(row.date_of_birth)}</td>
 										<td>${escape_html(row.mobile || '-')}</td>
 										<td><span class="badge badge-light border">${escape_html(row.sol_id || '-')}</span></td>
-										<td class="text-muted small">${escape_html(row.cif_creation || '-')}</td>
+										<td class="text-muted small">${format_date(row.cif_creation)}</td>
 										<td class="small text-muted">${escape_html(row.adress || '-')}</td>
 									</tr>
 								`;
