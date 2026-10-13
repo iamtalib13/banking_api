@@ -1341,3 +1341,140 @@ def run_bulk_commission_payment(payment_names=None):
         "skipped_count": skipped_count,
         "results": results,
     }
+
+
+@frappe.whitelist()
+def get_linked_commission_records(payment_name=None, agent_code=None, creation=None):
+    """
+    Fetch all Commission records linked to a Commission Payment record:
+    1. Commission.agent_code matches Commission Payment.agent_code
+    2. Commission.creation is in the same month and year as Commission Payment.creation
+    """
+    payment_doc = None
+    if payment_name and frappe.db.exists("Commission Payment", payment_name):
+        payment_doc = frappe.get_doc("Commission Payment", payment_name)
+        agent_code = (agent_code or payment_doc.agent_code or "").strip()
+        creation_val = payment_doc.creation
+    elif agent_code:
+        agent_code = str(agent_code).strip()
+        creation_val = creation or now_datetime()
+    else:
+        return {
+            "records": [],
+            "count": 0,
+            "agent_code": None,
+            "period_display": "",
+            "totals": {},
+        }
+
+    if not agent_code:
+        return {
+            "records": [],
+            "count": 0,
+            "agent_code": None,
+            "period_display": "",
+            "totals": {},
+        }
+
+    try:
+        creation_dt = frappe.utils.get_datetime(creation_val) if creation_val else now_datetime()
+    except Exception:
+        creation_dt = now_datetime()
+
+    target_year = creation_dt.year
+    target_month = creation_dt.month
+    month_name = creation_dt.strftime("%B")
+    period_display = f"{month_name} {target_year}"
+
+    records = frappe.db.sql(
+        """
+        SELECT
+            name,
+            creation,
+            agent_code,
+            agent_name,
+            customer_account_number,
+            customer_account_name,
+            scheme_code,
+            scheme_description,
+            sol_id,
+            sol_description,
+            deposit_amount,
+            collection,
+            demand,
+            eligible_amount,
+            commission_amount,
+            tds,
+            security_deposit,
+            netpay,
+            deduction,
+            final_net_pay
+        FROM `tabCommission`
+        WHERE agent_code = %(agent_code)s
+          AND YEAR(creation) = %(year)s
+          AND MONTH(creation) = %(month)s
+          AND docstatus < 2
+        ORDER BY creation DESC, name DESC
+        """,
+        {
+            "agent_code": agent_code,
+            "year": target_year,
+            "month": target_month,
+        },
+        as_dict=True,
+    )
+
+    def _to_flt(val):
+        try:
+            return float(str(val).strip()) if val not in (None, "") else 0.0
+        except (ValueError, TypeError):
+            return 0.0
+
+    total_gross = sum(_to_flt(r.get("commission_amount")) for r in records)
+    total_tds = sum(_to_flt(r.get("tds")) for r in records)
+    total_security = sum(_to_flt(r.get("security_deposit")) for r in records)
+    total_netpay = sum(_to_flt(r.get("netpay")) for r in records)
+    total_deposit = sum(_to_flt(r.get("deposit_amount")) for r in records)
+
+    # Pick single final_net_pay value without summing
+    single_final_netpay = None
+    if payment_doc:
+        single_final_netpay = _to_flt(payment_doc.final_netpay)
+    if not single_final_netpay:
+        for r in records:
+            if r.get("final_net_pay") not in (None, ""):
+                single_final_netpay = _to_flt(r.get("final_net_pay"))
+                break
+    if single_final_netpay is None:
+        single_final_netpay = 0.0
+
+    formatted_records = []
+    for r in records:
+        rec = dict(r)
+        if rec.get("creation"):
+            rec["creation_str"] = str(rec["creation"])
+            rec["creation_formatted"] = frappe.utils.format_datetime(
+                rec["creation"], "yyyy-MM-dd HH:mm"
+            )
+        else:
+            rec["creation_str"] = ""
+            rec["creation_formatted"] = "-"
+        formatted_records.append(rec)
+
+    return {
+        "records": formatted_records,
+        "count": len(formatted_records),
+        "agent_code": agent_code,
+        "month": target_month,
+        "month_name": month_name,
+        "year": target_year,
+        "period_display": period_display,
+        "totals": {
+            "gross_commission": total_gross,
+            "tds": total_tds,
+            "security_deposit": total_security,
+            "netpay": total_netpay,
+            "final_netpay": single_final_netpay,
+            "deposit_amount": total_deposit,
+        },
+    }
