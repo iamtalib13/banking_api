@@ -6,8 +6,6 @@
  "engine": "InnoDB",
  "field_order": [
   "aadhar",
-  "column_break_nexf",
-  "pan",
   "section_break_fnvz",
   "merge_widget",
   "cif_details"
@@ -17,15 +15,6 @@
    "fieldname": "aadhar",
    "fieldtype": "Data",
    "label": "Aadhar"
-  },
-  {
-   "fieldname": "pan",
-   "fieldtype": "Data",
-   "label": "PAN"
-  },
-  {
-   "fieldname": "column_break_nexf",
-   "fieldtype": "Column Break"
   },
   {
    "fieldname": "section_break_fnvz",
@@ -46,7 +35,7 @@
  "hide_toolbar": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-12 12:09:49.553181",
+ "modified": "2026-10-13 15:10:26.218213",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "CIF Merge",

@@ -27,6 +27,9 @@ frappe.ui.form.on("CIF Merge", {
 			callback: function(r) {
 				frm.clear_table("cif_details");
 				if (r.message && r.message.length > 0) {
+					if (!frm.doc.aadhar && r.message[0] && r.message[0].aadhar) {
+						frm.set_value("aadhar", r.message[0].aadhar);
+					}
 					r.message.forEach(row => {
 						let child = frm.add_child("cif_details");
 						child.cif_id = row.cif_id;
@@ -35,9 +38,13 @@ frappe.ui.form.on("CIF Merge", {
 						child.last_name = row.last_name;
 						child.cif_creation = row.cif_creation;
 						child.date_of_birth = row.date_of_birth;
+						child.pan = row.pan;
 						child.mobile = row.mobile;
-						child.adress = row.adress;
+						child.phone_local_code = row.phone_local_code;
 						child.sol_id = row.sol_id;
+						child.address_line_1 = row.address_line_1;
+						child.address_line_2 = row.address_line_2;
+						child.address_line_3 = row.address_line_3;
 						child.primary = row.primary || 0;
 						child.merge = row.merge || 0;
 						child.re_kyc = row.re_kyc || 0;
@@ -100,6 +107,17 @@ frappe.ui.form.on("CIF Merge", {
 		});
 
 		let escape_html = (str) => frappe.utils.escape_html(str || '');
+
+		let format_date = (d) => {
+			if (!d) return '-';
+			let s = String(d).trim();
+			// Agar YYYY-MM-DD ya YYYY-MM-DD HH:mm:ss format ho
+			let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+			if (m) {
+				return `${m[3]}/${m[2]}/${m[1]}`;
+			}
+			return escape_html(frappe.datetime.str_to_user ? frappe.datetime.str_to_user(s) : s);
+		};
 
 		let render_token_name = (name) => {
 			if (!name) return '<span class="text-muted font-italic small">Empty</span>';
@@ -169,7 +187,7 @@ frappe.ui.form.on("CIF Merge", {
 					</td>
 					<td>${render_token_name(row.first_name)}</td>
 					<td>${render_token_name(row.last_name)}</td>
-					<td class="text-muted small">${escape_html(row.cif_creation || '-')}</td>
+					<td class="text-muted small">${format_date(row.cif_creation)}</td>
 					<td class="text-center">
 						<input type="checkbox" class="cif-primary-chk" data-idx="${idx}" ${row.primary ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px;">
 					</td>
@@ -207,9 +225,9 @@ frappe.ui.form.on("CIF Merge", {
 			<!-- Table 1: Actions & Deduplication Control -->
 			<div class="mb-3">
 				<h6 class="text-secondary font-weight-bold mb-1" style="font-size: 13px;"><i class="fa fa-sliders mr-1 text-primary"></i> 1. CIF Selection & Deduplication Table</h6>
-				<div class="table-responsive border rounded">
-					<table class="table table-sm table-bordered m-0" style="vertical-align: middle;">
-						<thead class="thead-light small">
+				<div class="table-responsive border rounded" style="max-height: 320px; overflow: auto;">
+					<table class="table table-sm table-bordered m-0" style="vertical-align: middle; min-width: 600px;">
+						<thead class="thead-light small" style="position: sticky; top: 0; z-index: 2; background: #f8f9fa;">
 							<tr>
 								<th style="width: 40px;" class="text-center">#</th>
 								<th style="min-width: 120px;">CIF ID</th>
@@ -264,9 +282,9 @@ frappe.ui.form.on("CIF Merge", {
 			<!-- Table 2: User Other Details -->
 			<div class="mb-3">
 				<h6 class="text-secondary font-weight-bold mb-1" style="font-size: 13px;"><i class="fa fa-id-card-o mr-1 text-info"></i> 2. CIF User Full Details</h6>
-				<div class="table-responsive border rounded">
-					<table class="table table-sm table-hover table-bordered m-0" style="vertical-align: middle;">
-						<thead class="thead-light small">
+				<div class="table-responsive border rounded" style="max-height: 350px; overflow: auto;">
+					<table class="table table-sm table-hover table-bordered m-0" style="vertical-align: middle; min-width: 1050px;">
+						<thead class="thead-light small" style="position: sticky; top: 0; z-index: 2; background: #f8f9fa;">
 							<tr>
 								<th style="width: 40px;" class="text-center">#</th>
 								<th style="min-width: 120px;">CIF ID</th>
@@ -305,11 +323,11 @@ frappe.ui.form.on("CIF Merge", {
 										<td>${escape_html(row.first_name || '-')}</td>
 										<td>${escape_html(row.middle_name || '-')}</td>
 										<td>${escape_html(row.last_name || '-')}</td>
-										<td>${escape_html(row.date_of_birth || '-')}</td>
+										<td>${format_date(row.date_of_birth)}</td>
 										<td>${escape_html(row.mobile || '-')}</td>
 										<td><span class="badge badge-light border">${escape_html(row.sol_id || '-')}</span></td>
-										<td class="text-muted small">${escape_html(row.cif_creation || '-')}</td>
-										<td class="small text-muted">${escape_html(row.adress || '-')}</td>
+										<td class="text-muted small">${format_date(row.cif_creation)}</td>
+										<td class="small text-muted">${escape_html([row.address_line_1, row.address_line_2, row.address_line_3].filter(Boolean).join(', ') || '-')}</td>
 									</tr>
 								`;
 							}).join('')}
