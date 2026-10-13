@@ -159,7 +159,7 @@
                 <div class="table-wrap">
                     <table>
 
-                        <thead>
+                        <!-- <thead>
                             <tr>
                                 <th class="checkbox-col">
                                     <input type="checkbox" :checked="isPageAllSelected" @change="toggleSelectAllPage()">
@@ -181,16 +181,46 @@
                                 <th class="num">Deduction</th>
                                 <th class="num">Final Net Pay</th>
                             </tr>
+                        </thead> -->
+                        <thead>
+                            <tr>
+                                <th class="checkbox-col">
+                                    <input type="checkbox" :checked="isPageAllSelected" @change="toggleSelectAllPage()">
+                                </th>
+                                <th>SOL ID</th>
+                                <th>SOL Name</th>
+                                <th>Agent Code</th>
+                                <th>Agent Name</th>
+                                <!-- <th>Scheme Code</th>
+                                <th>Scheme Description</th> -->
+                                <th v-if="showSchemeColumns">Scheme Code</th>
+                                <th v-if="showSchemeColumns">Scheme Description</th>
+                                <th>PAN</th>
+                                <th>PAN Status</th>
+                                <th>CIF</th>
+                                <th>Agent Saving Account</th>
+                                <th>Security Account</th>
+                                <th>Operative Account</th>
+                                <th class="num">Collection</th>
+                                <th class="num">Eligible Amount</th>
+                                <th class="num">Commission Amount</th>
+                                <th class="num">TDS</th>
+                                <th class="num">Security Deposit</th>
+                                <th class="num">Net Pay</th>
+                                <th class="num">Deduction</th>
+                                <th class="num">Final Net Pay</th>
+                            </tr>
                         </thead>
                         <tbody v-if="loading">
                             <tr class="skeleton-row" v-for="n in 6" :key="n">
-                                <td colspan="16">
+                                <!-- <td colspan="20"> -->
+                                <td :colspan="showSchemeColumns ? 20 : 18">
                                     <div class="skeleton-bar"></div>
                                 </td>
                             </tr>
                         </tbody>
 
-                        <tbody v-if="!loading && records.length > 0">
+                        <!-- <tbody v-if="!loading && records.length > 0">
                             <tr v-for="(row, idx) in records" :key="row.agent_code"
                                 :style="{ '--row-delay': idx * 35 + 'ms' }" class="data-row"
                                 :class="{ 'row-selected': isRowSelected(row.agent_code) }">
@@ -216,10 +246,47 @@
                                 <td class="num muted">NA</td>
                                 <td class="num strong muted">NA</td>
                             </tr>
+                        </tbody> -->
+                        <tbody v-if="!loading && records.length > 0">
+                            <tr v-for="(row, idx) in records" :key="row.agent_code"
+                                :style="{ '--row-delay': idx * 35 + 'ms' }" class="data-row"
+                                :class="{ 'row-selected': isRowSelected(row.agent_code) }">
+                                <td class="checkbox-col">
+                                    <input type="checkbox" :checked="isRowSelected(row.agent_code)"
+                                        @change="toggleRow(row)">
+                                </td>
+                                <td>[[ row.sol_id ]]</td>
+                                <td>[[ row.sol_description || '—' ]]</td>
+                                <td>[[ row.agent_code || '—' ]]</td>
+                                <td>[[ row.agent_name || '—' ]]</td>
+                                <!-- <td><span class="chip" v-if="row.scheme_code">[[ row.scheme_code ]]</span><span
+                                        v-else>—</span></td>
+                                <td>[[ row.scheme_description || '—' ]]</td> -->
+                                <td v-if="showSchemeColumns">
+                                    <span class="chip" v-if="row.scheme_code">[[ row.scheme_code ]]</span>
+                                    <span v-else>—</span>
+                                </td>
+                                <td v-if="showSchemeColumns">[[ row.scheme_description || '—' ]]</td>
+                                <td>[[ row.pan_card || '—' ]]</td>
+                                <td>[[ row.pan_status || '—' ]]</td>
+                                <td>[[ row.cif || '—' ]]</td>
+                                <td>[[ row.agent_saving_account || '—' ]]</td>
+                                <td>[[ row.security_account || '—' ]]</td>
+                                <td>[[ row.operative_account || '—' ]]</td>
+                                <td class="num">[[ formatCurrency(row.collection) ]]</td>
+                                <td class="num">[[ formatCurrency(row.eligible_amount) ]]</td>
+                                <td class="num">[[ formatCurrency(row.commission_amount) ]]</td>
+                                <td class="num">[[ formatCurrency(row.tds) ]]</td>
+                                <td class="num">[[ formatCurrency(row.security_deposit) ]]</td>
+                                <td class="num">[[ formatCurrency(row.netpay) ]]</td>
+                                <td class="num muted">NA</td>
+                                <td class="num strong muted">NA</td>
+                            </tr>
                         </tbody>
                         <tbody v-if="!loading && records.length === 0">
                             <tr>
-                                <td colspan="16" class="empty-state">
+                                <!-- <td colspan="20" class="empty-state"> -->
+                                <td :colspan="showSchemeColumns ? 20 : 18" class="empty-state">
                                     <div class="empty-icon">📄</div>
                                     No commission records found for the selected filters.
                                 </td>
@@ -476,6 +543,10 @@
                 return chips;
             },
 
+            get showSchemeColumns() {
+                return !!(this.filters.scheme_code && String(this.filters.scheme_code).trim());
+            },
+
             // ---------- Autocomplete helpers ----------
             getMatches(type) {
                 const q = (this.autocomplete[type].query || '').toLowerCase().trim();
@@ -510,10 +581,17 @@
                 this.fetchRecords(true);
             },
 
+            // clearAutocomplete(type) {
+            //     this.autocomplete[type].query = '';
+            //     this.filters[type] = '';
+            //     this.autocomplete[type].open = false;
+            //     this.fetchRecords(true);
+            // },
+
             clearAutocomplete(type) {
                 this.autocomplete[type].query = '';
                 this.filters[type] = '';
-                this.autocomplete[type].open = false;
+                this.autocomplete[type].open = true;
                 this.fetchRecords(true);
             },
             // -------------------------------------------
