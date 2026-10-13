@@ -857,46 +857,42 @@ def _build_commission_tuple(row, is_query_2, now_ts, doc_name=None):
     )
 
 
-def _bulk_update_commissions(update_tuples, chunk_size=5000):
+def _bulk_update_commissions(update_tuples, chunk_size=2000):
     """
-    Lightning-fast batch update of existing Commission records via temporary table join.
-    Updates agent details, demand, collection, tenure, etc. in real-time.
+    Direct batch update of existing Commission records using cursor.executemany without any temporary tables.
     """
     if not update_tuples:
         return
 
-    frappe.db.sql("""
-        CREATE TEMPORARY TABLE IF NOT EXISTS `_temp_comm_update` (
-            `name` varchar(140) PRIMARY KEY,
-            `modified` datetime(6),
-            `agent_code` varchar(140),
-            `agent_name` varchar(140),
-            `customer_account_number` varchar(140),
-            `customer_account_name` varchar(140),
-            `deposit_amount` int(11),
-            `tenure_months` int(11),
-            `tenure_days` int(11),
-            `demand` int(11),
-            `collection` int(11),
-            `eligible_amount` varchar(140),
-            `account_opening_date` date,
-            `remarks` varchar(140),
-            `pan_card` varchar(140),
-            `scheme_code` int(11),
-            `scheme_description` varchar(140),
-            `sol_id` int(11),
-            `sol_description` varchar(140)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    """)
+    update_sql = """
+        UPDATE `tabCommission`
+        SET
+            modified = %s,
+            agent_code = %s,
+            agent_name = %s,
+            customer_account_number = %s,
+            customer_account_name = %s,
+            deposit_amount = %s,
+            tenure_months = %s,
+            tenure_days = %s,
+            demand = %s,
+            collection = %s,
+            eligible_amount = %s,
+            account_opening_date = %s,
+            remarks = %s,
+            pan_card = %s,
+            scheme_code = %s,
+            scheme_description = %s,
+            sol_id = %s,
+            sol_description = %s
+        WHERE name = %s
+    """
 
+    cursor = frappe.db._cursor
     for i in range(0, len(update_tuples), chunk_size):
         chunk = update_tuples[i:i + chunk_size]
-        frappe.db.sql("TRUNCATE TABLE `_temp_comm_update`")
-
-        # Map full tuple indices to temp table columns
-        temp_rows = [
+        params = [
             (
-                t[0],   # name
                 t[2],   # modified
                 t[7],   # agent_code
                 t[8],   # agent_name
@@ -915,50 +911,12 @@ def _bulk_update_commissions(update_tuples, chunk_size=5000):
                 t[21],  # scheme_description
                 t[22],  # sol_id
                 t[23],  # sol_description
+                t[0],   # name (WHERE clause)
             )
             for t in chunk
         ]
-
-        frappe.db.bulk_insert(
-            "_temp_comm_update",
-            [
-                "name", "modified", "agent_code", "agent_name",
-                "customer_account_number", "customer_account_name",
-                "deposit_amount", "tenure_months", "tenure_days",
-                "demand", "collection", "eligible_amount",
-                "account_opening_date", "remarks", "pan_card",
-                "scheme_code", "scheme_description", "sol_id", "sol_description"
-            ],
-            temp_rows,
-            chunk_size=chunk_size
-        )
-
-        frappe.db.sql("""
-            UPDATE `tabCommission` c
-            INNER JOIN `_temp_comm_update` t ON c.name = t.name
-            SET
-                c.modified = t.modified,
-                c.agent_code = t.agent_code,
-                c.agent_name = t.agent_name,
-                c.customer_account_number = t.customer_account_number,
-                c.customer_account_name = t.customer_account_name,
-                c.deposit_amount = t.deposit_amount,
-                c.tenure_months = t.tenure_months,
-                c.tenure_days = t.tenure_days,
-                c.demand = t.demand,
-                c.collection = t.collection,
-                c.eligible_amount = t.eligible_amount,
-                c.account_opening_date = t.account_opening_date,
-                c.remarks = t.remarks,
-                c.pan_card = t.pan_card,
-                c.scheme_code = t.scheme_code,
-                c.scheme_description = t.scheme_description,
-                c.sol_id = t.sol_id,
-                c.sol_description = t.sol_description
-        """)
+        cursor.executemany(update_sql, params)
         frappe.db.commit()
-
-    frappe.db.sql("DROP TEMPORARY TABLE IF EXISTS `_temp_comm_update`")
 
 
 def _create_commission_from_query_1(row, commit=True):
