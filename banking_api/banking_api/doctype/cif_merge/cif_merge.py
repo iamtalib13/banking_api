@@ -327,15 +327,15 @@ def sync_all_cif_merge_records(batch_size=5000):
 		conn = None
 		try:
 			conn = get_dr_connection()
-			cursor_name = f"cif_cur_{label.lower()}"
-			
-			with conn.cursor(name=cursor_name, cursor_factory=RealDictCursor) as cur:
+			with conn.cursor() as setup_cur:
 				try:
-					cur.execute("SET statement_timeout = 0;")
-					cur.execute("SET idle_in_transaction_session_timeout = 0;")
+					setup_cur.execute("SET statement_timeout = 0;")
+					setup_cur.execute("SET idle_in_transaction_session_timeout = 0;")
 				except Exception:
 					pass
 
+			cursor_name = f"cif_cur_{label.lower()}"
+			with conn.cursor(name=cursor_name, cursor_factory=RealDictCursor) as cur:
 				cur.itersize = batch_size
 				cur.execute(sql)
 
