@@ -27,6 +27,9 @@ frappe.ui.form.on("CIF Merge", {
 			callback: function(r) {
 				frm.clear_table("cif_details");
 				if (r.message && r.message.length > 0) {
+					if (!frm.doc.aadhar && r.message[0] && r.message[0].aadhar) {
+						frm.set_value("aadhar", r.message[0].aadhar);
+					}
 					r.message.forEach(row => {
 						let child = frm.add_child("cif_details");
 						child.cif_id = row.cif_id;
@@ -35,9 +38,13 @@ frappe.ui.form.on("CIF Merge", {
 						child.last_name = row.last_name;
 						child.cif_creation = row.cif_creation;
 						child.date_of_birth = row.date_of_birth;
+						child.pan = row.pan;
 						child.mobile = row.mobile;
-						child.adress = row.adress;
+						child.phone_local_code = row.phone_local_code;
 						child.sol_id = row.sol_id;
+						child.address_line_1 = row.address_line_1;
+						child.address_line_2 = row.address_line_2;
+						child.address_line_3 = row.address_line_3;
 						child.primary = row.primary || 0;
 						child.merge = row.merge || 0;
 						child.re_kyc = row.re_kyc || 0;
@@ -320,7 +327,7 @@ frappe.ui.form.on("CIF Merge", {
 										<td>${escape_html(row.mobile || '-')}</td>
 										<td><span class="badge badge-light border">${escape_html(row.sol_id || '-')}</span></td>
 										<td class="text-muted small">${format_date(row.cif_creation)}</td>
-										<td class="small text-muted">${escape_html(row.adress || '-')}</td>
+										<td class="small text-muted">${escape_html([row.address_line_1, row.address_line_2, row.address_line_3].filter(Boolean).join(', ') || '-')}</td>
 									</tr>
 								`;
 							}).join('')}
