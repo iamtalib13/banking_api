@@ -1,5 +1,6 @@
 frappe.ui.form.on("CIF Merge", {
 	refresh(frm) {
+		frm.set_df_property("aadhar", "hidden", 0);
 		frm.trigger("render_custom_table");
 	},
 	cif_details_on_form_rendered(frm) {

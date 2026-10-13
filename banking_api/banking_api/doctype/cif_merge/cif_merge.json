@@ -1,34 +1,59 @@
 {
  "actions": [],
  "allow_rename": 1,
+ "autoname": "field:aadhar",
  "creation": "2026-10-10 12:07:26.862095",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "search_section",
   "aadhar",
+  "column_break_count",
+  "total_cif_count",
   "section_break_fnvz",
   "merge_widget",
   "cif_details"
  ],
  "fields": [
   {
+   "fieldname": "search_section",
+   "fieldtype": "Section Break",
+   "label": "CIF Identification"
+  },
+  {
    "fieldname": "aadhar",
    "fieldtype": "Data",
-   "label": "Aadhar"
+   "in_list_view": 1,
+   "label": "Aadhar",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "column_break_count",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "total_cif_count",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Total CIF Count",
+   "read_only": 1
   },
   {
    "fieldname": "section_break_fnvz",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "CIF Merge & Deduplication"
+  },
+  {
+   "fieldname": "merge_widget",
+   "fieldtype": "HTML"
   },
   {
    "fieldname": "cif_details",
    "fieldtype": "Table",
    "label": "CIF Details",
    "options": "CIF Details"
-  },
-  {
-   "fieldname": "merge_widget",
-   "fieldtype": "HTML"
   }
  ],
  "grid_page_length": 50,

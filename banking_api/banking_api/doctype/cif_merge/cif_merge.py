@@ -6,12 +6,12 @@ from psycopg2.extras import RealDictCursor
 
 class CIFMerge(Document):
 	def validate(self):
-		if not self.aadhar and not self.pan:
-			frappe.throw("Kripya Aadhar ya PAN me se kam se kam ek field fill karein search karne ke liye.")
+		if not self.aadhar:
+			frappe.throw("Kripya Aadhar fill karein.")
 
 		# Agar user ne child table me already data edit/add kiya hai, to use overwrite mat karo
-		if not self.cif_details and (self.aadhar or self.pan):
-			records = get_cif_records(self.aadhar, self.pan)
+		if not self.cif_details and self.aadhar:
+			records = get_cif_records(aadhar=self.aadhar)
 			if records:
 				for r in records:
 					self.append("cif_details", {
@@ -32,6 +32,11 @@ class CIFMerge(Document):
 						"merge": r.get("merge", 0),
 						"re_kyc": r.get("re_kyc", 0)
 					})
+
+		if self.cif_details:
+			self.total_cif_count = len(self.cif_details)
+		else:
+			self.total_cif_count = 0
 
 
 ACTIVE_CIF_QUERY = """
@@ -315,17 +320,22 @@ def sync_all_cif_merge_records(batch_size=5000):
 		("INACTIVE", INACTIVE_CIF_QUERY.format(filter_clause="1=1")),
 	]
 
-	conn = None
 	total_processed = 0
 
-	try:
-		conn = get_dr_connection()
-
-		for label, sql in queries:
-			print(f"\n[INFO] Processing {label} CIF Records...")
-			cursor_name = f"cif_cursor_{label.lower()}"
+	for label, sql in queries:
+		print(f"\n[INFO] Processing {label} CIF Records...")
+		conn = None
+		try:
+			conn = get_dr_connection()
+			cursor_name = f"cif_cur_{label.lower()}"
 			
 			with conn.cursor(name=cursor_name, cursor_factory=RealDictCursor) as cur:
+				try:
+					cur.execute("SET statement_timeout = 0;")
+					cur.execute("SET idle_in_transaction_session_timeout = 0;")
+				except Exception:
+					pass
+
 				cur.itersize = batch_size
 				cur.execute(sql)
 
@@ -353,24 +363,23 @@ def sync_all_cif_merge_records(batch_size=5000):
 					total_processed += len(rows)
 					print(f"[PROGRESS] {label}: {batch_count} records processed so far...")
 
-		print(f"\n--- Bulk CIF Merge Sync Completed! Total processed: {total_processed} ---")
+		except Exception as e:
+			frappe.db.rollback()
+			frappe.log_error(message=frappe.get_traceback(), title=f"Bulk CIF Sync Failed on {label}")
+			print(f"[ERROR] Sync failed on {label}: {str(e)}")
+			raise e
+		finally:
+			if conn:
+				try:
+					conn.close()
+				except Exception:
+					pass
 
-	except Exception as e:
-		frappe.db.rollback()
-		frappe.log_error(message=frappe.get_traceback(), title="Bulk CIF Sync Failed")
-		print(f"[ERROR] Sync failed: {str(e)}")
-		raise e
-	finally:
-		if conn:
-			try:
-				conn.close()
-			except Exception:
-				pass
+	print(f"\n--- Bulk CIF Merge Sync Completed! Total processed: {total_processed} ---")
 
 
 def _upsert_cif_merge(aadhaar, cif_list):
 	"""Helper to create or update CIF Merge document and its child CIF Details."""
-	# Check if CIF Merge document already exists for this Aadhaar
 	existing_name = frappe.db.get_value("CIF Merge", {"aadhar": aadhaar}, "name")
 
 	if existing_name:
@@ -406,7 +415,8 @@ def _upsert_cif_merge(aadhaar, cif_list):
 		})
 		existing_cif_ids.add(cif_id)
 
+	doc.total_cif_count = len(doc.cif_details)
 	doc.flags.ignore_validate = True
 	doc.flags.ignore_mandatory = True
-	doc.save(ignore_permissions=True)
-
+	doc.flags.ignore_permissions = True
+	doc.save()
