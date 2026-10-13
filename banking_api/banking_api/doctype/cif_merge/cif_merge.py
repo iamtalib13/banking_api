@@ -297,3 +297,116 @@ def get_cif_records(aadhar=None, pan=None):
 				pass
 
 	return records
+
+
+@frappe.whitelist()
+def sync_all_cif_merge_records(batch_size=5000):
+	"""
+	Bulk synchronizes duplicate CIF records from Finacle DR DB into 'CIF Merge' doctype.
+	Fetches active and inactive records in batches of 5000 rows to optimize memory and DB load.
+	Command to execute:
+		bench execute banking_api.banking_api.doctype.cif_merge.cif_merge.sync_all_cif_merge_records
+	"""
+	batch_size = int(batch_size)
+	print(f"--- Starting Bulk CIF Merge Sync (Batch size: {batch_size}) ---")
+
+	queries = [
+		("ACTIVE", ACTIVE_CIF_QUERY.format(filter_clause="1=1")),
+		("INACTIVE", INACTIVE_CIF_QUERY.format(filter_clause="1=1")),
+	]
+
+	conn = None
+	total_processed = 0
+
+	try:
+		conn = get_dr_connection()
+
+		for label, sql in queries:
+			print(f"\n[INFO] Processing {label} CIF Records...")
+			cursor_name = f"cif_cursor_{label.lower()}"
+			
+			with conn.cursor(name=cursor_name, cursor_factory=RealDictCursor) as cur:
+				cur.itersize = batch_size
+				cur.execute(sql)
+
+				batch_count = 0
+				while True:
+					rows = cur.fetchmany(batch_size)
+					if not rows:
+						break
+
+					# Group rows by Aadhaar number
+					grouped = {}
+					for r in rows:
+						aadhaar = (r.get("AADHAAR NUMBER") or "").strip()
+						if not aadhaar:
+							continue
+						if aadhaar not in grouped:
+							grouped[aadhaar] = []
+						grouped[aadhaar].append(r)
+
+					for aadhaar, cif_list in grouped.items():
+						_upsert_cif_merge(aadhaar, cif_list)
+
+					frappe.db.commit()
+					batch_count += len(rows)
+					total_processed += len(rows)
+					print(f"[PROGRESS] {label}: {batch_count} records processed so far...")
+
+		print(f"\n--- Bulk CIF Merge Sync Completed! Total processed: {total_processed} ---")
+
+	except Exception as e:
+		frappe.db.rollback()
+		frappe.log_error(message=frappe.get_traceback(), title="Bulk CIF Sync Failed")
+		print(f"[ERROR] Sync failed: {str(e)}")
+		raise e
+	finally:
+		if conn:
+			try:
+				conn.close()
+			except Exception:
+				pass
+
+
+def _upsert_cif_merge(aadhaar, cif_list):
+	"""Helper to create or update CIF Merge document and its child CIF Details."""
+	# Check if CIF Merge document already exists for this Aadhaar
+	existing_name = frappe.db.get_value("CIF Merge", {"aadhar": aadhaar}, "name")
+
+	if existing_name:
+		doc = frappe.get_doc("CIF Merge", existing_name)
+	else:
+		doc = frappe.new_doc("CIF Merge")
+		doc.aadhar = aadhaar
+
+	existing_cif_ids = {row.cif_id for row in doc.cif_details}
+
+	for r in cif_list:
+		cif_id = r.get("CIF ID")
+		if not cif_id or cif_id in existing_cif_ids:
+			continue
+
+		doc.append("cif_details", {
+			"cif_id": cif_id,
+			"first_name": r.get("FIRST NAME") or (r.get("CUSTOMER NAME", "").split(" ")[0] if r.get("CUSTOMER NAME") else ""),
+			"middle_name": r.get("MIDDLE NAME") or "",
+			"last_name": r.get("LAST NAME") or "",
+			"cif_creation": str(r.get("CIF OPENING DATE")) if r.get("CIF OPENING DATE") else "",
+			"date_of_birth": str(r.get("CUST DOB")) if r.get("CUST DOB") else "",
+			"pan": r.get("PAN NUMBER") or "",
+			"mobile": r.get("PHONE NUMBER") or "",
+			"phone_local_code": r.get("PHONE LOCAL CODE") or "",
+			"sol_id": r.get("SOL ID") or "",
+			"address_line_1": r.get("ADDRESS LINE 1") or "",
+			"address_line_2": r.get("ADDRESS LINE 2") or "",
+			"address_line_3": r.get("ADDRESS LINE 3") or "",
+			"primary": 0,
+			"merge": 0,
+			"re_kyc": 0
+		})
+		existing_cif_ids.add(cif_id)
+
+	doc.flags.ignore_validate = True
+	doc.flags.ignore_mandatory = True
+	doc.save(ignore_permissions=True)
+
