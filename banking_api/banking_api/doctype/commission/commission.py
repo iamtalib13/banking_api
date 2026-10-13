@@ -6,7 +6,7 @@ from tqdm import tqdm
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import add_to_date, cint, flt, getdate
+from frappe.utils import add_to_date, cint, flt, getdate, now_datetime
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -758,98 +758,100 @@ def _safe_str(value):
     return str(value).strip()
 
 
-def _get_agent_details(agent_code):
+COMMISSION_BULK_FIELDS = [
+    "name",
+    "creation",
+    "modified",
+    "modified_by",
+    "owner",
+    "docstatus",
+    "idx",
+    "agent_code",
+    "agent_name",
+    "customer_account_number",
+    "customer_account_name",
+    "deposit_amount",
+    "tenure_months",
+    "tenure_days",
+    "demand",
+    "collection",
+    "eligible_amount",
+    "account_opening_date",
+    "remarks",
+    "pan_card",
+    "scheme_code",
+    "scheme_description",
+    "sol_id",
+    "sol_description",
+]
+
+
+def _sync_agent_fetch_from_fields():
     """
-    Fetch agent-related fields from Agent DocType.
-
-    Matching rule:
-        Commission.agent_code == Agent.name
-
-    Missing Agent or missing field values become "0".
+    Simulate Frappe ORM fetch_from across all inserted Commission records
+    via a single lightning-fast bulk UPDATE JOIN.
     """
-    default_details = {
-        "cif": "0",
-        "agent_operative_account": "0",
-        "agent_saving_account": "0",
-        "pan_status": "0",
-        "agent_security_account": "0",
-    }
+    frappe.db.sql("""
+        UPDATE `tabCommission` c
+        INNER JOIN `tabAgent` a ON c.agent_code = a.name
+        SET
+            c.agent_operative_account = COALESCE(a.agent_operative_account, '0'),
+            c.agent_saving_account    = COALESCE(a.agent_saving_account, '0'),
+            c.agent_security_account  = COALESCE(a.agent_security_account, '0'),
+            c.cif                     = COALESCE(a.cif, '0'),
+            c.pan_status              = COALESCE(a.pan_status, '0')
+        WHERE
+            c.agent_code IS NOT NULL
+            AND (
+                c.agent_operative_account IS NULL
+                OR c.cif IS NULL
+                OR c.pan_status IS NULL
+                OR c.agent_saving_account IS NULL
+                OR c.agent_security_account IS NULL
+            )
+    """)
+    frappe.db.commit()
 
-    if not agent_code:
-        return default_details
 
-    agent_code = str(agent_code).strip()
+def _build_commission_tuple(row, is_query_2, now_ts):
+    collection_val = row.get("total_tran_amt_dtt") if is_query_2 else row.get("total_tran_amt")
 
-    if not agent_code:
-        return default_details
-
-    agent_details = frappe.db.get_value(
-        "Agent",
-        agent_code,
-        [
-            "cif",
-            "agent_operative_account",
-            "agent_saving_account",
-            "pan_status",
-            "agent_security_account",
-        ],
-        as_dict=True,
+    return (
+        frappe.generate_hash(length=10),
+        now_ts,
+        now_ts,
+        "Administrator",
+        "Administrator",
+        0,
+        0,
+        _safe_str(row.get("rm_id")),
+        _safe_str(row.get("rm_name")),
+        _safe_str(row.get("foracid")),
+        _safe_str(row.get("acct_name")),
+        _safe_int(row.get("deposit_amount")) or 0,
+        _safe_int(row.get("deposit_period_mths")) or 0,
+        _safe_int(row.get("deposit_period_days")) or 0,
+        _safe_int(row.get("adjusted_flow_amount")) or 0,
+        _safe_int(collection_val) or 0,
+        _safe_str(row.get("commission_amount")),
+        row.get("acct_opn_date"),
+        _safe_str(row.get("one_year_completed")),
+        _safe_str(row.get("referencenumber")),
+        _safe_int(row.get("scheme_code")) or 0,
+        _safe_str(row.get("schm_desc")),
+        _safe_int(row.get("sol_id")) or 0,
+        _safe_str(row.get("sol_desc")),
     )
 
-    if not agent_details:
-        return default_details
 
-    return {
-        "cif": _safe_str(agent_details.get("cif")) or "0",
-        "agent_operative_account": (
-            _safe_str(
-                agent_details.get("agent_operative_account")
-            )
-            or "0"
-        ),
-        "agent_saving_account": (
-            _safe_str(
-                agent_details.get("agent_saving_account")
-            )
-            or "0"
-        ),
-        "pan_status": (
-            _safe_str(
-                agent_details.get("pan_status")
-            )
-            or "0"
-        ),
-        "agent_security_account": (
-            _safe_str(
-                agent_details.get("agent_security_account")
-            )
-            or "0"
-        ),
-    }
-
-
-def _create_commission_from_query_1(row):
+def _create_commission_from_query_1(row, commit=True):
     agent_code = _safe_str(row.get("rm_id")) or "0"
-    agent_details = _get_agent_details(agent_code)
 
     doc = frappe.get_doc({
         "doctype": "Commission",
 
         "agent_code": agent_code,
         "agent_name": _safe_str(row.get("rm_name")) or "0",
-
-        # Values come from Agent DocType, not QUERY_1.
-        "cif": agent_details["cif"],
-        "agent_operative_account": (
-            agent_details["agent_operative_account"]
-        ),
-        "agent_saving_account": (
-            agent_details["agent_saving_account"]
-        ),
-        "pan_status": agent_details["pan_status"],
-        "agent_security_account": (
-            agent_details["agent_security_account"]
-        ),
 
         "customer_account_number": (
             _safe_str(row.get("foracid")) or "0"
@@ -909,33 +911,20 @@ def _create_commission_from_query_1(row):
     })
 
     doc.insert(ignore_permissions=True)
-    frappe.db.commit()
+    if commit:
+        frappe.db.commit()
 
     return doc.name
 
 
-def _create_commission_from_query_2(row):
+def _create_commission_from_query_2(row, commit=True):
     agent_code = _safe_str(row.get("rm_id")) or "0"
-    agent_details = _get_agent_details(agent_code)
 
     doc = frappe.get_doc({
         "doctype": "Commission",
 
         "agent_code": agent_code,
         "agent_name": _safe_str(row.get("rm_name")) or "0",
-
-        # Values come from Agent DocType, not QUERY_2.
-        "cif": agent_details["cif"],
-        "agent_operative_account": (
-            agent_details["agent_operative_account"]
-        ),
-        "agent_saving_account": (
-            agent_details["agent_saving_account"]
-        ),
-        "pan_status": agent_details["pan_status"],
-        "agent_security_account": (
-            agent_details["agent_security_account"]
-        ),
 
         "customer_account_number": (
             _safe_str(row.get("foracid")) or "0"
@@ -995,7 +984,8 @@ def _create_commission_from_query_2(row):
     })
 
     doc.insert(ignore_permissions=True)
-    frappe.db.commit()
+    if commit:
+        frappe.db.commit()
 
     return doc.name
 
@@ -1010,46 +1000,31 @@ def _run_query(connection, query):
 def fetch_and_create_commission():
     """
     Execute Query 2 first, then Query 1.
-    Each document is inserted and committed individually.
+    Uses bulk_insert for lightning-fast performance across 80,000+ records.
     """
     frappe.only_for(("System Manager",))
 
     conn = None
-    inserted_docs = []
     errors = []
-    query_1_rows = []
-    query_2_rows = []
 
     try:
         conn = db_connection()
 
+        now_ts = now_datetime()
+
         # Query 2 first, preserving current logic
-        # _run_query(conn, QUERY_1)
-        # _run_query(conn, QUERY_2)
         query_2_rows = _run_query(
             conn,
             get_query_2(),
         )
 
-        for row in query_2_rows:
-            try:
-                docname = _create_commission_from_query_2(row)
-                inserted_docs.append(docname)
-
-            except Exception:
-                frappe.db.rollback()
-
-                error_message = (
-                    f"Query 2 row failed for foracid "
-                    f"{row.get('foracid')}: {frappe.get_traceback()}"
-                )
-
-                frappe.log_error(
-                    error_message,
-                    "Commission Import Query 2 Row Error",
-                )
-
-                errors.append(error_message)
+        q2_tuples = [
+            _build_commission_tuple(row, True, now_ts)
+            for row in query_2_rows
+        ]
+        if q2_tuples:
+            frappe.db.bulk_insert("Commission", COMMISSION_BULK_FIELDS, q2_tuples, chunk_size=5000)
+            frappe.db.commit()
 
         # Query 1 second, preserving current logic
         query_1_rows = _run_query(
@@ -1057,38 +1032,27 @@ def fetch_and_create_commission():
             get_query_1(),
         )
 
-        for row in query_1_rows:
-            try:
-                docname = _create_commission_from_query_1(row)
-                inserted_docs.append(docname)
+        q1_tuples = [
+            _build_commission_tuple(row, False, now_ts)
+            for row in query_1_rows
+        ]
+        if q1_tuples:
+            frappe.db.bulk_insert("Commission", COMMISSION_BULK_FIELDS, q1_tuples, chunk_size=5000)
+            frappe.db.commit()
 
-            except Exception:
-                frappe.db.rollback()
-
-                error_message = (
-                    f"Query 1 row failed for foracid "
-                    f"{row.get('foracid')}: {frappe.get_traceback()}"
-                )
-
-                frappe.log_error(
-                    error_message,
-                    "Commission Import Query 1 Row Error",
-                )
-
-                errors.append(error_message)
+        total_created = len(q2_tuples) + len(q1_tuples)
+        if total_created > 0:
+            _sync_agent_fetch_from_fields()
 
         return {
             "status": "completed",
             "query_1_fetched": len(query_1_rows),
             "query_2_fetched": len(query_2_rows),
-            "query_1_created": sum(
-                1 for name in inserted_docs
-                if name
-            ),
-            "query_2_created": len(inserted_docs),
-            "inserted_count": len(inserted_docs),
-            "error_count": len(errors),
-            "errors": errors,
+            "query_1_created": len(q1_tuples),
+            "query_2_created": len(q2_tuples),
+            "inserted_count": total_created,
+            "error_count": 0,
+            "errors": [],
         }
 
     except Exception:
@@ -1107,20 +1071,14 @@ def fetch_and_create_commission():
 @frappe.whitelist()
 def run_fetch_and_create_commission_with_progress(limit=None):
     """
-    Execute Query 1 and Query 2 with terminal progress.
-    Each document is inserted and committed individually.
+    Execute Query 1 and Query 2 with terminal progress using high-speed bulk batches.
     """
     frappe.only_for(("System Manager",))
-    # _validate_commission_calculation_enabled()
 
     conn = None
-    inserted_docs = []
-    errors = []
-
     try:
         if limit is not None and str(limit).strip():
             limit = int(limit)
-
             if limit <= 0:
                 frappe.throw(_("Limit must be greater than 0"))
         else:
@@ -1128,116 +1086,77 @@ def run_fetch_and_create_commission_with_progress(limit=None):
 
         conn = db_connection()
 
-        query_1_rows = _run_query(
-            conn,
-            get_query_1(),
-        )
-        query_2_rows = _run_query(
-            conn,
-            get_query_2(),
-        )
+        query_1_rows = _run_query(conn, get_query_1())
+        query_2_rows = _run_query(conn, get_query_2())
 
-        total_available = len(query_1_rows) + len(query_2_rows)
-        total_to_process = (
-            min(limit, total_available)
-            if limit
-            else total_available
-        )
+        if limit:
+            if len(query_2_rows) >= limit:
+                query_2_rows = query_2_rows[:limit]
+                query_1_rows = []
+            else:
+                rem = limit - len(query_2_rows)
+                query_1_rows = query_1_rows[:rem]
 
-        created_count = 0
-        query_1_created = 0
-        query_2_created = 0
+        now_ts = now_datetime()
 
-        progress = tqdm(
-            total=total_to_process,
-            desc="Creating Commission Docs",
-            unit="doc",
-        )
+        total_to_process = len(query_2_rows) + len(query_1_rows)
+        progress = tqdm(total=total_to_process, desc="Creating Commission Docs", unit="doc")
 
         try:
-            for row in query_1_rows:
-                if limit and created_count >= limit:
-                    break
-
-                try:
-                    docname = _create_commission_from_query_1(row)
-
-                    inserted_docs.append(docname)
-                    created_count += 1
-                    query_1_created += 1
-                    progress.update(1)
-
-                except Exception:
-                    frappe.db.rollback()
-
-                    error_message = (
-                        f"Query 1 row failed for foracid "
-                        f"{row.get('foracid')}: {frappe.get_traceback()}"
-                    )
-
-                    frappe.log_error(
-                        error_message,
-                        "Commission Import Query 1 Row Error",
-                    )
-
-                    errors.append(error_message)
-
+            # Process Query 2
+            q2_tuples = []
             for row in query_2_rows:
-                if limit and created_count >= limit:
-                    break
+                q2_tuples.append(_build_commission_tuple(row, True, now_ts))
+                if len(q2_tuples) >= 2000:
+                    frappe.db.bulk_insert("Commission", COMMISSION_BULK_FIELDS, q2_tuples, chunk_size=2000)
+                    frappe.db.commit()
+                    progress.update(len(q2_tuples))
+                    q2_tuples = []
+            if q2_tuples:
+                frappe.db.bulk_insert("Commission", COMMISSION_BULK_FIELDS, q2_tuples, chunk_size=2000)
+                frappe.db.commit()
+                progress.update(len(q2_tuples))
 
-                try:
-                    docname = _create_commission_from_query_2(row)
-
-                    inserted_docs.append(docname)
-                    created_count += 1
-                    query_2_created += 1
-                    progress.update(1)
-
-                except Exception:
-                    frappe.db.rollback()
-
-                    error_message = (
-                        f"Query 2 row failed for foracid "
-                        f"{row.get('foracid')}: {frappe.get_traceback()}"
-                    )
-
-                    frappe.log_error(
-                        error_message,
-                        "Commission Import Query 2 Row Error",
-                    )
-
-                    errors.append(error_message)
+            # Process Query 1
+            q1_tuples = []
+            for row in query_1_rows:
+                q1_tuples.append(_build_commission_tuple(row, False, now_ts))
+                if len(q1_tuples) >= 2000:
+                    frappe.db.bulk_insert("Commission", COMMISSION_BULK_FIELDS, q1_tuples, chunk_size=2000)
+                    frappe.db.commit()
+                    progress.update(len(q1_tuples))
+                    q1_tuples = []
+            if q1_tuples:
+                frappe.db.bulk_insert("Commission", COMMISSION_BULK_FIELDS, q1_tuples, chunk_size=2000)
+                frappe.db.commit()
+                progress.update(len(q1_tuples))
 
         finally:
             progress.close()
 
+        if total_to_process > 0:
+            _sync_agent_fetch_from_fields()
+
         print("\nCommission Fetch Completed")
-        print(f"Query 1 Rows Fetched: {len(query_1_rows)}")
-        print(f"Query 2 Rows Fetched: {len(query_2_rows)}")
-        print(f"Query 1 Docs Created: {query_1_created}")
-        print(f"Query 2 Docs Created: {query_2_created}")
-        print(f"Total Docs Created: {len(inserted_docs)}")
-        print(f"Total Errors: {len(errors)}")
+        print(f"Query 1 Docs Created: {len(query_1_rows)}")
+        print(f"Query 2 Docs Created: {len(query_2_rows)}")
+        print(f"Total Docs Created: {total_to_process}")
 
         return {
             "status": "completed",
             "limit": limit,
             "query_1_fetched": len(query_1_rows),
             "query_2_fetched": len(query_2_rows),
-            "query_1_created": query_1_created,
-            "query_2_created": query_2_created,
-            "inserted_count": len(inserted_docs),
-            "error_count": len(errors),
-            "errors": errors,
+            "query_1_created": len(query_1_rows),
+            "query_2_created": len(query_2_rows),
+            "inserted_count": total_to_process,
+            "error_count": 0,
+            "errors": [],
         }
 
     except Exception:
         frappe.db.rollback()
-        frappe.log_error(
-            frappe.get_traceback(),
-            "Commission Import Failed",
-        )
+        frappe.log_error(frappe.get_traceback(), "Commission Import Failed")
         raise
 
     finally:
