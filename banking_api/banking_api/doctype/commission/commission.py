@@ -813,25 +813,24 @@ def _sync_agent_fetch_from_fields():
     frappe.db.commit()
 
 
-def _get_existing_commission_keys():
+def _get_existing_commission_map():
     """
-    Get existing (customer_account_number, scheme_code) keys created in the current month.
-    This guarantees zero duplicates on daily runs.
+    Get mapping of (customer_account_number_scheme_code) -> name created in the current month.
+    Allows lightning-fast O(1) distinction between INSERT and UPDATE.
     """
-    return set(
-        frappe.db.sql("""
-            SELECT CONCAT(COALESCE(customer_account_number, ''), '_', COALESCE(scheme_code, ''))
-            FROM `tabCommission`
-            WHERE creation >= DATE_FORMAT(NOW(), '%%Y-%%m-01')
-        """, pluck=True)
-    )
+    rows = frappe.db.sql("""
+        SELECT name, CONCAT(COALESCE(customer_account_number, ''), '_', COALESCE(scheme_code, '')) as `key`
+        FROM `tabCommission`
+        WHERE creation >= DATE_FORMAT(NOW(), '%%Y-%%m-01')
+    """, as_dict=True)
+    return {r["key"]: r["name"] for r in rows if r.get("key")}
 
 
-def _build_commission_tuple(row, is_query_2, now_ts):
+def _build_commission_tuple(row, is_query_2, now_ts, doc_name=None):
     collection_val = row.get("total_tran_amt_dtt") if is_query_2 else row.get("total_tran_amt")
 
     return (
-        frappe.generate_hash(length=10),
+        doc_name or frappe.generate_hash(length=10),
         now_ts,
         now_ts,
         "Administrator",
@@ -856,6 +855,110 @@ def _build_commission_tuple(row, is_query_2, now_ts):
         _safe_int(row.get("sol_id")) or 0,
         _safe_str(row.get("sol_desc")),
     )
+
+
+def _bulk_update_commissions(update_tuples, chunk_size=5000):
+    """
+    Lightning-fast batch update of existing Commission records via temporary table join.
+    Updates agent details, demand, collection, tenure, etc. in real-time.
+    """
+    if not update_tuples:
+        return
+
+    frappe.db.sql("""
+        CREATE TEMPORARY TABLE IF NOT EXISTS `_temp_comm_update` (
+            `name` varchar(140) PRIMARY KEY,
+            `modified` datetime(6),
+            `agent_code` varchar(140),
+            `agent_name` varchar(140),
+            `customer_account_number` varchar(140),
+            `customer_account_name` varchar(140),
+            `deposit_amount` int(11),
+            `tenure_months` int(11),
+            `tenure_days` int(11),
+            `demand` int(11),
+            `collection` int(11),
+            `eligible_amount` varchar(140),
+            `account_opening_date` date,
+            `remarks` varchar(140),
+            `pan_card` varchar(140),
+            `scheme_code` int(11),
+            `scheme_description` varchar(140),
+            `sol_id` int(11),
+            `sol_description` varchar(140)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    """)
+
+    for i in range(0, len(update_tuples), chunk_size):
+        chunk = update_tuples[i:i + chunk_size]
+        frappe.db.sql("TRUNCATE TABLE `_temp_comm_update`")
+
+        # Map full tuple indices to temp table columns
+        temp_rows = [
+            (
+                t[0],   # name
+                t[2],   # modified
+                t[7],   # agent_code
+                t[8],   # agent_name
+                t[9],   # customer_account_number
+                t[10],  # customer_account_name
+                t[11],  # deposit_amount
+                t[12],  # tenure_months
+                t[13],  # tenure_days
+                t[14],  # demand
+                t[15],  # collection
+                t[16],  # eligible_amount
+                t[17],  # account_opening_date
+                t[18],  # remarks
+                t[19],  # pan_card
+                t[20],  # scheme_code
+                t[21],  # scheme_description
+                t[22],  # sol_id
+                t[23],  # sol_description
+            )
+            for t in chunk
+        ]
+
+        frappe.db.bulk_insert(
+            "_temp_comm_update",
+            [
+                "name", "modified", "agent_code", "agent_name",
+                "customer_account_number", "customer_account_name",
+                "deposit_amount", "tenure_months", "tenure_days",
+                "demand", "collection", "eligible_amount",
+                "account_opening_date", "remarks", "pan_card",
+                "scheme_code", "scheme_description", "sol_id", "sol_description"
+            ],
+            temp_rows,
+            chunk_size=chunk_size
+        )
+
+        frappe.db.sql("""
+            UPDATE `tabCommission` c
+            INNER JOIN `_temp_comm_update` t ON c.name = t.name
+            SET
+                c.modified = t.modified,
+                c.agent_code = t.agent_code,
+                c.agent_name = t.agent_name,
+                c.customer_account_number = t.customer_account_number,
+                c.customer_account_name = t.customer_account_name,
+                c.deposit_amount = t.deposit_amount,
+                c.tenure_months = t.tenure_months,
+                c.tenure_days = t.tenure_days,
+                c.demand = t.demand,
+                c.collection = t.collection,
+                c.eligible_amount = t.eligible_amount,
+                c.account_opening_date = t.account_opening_date,
+                c.remarks = t.remarks,
+                c.pan_card = t.pan_card,
+                c.scheme_code = t.scheme_code,
+                c.scheme_description = t.scheme_description,
+                c.sol_id = t.sol_id,
+                c.sol_description = t.sol_description
+        """)
+        frappe.db.commit()
+
+    frappe.db.sql("DROP TEMPORARY TABLE IF EXISTS `_temp_comm_update`")
 
 
 def _create_commission_from_query_1(row, commit=True):
@@ -1027,7 +1130,8 @@ def fetch_and_create_commission():
         conn = db_connection()
 
         now_ts = now_datetime()
-        existing_keys = _get_existing_commission_keys()
+        existing_map = _get_existing_commission_map()
+        processed_keys = set()
 
         # Fetch rows from external Postgres immediately while connection is fresh
         query_2_rows = _run_query(
@@ -1044,41 +1148,55 @@ def fetch_and_create_commission():
         conn.close()
         conn = None
 
-        q2_tuples = []
+        insert_tuples = []
+        update_tuples = []
+
+        # Process Query 2
         for row in query_2_rows:
             key = f"{row.get('foracid') or ''}_{row.get('scheme_code') or ''}"
-            if key in existing_keys:
+            if key in processed_keys:
                 continue
-            existing_keys.add(key)
-            q2_tuples.append(_build_commission_tuple(row, True, now_ts))
+            processed_keys.add(key)
 
-        if q2_tuples:
-            frappe.db.bulk_insert("Commission", COMMISSION_BULK_FIELDS, q2_tuples, chunk_size=5000)
-            frappe.db.commit()
+            existing_name = existing_map.get(key)
+            if existing_name:
+                update_tuples.append(_build_commission_tuple(row, True, now_ts, doc_name=existing_name))
+            else:
+                insert_tuples.append(_build_commission_tuple(row, True, now_ts))
 
-        q1_tuples = []
+        # Process Query 1
         for row in query_1_rows:
             key = f"{row.get('foracid') or ''}_{row.get('scheme_code') or ''}"
-            if key in existing_keys:
+            if key in processed_keys:
                 continue
-            existing_keys.add(key)
-            q1_tuples.append(_build_commission_tuple(row, False, now_ts))
+            processed_keys.add(key)
 
-        if q1_tuples:
-            frappe.db.bulk_insert("Commission", COMMISSION_BULK_FIELDS, q1_tuples, chunk_size=5000)
+            existing_name = existing_map.get(key)
+            if existing_name:
+                update_tuples.append(_build_commission_tuple(row, False, now_ts, doc_name=existing_name))
+            else:
+                insert_tuples.append(_build_commission_tuple(row, False, now_ts))
+
+        # Execute Bulk Inserts
+        if insert_tuples:
+            frappe.db.bulk_insert("Commission", COMMISSION_BULK_FIELDS, insert_tuples, chunk_size=5000)
             frappe.db.commit()
 
-        total_created = len(q2_tuples) + len(q1_tuples)
-        if total_created > 0:
+        # Execute Bulk Updates
+        if update_tuples:
+            _bulk_update_commissions(update_tuples, chunk_size=5000)
+
+        total_processed = len(insert_tuples) + len(update_tuples)
+        if total_processed > 0:
             _sync_agent_fetch_from_fields()
 
         return {
             "status": "completed",
             "query_1_fetched": len(query_1_rows),
             "query_2_fetched": len(query_2_rows),
-            "query_1_created": len(q1_tuples),
-            "query_2_created": len(q2_tuples),
-            "inserted_count": total_created,
+            "inserted_count": len(insert_tuples),
+            "updated_count": len(update_tuples),
+            "total_processed": total_processed,
             "error_count": 0,
             "errors": [],
         }
@@ -1126,49 +1244,52 @@ def run_fetch_and_create_commission_with_progress(limit=None):
                 query_1_rows = query_1_rows[:rem]
 
         now_ts = now_datetime()
-        existing_keys = _get_existing_commission_keys()
+        existing_map = _get_existing_commission_map()
+        processed_keys = set()
 
         total_to_process = len(query_2_rows) + len(query_1_rows)
-        progress = tqdm(total=total_to_process, desc="Creating Commission Docs", unit="doc")
+        progress = tqdm(total=total_to_process, desc="Upserting Commission Docs", unit="doc")
+
+        insert_tuples = []
+        update_tuples = []
 
         try:
             # Process Query 2
-            q2_tuples = []
             for row in query_2_rows:
                 key = f"{row.get('foracid') or ''}_{row.get('scheme_code') or ''}"
-                if key in existing_keys:
+                if key in processed_keys:
                     progress.update(1)
                     continue
-                existing_keys.add(key)
-                q2_tuples.append(_build_commission_tuple(row, True, now_ts))
-                if len(q2_tuples) >= 2000:
-                    frappe.db.bulk_insert("Commission", COMMISSION_BULK_FIELDS, q2_tuples, chunk_size=2000)
-                    frappe.db.commit()
-                    progress.update(len(q2_tuples))
-                    q2_tuples = []
-            if q2_tuples:
-                frappe.db.bulk_insert("Commission", COMMISSION_BULK_FIELDS, q2_tuples, chunk_size=2000)
-                frappe.db.commit()
-                progress.update(len(q2_tuples))
+                processed_keys.add(key)
+
+                existing_name = existing_map.get(key)
+                if existing_name:
+                    update_tuples.append(_build_commission_tuple(row, True, now_ts, doc_name=existing_name))
+                else:
+                    insert_tuples.append(_build_commission_tuple(row, True, now_ts))
+                progress.update(1)
 
             # Process Query 1
-            q1_tuples = []
             for row in query_1_rows:
                 key = f"{row.get('foracid') or ''}_{row.get('scheme_code') or ''}"
-                if key in existing_keys:
+                if key in processed_keys:
                     progress.update(1)
                     continue
-                existing_keys.add(key)
-                q1_tuples.append(_build_commission_tuple(row, False, now_ts))
-                if len(q1_tuples) >= 2000:
-                    frappe.db.bulk_insert("Commission", COMMISSION_BULK_FIELDS, q1_tuples, chunk_size=2000)
-                    frappe.db.commit()
-                    progress.update(len(q1_tuples))
-                    q1_tuples = []
-            if q1_tuples:
-                frappe.db.bulk_insert("Commission", COMMISSION_BULK_FIELDS, q1_tuples, chunk_size=2000)
+                processed_keys.add(key)
+
+                existing_name = existing_map.get(key)
+                if existing_name:
+                    update_tuples.append(_build_commission_tuple(row, False, now_ts, doc_name=existing_name))
+                else:
+                    insert_tuples.append(_build_commission_tuple(row, False, now_ts))
+                progress.update(1)
+
+            if insert_tuples:
+                frappe.db.bulk_insert("Commission", COMMISSION_BULK_FIELDS, insert_tuples, chunk_size=5000)
                 frappe.db.commit()
-                progress.update(len(q1_tuples))
+
+            if update_tuples:
+                _bulk_update_commissions(update_tuples, chunk_size=5000)
 
             _sync_agent_fetch_from_fields()
 
