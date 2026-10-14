@@ -1,9 +1,18 @@
 frappe.ui.form.on("CIF Merge", {
+	onload(frm) {
+		let is_admin = frappe.user_roles.includes("System Manager") || frappe.session.user === "Administrator";
+		frm.toggle_display("cif_details", is_admin);
+	},
 	refresh(frm) {
 		frm.set_df_property("aadhar", "hidden", 0);
+		let is_admin = frappe.user_roles.includes("System Manager") || frappe.session.user === "Administrator";
+		frm.toggle_display("cif_details", is_admin);
+
 		frm.trigger("render_custom_table");
 	},
 	cif_details_on_form_rendered(frm) {
+		let is_admin = frappe.user_roles.includes("System Manager") || frappe.session.user === "Administrator";
+		frm.toggle_display("cif_details", is_admin);
 		frm.trigger("render_custom_table");
 	},
 	aadhar(frm) {
