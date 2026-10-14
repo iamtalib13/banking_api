@@ -84,7 +84,65 @@ frappe.listview_settings["Commission"] = {
             );
         }, action_label);
 
-        // 2) Calculate Commission (All Records) (under Actions)
+        // 2) Calculate Commission for Selected Records (under Actions)
+        listview.page.add_inner_button(
+            __("Calculate Commission (Selected Records)"),
+            () => {
+                const selected = listview.get_checked_items();
+
+                if (!selected.length) {
+                    frappe.msgprint(
+                        __("Please select at least one Commission record.")
+                    );
+                    return;
+                }
+
+                const commission_names = selected.map((row) => row.name);
+
+                frappe.confirm(
+                    __(
+                        `Calculate commission for ${commission_names.length} selected record(s)?`
+                    ),
+                    () => {
+                        frappe.call({
+                            method: "banking_api.banking_api.doctype.commission.commission.calculate_commission_for_selected",
+                            args: {
+                                commission_names: commission_names,
+                            },
+                            freeze: true,
+                            freeze_message: __(
+                                "Calculating commission for selected records..."
+                            ),
+                            callback: function (r) {
+                                if (!r.message) {
+                                    return;
+                                }
+
+                                const data = r.message;
+
+                                frappe.msgprint({
+                                    title: __("Selected Commission Calculation Result"),
+                                    indicator: data.error_count ? "orange" : "green",
+                                    message: `
+                                <div>
+                                    <p><b>Status:</b> ${frappe.utils.escape_html(data.status || "Completed")}</p>
+                                    <p><b>Total Selected:</b> ${data.total_processed || 0}</p>
+                                    <p><b>Successful:</b> ${data.success_count || 0}</p>
+                                    <p><b>Errors:</b> ${data.error_count || 0}</p>
+                                </div>
+                            `,
+                                });
+
+                                listview.refresh();
+                            },
+                        });
+                    }
+                );
+            },
+            __(action_label)
+        );
+
+        // 3) Calculate Commission (All Records) (under Actions)
         listview.page.add_inner_button(__("Calculate Commission (All Records)"), () => {
             frappe.confirm(
                 __(
@@ -118,6 +176,7 @@ frappe.listview_settings["Commission"] = {
                 }
             );
         }, action_label);
+
 
         listview.page.add_inner_button(__("Commission Dashboard (View Only)"), () => {
             window.open("http://shreyash.com:8000/commission", "_blank");
