@@ -1,9 +1,18 @@
 frappe.ui.form.on("CIF Merge", {
+	onload(frm) {
+		let is_admin = frappe.user_roles.includes("System Manager") || frappe.session.user === "Administrator";
+		frm.toggle_display("cif_details", is_admin);
+	},
 	refresh(frm) {
 		frm.set_df_property("aadhar", "hidden", 0);
+		let is_admin = frappe.user_roles.includes("System Manager") || frappe.session.user === "Administrator";
+		frm.toggle_display("cif_details", is_admin);
+
 		frm.trigger("render_custom_table");
 	},
 	cif_details_on_form_rendered(frm) {
+		let is_admin = frappe.user_roles.includes("System Manager") || frappe.session.user === "Administrator";
+		frm.toggle_display("cif_details", is_admin);
 		frm.trigger("render_custom_table");
 	},
 	aadhar(frm) {
@@ -203,6 +212,33 @@ frappe.ui.form.on("CIF Merge", {
 		}).join('');
 
 		let widget_html = `
+		<style>
+			.cif-scroll-wrapper {
+				overflow-x: scroll !important;
+				overflow-y: auto !important;
+				scrollbar-width: thin !important;
+				scrollbar-color: #64748b #f1f5f9 !important;
+				-webkit-overflow-scrolling: touch;
+				display: block;
+				width: 100%;
+			}
+			.cif-scroll-wrapper::-webkit-scrollbar {
+				width: 10px !important;
+				height: 10px !important;
+			}
+			.cif-scroll-wrapper::-webkit-scrollbar-track {
+				background: #f1f5f9 !important;
+				border-radius: 4px;
+				border: 1px solid #e2e8f0;
+			}
+			.cif-scroll-wrapper::-webkit-scrollbar-thumb {
+				background: #64748b !important;
+				border-radius: 4px;
+			}
+			.cif-scroll-wrapper::-webkit-scrollbar-thumb:hover {
+				background: #475569 !important;
+			}
+		</style>
 		<div class="cif-table-control-container p-3 bg-white border rounded shadow-sm mb-3">
 			<!-- Header & Action Status -->
 			<div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom flex-wrap gap-2">
@@ -226,6 +262,7 @@ frappe.ui.form.on("CIF Merge", {
 			<!-- Table 1: Actions & Deduplication Control -->
 			<div class="mb-3">
 				<h6 class="text-secondary font-weight-bold mb-1" style="font-size: 13px;"><i class="fa fa-sliders mr-1 text-primary"></i> 1. CIF Selection & Deduplication Table</h6>
+				<div class="cif-scroll-wrapper border rounded" style="max-height: 280px;">
 				<div class="table-responsive border rounded" style="overflow-x: auto; overflow-y: visible;">
 					<table class="table table-sm table-bordered m-0" style="vertical-align: middle; min-width: 600px;">
 						<thead class="thead-light small" style="position: sticky; top: 0; z-index: 2; background: #f8f9fa;">
@@ -283,6 +320,8 @@ frappe.ui.form.on("CIF Merge", {
 			<!-- Table 2: User Other Details -->
 			<div class="mb-3">
 				<h6 class="text-secondary font-weight-bold mb-1" style="font-size: 13px;"><i class="fa fa-id-card-o mr-1 text-info"></i> 2. CIF User Full Details</h6>
+				<div class="cif-scroll-wrapper border rounded" style="max-height: 320px;">
+					<table class="table table-sm table-hover table-bordered m-0" style="vertical-align: middle; min-width: 1350px;">
 				<div class="table-responsive border rounded" style="overflow-x: auto; overflow-y: visible;">
 					<table class="table table-sm table-hover table-bordered m-0" style="vertical-align: middle; min-width: 1050px;">
 						<thead class="thead-light small" style="position: sticky; top: 0; z-index: 2; background: #f8f9fa;">
