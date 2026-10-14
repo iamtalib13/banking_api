@@ -21,7 +21,8 @@
   "re_kyc",
   "address_line_1",
   "address_line_2",
-  "address_line_3"
+  "address_line_3",
+  "pin_code"
  ],
  "fields": [
   {
@@ -121,6 +122,12 @@
    "fieldname": "phone_local_code",
    "fieldtype": "Data",
    "label": "Phone Local Code"
+  },
+  {
+   "fieldname": "pin_code",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Pin Code"
   }
  ],
  "grid_page_length": 50,
