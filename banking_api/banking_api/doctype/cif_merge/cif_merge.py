@@ -36,8 +36,16 @@ class CIFMerge(Document):
 
 		if self.cif_details:
 			self.total_cif_count = len(self.cif_details)
+			# Agar koi bhi active cif ya active account hai to Active, warna Inactive
+			has_active = any(
+				(getattr(r, "cif_status", "") == "ACTIVE" or (getattr(r, "active_accounts_count", 0) or 0) > 0)
+				for r in self.cif_details
+			)
+			self.status = "Active" if has_active else "Inactive"
 		else:
 			self.total_cif_count = 0
+			self.status = "Inactive"
+
 
 
 ACTIVE_CIF_QUERY = """
@@ -306,15 +314,59 @@ def get_cif_records(aadhar=None, pan=None):
 
 
 @frappe.whitelist()
-def sync_all_cif_merge_records(batch_size=5000):
+def get_status_summary():
+	"""Returns counts of Active, Inactive, and Total records in CIF Merge."""
+	counts = frappe.db.sql("""
+		SELECT 
+			COALESCE(NULLIF(status, ''), 'Inactive') as status_val,
+			COUNT(*) as count
+		FROM `tabCIF Merge`
+		GROUP BY status_val
+	""", as_dict=True)
+
+	summary = {"Active": 0, "Inactive": 0, "Total": 0}
+	for r in counts:
+		val = r.status_val
+		summary[val] = r.count
+		summary["Total"] += r.count
+	return summary
+
+
+@frappe.whitelist()
+def get_top_cif_counts():
+	"""Returns top distinct total_cif_count values with their record counts."""
+	return frappe.db.sql("""
+		SELECT total_cif_count, COUNT(*) as doc_count
+		FROM `tabCIF Merge`
+		WHERE total_cif_count > 0
+		GROUP BY total_cif_count
+		ORDER BY total_cif_count DESC
+		LIMIT 10
+	""", as_dict=True)
+
+
+@frappe.whitelist()
+def trigger_sync_all():
+	if "System Manager" not in frappe.get_roles():
+		frappe.throw("Sirf System Manager hi sync trigger kar sakte hain.")
+	frappe.enqueue(
+		"banking_api.banking_api.doctype.cif_merge.cif_merge.sync_all_cif_merge_records",
+		queue="long",
+		timeout=3600
+	)
+	return {"status": "queued", "message": "Bulk CIF Sync background me start ho gaya hai."}
+
+
+@frappe.whitelist()
+def sync_all_cif_merge_records(batch_size=10000):
 	"""
-	Bulk synchronizes duplicate CIF records from Finacle DR DB into 'CIF Merge' doctype.
-	Fetches active and inactive records in batches of 5000 rows to optimize memory and DB load.
+	Bulk synchronizes duplicate CIF records from Finacle DR DB into 'CIF Merge' doctype
+	using high-performance direct SQL bulk inserts.
 	Command to execute:
 		bench execute banking_api.banking_api.doctype.cif_merge.cif_merge.sync_all_cif_merge_records
 	"""
 	batch_size = int(batch_size)
-	print(f"--- Starting Bulk CIF Merge Sync (Batch size: {batch_size}) ---")
+	print(f"--- Starting Superfast Bulk CIF Merge Sync (Batch size: {batch_size}) ---")
 
 	queries = [
 		("ACTIVE", ACTIVE_CIF_QUERY.format(filter_clause="1=1")),
@@ -344,7 +396,6 @@ def sync_all_cif_merge_records(batch_size=5000):
 					cur.itersize = batch_size
 					cur.execute(sql)
 
-					# Agar reconnect hua hai to already processed records ko fast-skip karein
 					if batch_count > 0:
 						print(f"[RECOVERY] Skipping {batch_count} already processed rows...")
 						cur.scroll(batch_count, mode='absolute')
@@ -364,17 +415,14 @@ def sync_all_cif_merge_records(batch_size=5000):
 								grouped[aadhaar] = []
 							grouped[aadhaar].append(r)
 
-						for aadhaar, cif_list in grouped.items():
-							_upsert_cif_merge(aadhaar, cif_list)
+						_bulk_upsert_cif_records(grouped, status="Active" if label == "ACTIVE" else "Inactive")
 
 						frappe.db.commit()
 						batch_count += len(rows)
 						total_processed += len(rows)
-						print(f"[PROGRESS] {label}: {batch_count} records processed so far...")
-						# Har successful batch par retry delay reset karein
+						print(f"[PROGRESS] {label}: {batch_count} records synced...")
 						retry_count = 0
 
-				# Complete ho gaya without error to break outer loop
 				break
 
 			except Exception as e:
@@ -393,48 +441,123 @@ def sync_all_cif_merge_records(batch_size=5000):
 					except Exception:
 						pass
 
-	print(f"\n--- Bulk CIF Merge Sync Completed! Total processed: {total_processed} ---")
+	print(f"\n--- Superfast CIF Merge Sync Completed! Total processed: {total_processed} ---")
 
 
-def _upsert_cif_merge(aadhaar, cif_list):
-	"""Helper to create or update CIF Merge document and its child CIF Details."""
-	existing_name = frappe.db.get_value("CIF Merge", {"aadhar": aadhaar}, "name")
+@frappe.whitelist()
+def update_existing_cif_merge_status():
+	"""
+	One-minute superfast batch update to set status (Active/Inactive) for all already-synced CIF Merge records.
+	Command:
+		bench execute banking_api.banking_api.doctype.cif_merge.cif_merge.update_existing_cif_merge_status
+	"""
+	print("--- Updating Status for already synced CIF Merge records ---")
+	# 1. Jo Aadhar ke pass active CIF/accounts hain unhe Active set karo
+	frappe.db.sql("""
+		UPDATE `tabCIF Merge` cm
+		SET cm.status = 'Active'
+		WHERE cm.name IN (
+			SELECT DISTINCT parent FROM `tabCIF Details`
+			WHERE active_accounts_count > 0 OR cif_status = 'ACTIVE'
+		)
+	""")
 
-	if existing_name:
-		doc = frappe.get_doc("CIF Merge", existing_name)
-	else:
-		doc = frappe.new_doc("CIF Merge")
-		doc.aadhar = aadhaar
+	# 2. Baaki sabko Inactive set karo jinka status set nahi hua
+	frappe.db.sql("""
+		UPDATE `tabCIF Merge`
+		SET status = 'Inactive'
+		WHERE status IS NULL OR status = ''
+	""")
 
-	existing_cif_ids = {row.cif_id for row in doc.cif_details}
+	frappe.db.commit()
+	print("--- Status update completed successfully! ---")
 
-	for r in cif_list:
-		cif_id = r.get("CIF ID")
-		if not cif_id or cif_id in existing_cif_ids:
-			continue
 
-		doc.append("cif_details", {
-			"cif_id": cif_id,
-			"first_name": r.get("FIRST NAME") or (r.get("CUSTOMER NAME", "").split(" ")[0] if r.get("CUSTOMER NAME") else ""),
-			"middle_name": r.get("MIDDLE NAME") or "",
-			"last_name": r.get("LAST NAME") or "",
-			"cif_creation": str(r.get("CIF OPENING DATE")) if r.get("CIF OPENING DATE") else "",
-			"date_of_birth": str(r.get("CUST DOB")) if r.get("CUST DOB") else "",
-			"pan": r.get("PAN NUMBER") or "",
-			"mobile": r.get("PHONE NUMBER") or "",
-			"phone_local_code": r.get("PHONE LOCAL CODE") or "",
-			"sol_id": r.get("SOL ID") or "",
-			"address_line_1": r.get("ADDRESS LINE 1") or "",
-			"address_line_2": r.get("ADDRESS LINE 2") or "",
-			"address_line_3": r.get("ADDRESS LINE 3") or "",
-			"primary": 0,
-			"merge": 0,
-			"re_kyc": 0
+def _bulk_upsert_cif_records(grouped, status="Active"):
+	"""Direct SQL bulk insert for CIF Merge and CIF Details to maximize ingestion speed."""
+	now = frappe.utils.now()
+	user = frappe.session.user or "Administrator"
+
+	parent_records = []
+	for aadhar, items in grouped.items():
+		parent_records.append({
+			"name": aadhar,
+			"creation": now,
+			"modified": now,
+			"modified_by": user,
+			"owner": user,
+			"aadhar": aadhar,
+			"total_cif_count": len(items),
+			"status": status
 		})
-		existing_cif_ids.add(cif_id)
 
-	doc.total_cif_count = len(doc.cif_details)
-	doc.flags.ignore_validate = True
-	doc.flags.ignore_mandatory = True
-	doc.flags.ignore_permissions = True
-	doc.save()
+	# 1. Bulk insert parent table `tabCIF Merge`
+	frappe.db.bulk_insert(
+		"CIF Merge",
+		fields=["name", "creation", "modified", "modified_by", "owner", "aadhar", "total_cif_count", "status"],
+		values=[list(d.values()) for d in parent_records],
+		ignore_duplicates=True
+	)
+
+	# Existing records ka status bhi update karein
+	aadhars = list(grouped.keys())
+	if aadhars:
+		format_strings = ','.join(['%s'] * len(aadhars))
+		frappe.db.sql(
+			f"UPDATE `tabCIF Merge` SET status = %s WHERE name IN ({format_strings}) AND (status IS NULL OR status != %s)",
+			tuple([status] + aadhars + [status])
+		)
+
+	# 2. Fetch existing child cif_ids to avoid duplicates
+	aadhars = list(grouped.keys())
+	existing_cifs = set()
+	if aadhars:
+		format_strings = ','.join(['%s'] * len(aadhars))
+		existing_rows = frappe.db.sql(
+			f"SELECT parent, cif_id FROM `tabCIF Details` WHERE parent IN ({format_strings})",
+			tuple(aadhars),
+			as_dict=True
+		)
+		existing_cifs = {(row.parent, row.cif_id) for row in existing_rows}
+
+	# 3. Prepare child rows for bulk insert
+	child_records = []
+	for aadhar, items in grouped.items():
+		for idx, r in enumerate(items, 1):
+			cif_id = r.get("CIF ID")
+			if not cif_id or (aadhar, cif_id) in existing_cifs:
+				continue
+
+			child_name = frappe.generate_hash(length=10)
+			first_name = r.get("FIRST NAME") or (r.get("CUSTOMER NAME", "").split(" ")[0] if r.get("CUSTOMER NAME") else "")
+			cif_creation = str(r.get("CIF OPENING DATE")) if r.get("CIF OPENING DATE") else None
+			dob = str(r.get("CUST DOB")) if r.get("CUST DOB") else None
+
+			child_records.append([
+				child_name, now, now, user, user,
+				aadhar, "CIF Merge", "cif_details", idx,
+				cif_id, first_name, r.get("MIDDLE NAME") or "", r.get("LAST NAME") or "",
+				cif_creation, dob, r.get("PAN NUMBER") or "", r.get("PHONE NUMBER") or "",
+				r.get("PHONE LOCAL CODE") or "", r.get("SOL ID") or "",
+				r.get("ADDRESS LINE 1") or "", r.get("ADDRESS LINE 2") or "", r.get("ADDRESS LINE 3") or "",
+				0, 0, 0
+			])
+			existing_cifs.add((aadhar, cif_id))
+
+	if child_records:
+		child_fields = [
+			"name", "creation", "modified", "modified_by", "owner",
+			"parent", "parenttype", "parentfield", "idx",
+			"cif_id", "first_name", "middle_name", "last_name",
+			"cif_creation", "date_of_birth", "pan", "mobile",
+			"phone_local_code", "sol_id",
+			"address_line_1", "address_line_2", "address_line_3",
+			"primary", "merge", "re_kyc"
+		]
+		frappe.db.bulk_insert(
+			"CIF Details",
+			fields=child_fields,
+			values=child_records,
+			ignore_duplicates=True
+		)
+
