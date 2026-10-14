@@ -758,6 +758,43 @@ def _safe_str(value):
     return str(value).strip()
 
 
+def _get_demand_settings():
+    """
+    Get demand multiplier and selected scheme codes from Commission Settings.
+    """
+    try:
+        settings = frappe.get_single("Commission Settings")
+        multiplier = getattr(settings, "demand_multiplier", None)
+        multiplier = float(multiplier) if multiplier not in (None, "") else 3.0
+        raw_schemes = getattr(settings, "demand_multiplier_scheme_codes", None) or ""
+        schemes = {
+            s.strip()
+            for line in str(raw_schemes).splitlines()
+            for s in line.split(",")
+            if s.strip()
+        }
+        return multiplier, schemes
+    except Exception:
+        return 3.0, set()
+
+
+def _calculate_demand(total_flow_amount, scheme_code):
+    """
+    Calculate demand with multiplier applied if scheme_code matches selected schemes in Commission Settings.
+    """
+    demand = _safe_int(total_flow_amount)
+    if demand is None:
+        return None
+
+    multiplier, schemes = _get_demand_settings()
+    curr_scheme = str(scheme_code).strip() if scheme_code is not None else ""
+
+    if schemes and curr_scheme in schemes:
+        return int(round(demand * multiplier))
+
+    return demand
+
+
 COMMISSION_BULK_FIELDS = [
     "name",
     "creation",
@@ -946,8 +983,9 @@ def _create_commission_from_query_1(row, commit=True):
             row.get("deposit_period_days")
         ),
 
-        "demand": _safe_int(
-            row.get("adjusted_flow_amount")
+        "demand": _calculate_demand(
+            row.get("total_flow_amount"),
+            row.get("scheme_code"),
         ),
         "collection": _safe_int(
             row.get("total_tran_amt")
@@ -1019,8 +1057,9 @@ def _create_commission_from_query_2(row, commit=True):
             row.get("deposit_period_days")
         ),
 
-        "demand": _safe_int(
-            row.get("adjusted_flow_amount")
+        "demand": _calculate_demand(
+            row.get("total_flow_amount"),
+            row.get("scheme_code"),
         ),
         "collection": _safe_int(
             row.get("total_tran_amt_dtt")
