@@ -326,10 +326,9 @@ def sync_all_cif_merge_records(batch_size=5000):
 	for label, sql in queries:
 		print(f"\n[INFO] Processing {label} CIF Records...")
 		batch_count = 0
-		max_retries = 10
+		attempt = 0
 		retry_count = 0
-
-		while retry_count < max_retries:
+		while True:
 			conn = None
 			try:
 				conn = get_dr_connection()
@@ -340,12 +339,12 @@ def sync_all_cif_merge_records(batch_size=5000):
 					except Exception:
 						pass
 
-				cursor_name = f"cif_stream_{label.lower()}_{retry_count}"
+				cursor_name = f"cif_stream_{label.lower()}_{attempt}"
 				with conn.cursor(name=cursor_name, cursor_factory=RealDictCursor) as cur:
 					cur.itersize = batch_size
 					cur.execute(sql)
 
-					# Agar retry hua hai to already processed records ko fast-skip karein
+					# Agar reconnect hua hai to already processed records ko fast-skip karein
 					if batch_count > 0:
 						print(f"[RECOVERY] Skipping {batch_count} already processed rows...")
 						cur.scroll(batch_count, mode='absolute')
@@ -372,23 +371,21 @@ def sync_all_cif_merge_records(batch_size=5000):
 						batch_count += len(rows)
 						total_processed += len(rows)
 						print(f"[PROGRESS] {label}: {batch_count} records processed so far...")
+						# Har successful batch par retry delay reset karein
+						retry_count = 0
 
-				# Agar complete ho gaya without error to break retry loop
+				# Complete ho gaya without error to break outer loop
 				break
 
 			except Exception as e:
 				frappe.db.rollback()
+				attempt += 1
 				retry_count += 1
-				err_msg = str(e)
+				err_msg = str(e).strip()
 				print(f"\n[WARNING] Disconnected at {batch_count} rows. Error: {err_msg}")
-				if retry_count < max_retries:
-					wait_sec = retry_count * 5
-					print(f"[RETRY {retry_count}/{max_retries}] Reconnecting in {wait_sec}s and resuming from row {batch_count}...")
-					time.sleep(wait_sec)
-				else:
-					frappe.log_error(message=frappe.get_traceback(), title=f"Bulk CIF Sync Failed on {label}")
-					print(f"[ERROR] Max retries reached on {label}: {err_msg}")
-					raise e
+				wait_sec = min(retry_count * 5, 30)
+				print(f"[RETRY attempt #{attempt}] Reconnecting in {wait_sec}s and resuming from row {batch_count}...")
+				time.sleep(wait_sec)
 			finally:
 				if conn:
 					try:
