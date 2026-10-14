@@ -55,6 +55,7 @@ frappe.ui.form.on("CIF Merge", {
 						child.address_line_1 = row.address_line_1;
 						child.address_line_2 = row.address_line_2;
 						child.address_line_3 = row.address_line_3;
+						child.pin_code = row.pin_code;
 						child.primary = row.primary || 0;
 						child.merge = row.merge || 0;
 						child.re_kyc = row.re_kyc || 0;
