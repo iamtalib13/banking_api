@@ -46,7 +46,10 @@
   "agent_deduction_maximum",
   "agent_deduction_operation",
   "eligible_amount_scheme_groups_settings",
-  "eligible_amount_scheme_groups"
+  "eligible_amount_scheme_groups",
+  "demand_multiplier_settings",
+  "demand_multiplier",
+  "demand_multiplier_scheme_codes"
  ],
  "fields": [
   {
@@ -301,6 +304,26 @@
    "fieldname": "enable_commission_calculation_section",
    "fieldtype": "Section Break",
    "label": "Enable Commission Calculation"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "demand_multiplier_settings",
+   "fieldtype": "Section Break",
+   "label": "Demand Multiplier Settings"
+  },
+  {
+   "default": "3",
+   "description": "Demand multiplier factor for selected schemes (e.g. 3)",
+   "fieldname": "demand_multiplier",
+   "fieldtype": "Float",
+   "label": "Demand Multiplier"
+  },
+  {
+   "default": "",
+   "description": "Scheme codes separated by comma or new line. Example: 2005, 2006, 2010",
+   "fieldname": "demand_multiplier_scheme_codes",
+   "fieldtype": "Small Text",
+   "label": "Selected Scheme Codes for Multiplier"
   }
  ],
  "grid_page_length": 50,
