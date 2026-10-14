@@ -263,6 +263,7 @@ frappe.ui.form.on("CIF Merge", {
 			<div class="mb-3">
 				<h6 class="text-secondary font-weight-bold mb-1" style="font-size: 13px;"><i class="fa fa-sliders mr-1 text-primary"></i> 1. CIF Selection & Deduplication Table</h6>
 				<div class="cif-scroll-wrapper border rounded" style="max-height: 280px;">
+				<div class="table-responsive border rounded" style="overflow-x: auto; overflow-y: visible;">
 					<table class="table table-sm table-bordered m-0" style="vertical-align: middle; min-width: 600px;">
 						<thead class="thead-light small" style="position: sticky; top: 0; z-index: 2; background: #f8f9fa;">
 							<tr>
@@ -321,6 +322,8 @@ frappe.ui.form.on("CIF Merge", {
 				<h6 class="text-secondary font-weight-bold mb-1" style="font-size: 13px;"><i class="fa fa-id-card-o mr-1 text-info"></i> 2. CIF User Full Details</h6>
 				<div class="cif-scroll-wrapper border rounded" style="max-height: 320px;">
 					<table class="table table-sm table-hover table-bordered m-0" style="vertical-align: middle; min-width: 1350px;">
+				<div class="table-responsive border rounded" style="overflow-x: auto; overflow-y: visible;">
+					<table class="table table-sm table-hover table-bordered m-0" style="vertical-align: middle; min-width: 1050px;">
 						<thead class="thead-light small" style="position: sticky; top: 0; z-index: 2; background: #f8f9fa;">
 							<tr>
 								<th style="width: 40px;" class="text-center">#</th>
