@@ -212,6 +212,30 @@ frappe.ui.form.on("CIF Merge", {
 		}).join('');
 
 		let widget_html = `
+		<style>
+			.cif-scroll-wrapper {
+				overflow-x: auto !important;
+				overflow-y: auto !important;
+				scrollbar-width: thin !important;
+				scrollbar-color: #94a3b8 #f1f5f9 !important;
+				-webkit-overflow-scrolling: touch;
+			}
+			.cif-scroll-wrapper::-webkit-scrollbar {
+				width: 8px !important;
+				height: 8px !important;
+			}
+			.cif-scroll-wrapper::-webkit-scrollbar-track {
+				background: #f1f5f9 !important;
+				border-radius: 4px;
+			}
+			.cif-scroll-wrapper::-webkit-scrollbar-thumb {
+				background: #94a3b8 !important;
+				border-radius: 4px;
+			}
+			.cif-scroll-wrapper::-webkit-scrollbar-thumb:hover {
+				background: #64748b !important;
+			}
+		</style>
 		<div class="cif-table-control-container p-3 bg-white border rounded shadow-sm mb-3">
 			<!-- Header & Action Status -->
 			<div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom flex-wrap gap-2">
@@ -235,7 +259,7 @@ frappe.ui.form.on("CIF Merge", {
 			<!-- Table 1: Actions & Deduplication Control -->
 			<div class="mb-3">
 				<h6 class="text-secondary font-weight-bold mb-1" style="font-size: 13px;"><i class="fa fa-sliders mr-1 text-primary"></i> 1. CIF Selection & Deduplication Table</h6>
-				<div class="table-responsive border rounded" style="max-height: 320px; overflow: auto;">
+				<div class="cif-scroll-wrapper border rounded" style="max-height: 280px;">
 					<table class="table table-sm table-bordered m-0" style="vertical-align: middle; min-width: 600px;">
 						<thead class="thead-light small" style="position: sticky; top: 0; z-index: 2; background: #f8f9fa;">
 							<tr>
@@ -292,7 +316,7 @@ frappe.ui.form.on("CIF Merge", {
 			<!-- Table 2: User Other Details -->
 			<div class="mb-3">
 				<h6 class="text-secondary font-weight-bold mb-1" style="font-size: 13px;"><i class="fa fa-id-card-o mr-1 text-info"></i> 2. CIF User Full Details</h6>
-				<div class="table-responsive border rounded" style="max-height: 350px; overflow: auto;">
+				<div class="cif-scroll-wrapper border rounded" style="max-height: 320px;">
 					<table class="table table-sm table-hover table-bordered m-0" style="vertical-align: middle; min-width: 1050px;">
 						<thead class="thead-light small" style="position: sticky; top: 0; z-index: 2; background: #f8f9fa;">
 							<tr>
