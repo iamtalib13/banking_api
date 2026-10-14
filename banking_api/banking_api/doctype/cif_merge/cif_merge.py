@@ -29,6 +29,7 @@ class CIFMerge(Document):
 						"address_line_1": r.get("address_line_1"),
 						"address_line_2": r.get("address_line_2"),
 						"address_line_3": r.get("address_line_3"),
+						"pin_code": r.get("pin_code") or "",
 						"primary": r.get("primary", 0),
 						"merge": r.get("merge", 0),
 						"re_kyc": r.get("re_kyc", 0)
@@ -290,6 +291,7 @@ def get_cif_records(aadhar=None, pan=None):
 				"address_line_1": r.get("ADDRESS LINE 1") or "",
 				"address_line_2": r.get("ADDRESS LINE 2") or "",
 				"address_line_3": r.get("ADDRESS LINE 3") or "",
+				"pin_code": r.get("PIN CODE") or "",
 				"cif_status": r.get("CIF STATUS") or "ACTIVE",
 				"active_accounts_count": r.get("ACTIVE ACCOUNTS COUNT") or 0,
 				"active_account_numbers": r.get("ACTIVE ACCOUNT NUMBERS") or "",
@@ -540,6 +542,7 @@ def _bulk_upsert_cif_records(grouped, status="Active"):
 				cif_creation, dob, r.get("PAN NUMBER") or "", r.get("PHONE NUMBER") or "",
 				r.get("PHONE LOCAL CODE") or "", r.get("SOL ID") or "",
 				r.get("ADDRESS LINE 1") or "", r.get("ADDRESS LINE 2") or "", r.get("ADDRESS LINE 3") or "",
+				r.get("PIN CODE") or "",
 				0, 0, 0
 			])
 			existing_cifs.add((aadhar, cif_id))
@@ -552,6 +555,7 @@ def _bulk_upsert_cif_records(grouped, status="Active"):
 			"cif_creation", "date_of_birth", "pan", "mobile",
 			"phone_local_code", "sol_id",
 			"address_line_1", "address_line_2", "address_line_3",
+			"pin_code",
 			"primary", "merge", "re_kyc"
 		]
 		frappe.db.bulk_insert(
