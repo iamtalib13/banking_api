@@ -8,6 +8,35 @@ frappe.ui.form.on("CIF Merge", {
 		let is_admin = frappe.user_roles.includes("System Manager") || frappe.session.user === "Administrator";
 		frm.toggle_display("cif_details", is_admin);
 
+		// Form header status indicator badge (Pending / Completed)
+		let is_completed = frm.doc.cif_status === "Completed";
+		frm.page.set_indicator(is_completed ? __("Completed") : __("Pending"), is_completed ? "green" : "orange");
+
+		// Complete Button handling
+		frm.clear_custom_buttons();
+		let has_primary = (frm.doc.cif_details || []).some(r => r.primary);
+
+		if (frm.doc.cif_status === "Completed") {
+			frm.set_intro(__("This CIF Merge record is marked as <b>Completed</b>."), "green");
+			frm.set_read_only();
+		} else if (has_primary && !frm.is_new()) {
+			frm.add_custom_button(__("Complete"), function() {
+				frappe.confirm(
+					__("Are you sure you want to mark this CIF Merge as <b>Completed</b>? This will submit the record."),
+					function() {
+						frm.set_value("cif_status", "Completed");
+						frm.save().then(() => {
+							frappe.show_alert({
+								message: __("CIF Merge completed successfully!"),
+								indicator: "green"
+							});
+							frm.refresh();
+						});
+					}
+				);
+			}).addClass("btn-primary font-weight-bold");
+		}
+
 		frm.trigger("render_custom_table");
 	},
 	cif_details_on_form_rendered(frm) {
@@ -55,6 +84,7 @@ frappe.ui.form.on("CIF Merge", {
 						child.address_line_1 = row.address_line_1;
 						child.address_line_2 = row.address_line_2;
 						child.address_line_3 = row.address_line_3;
+						child.pin_code = row.pin_code;
 						child.primary = row.primary || 0;
 						child.merge = row.merge || 0;
 						child.re_kyc = row.re_kyc || 0;
@@ -442,7 +472,7 @@ frappe.ui.form.on("CIF Merge", {
 				}
 			});
 			frm.refresh_field("cif_details");
-			frm.trigger("render_custom_table");
+			frm.refresh();
 		});
 
 		// Event: Merge Checkbox (Mutually exclusive with Re-KYC & Primary)
