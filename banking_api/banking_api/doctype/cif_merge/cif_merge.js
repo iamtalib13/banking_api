@@ -214,26 +214,29 @@ frappe.ui.form.on("CIF Merge", {
 		let widget_html = `
 		<style>
 			.cif-scroll-wrapper {
-				overflow-x: auto !important;
+				overflow-x: scroll !important;
 				overflow-y: auto !important;
 				scrollbar-width: thin !important;
-				scrollbar-color: #94a3b8 #f1f5f9 !important;
+				scrollbar-color: #64748b #f1f5f9 !important;
 				-webkit-overflow-scrolling: touch;
+				display: block;
+				width: 100%;
 			}
 			.cif-scroll-wrapper::-webkit-scrollbar {
-				width: 8px !important;
-				height: 8px !important;
+				width: 10px !important;
+				height: 10px !important;
 			}
 			.cif-scroll-wrapper::-webkit-scrollbar-track {
 				background: #f1f5f9 !important;
 				border-radius: 4px;
+				border: 1px solid #e2e8f0;
 			}
 			.cif-scroll-wrapper::-webkit-scrollbar-thumb {
-				background: #94a3b8 !important;
+				background: #64748b !important;
 				border-radius: 4px;
 			}
 			.cif-scroll-wrapper::-webkit-scrollbar-thumb:hover {
-				background: #64748b !important;
+				background: #475569 !important;
 			}
 		</style>
 		<div class="cif-table-control-container p-3 bg-white border rounded shadow-sm mb-3">
@@ -317,7 +320,7 @@ frappe.ui.form.on("CIF Merge", {
 			<div class="mb-3">
 				<h6 class="text-secondary font-weight-bold mb-1" style="font-size: 13px;"><i class="fa fa-id-card-o mr-1 text-info"></i> 2. CIF User Full Details</h6>
 				<div class="cif-scroll-wrapper border rounded" style="max-height: 320px;">
-					<table class="table table-sm table-hover table-bordered m-0" style="vertical-align: middle; min-width: 1050px;">
+					<table class="table table-sm table-hover table-bordered m-0" style="vertical-align: middle; min-width: 1350px;">
 						<thead class="thead-light small" style="position: sticky; top: 0; z-index: 2; background: #f8f9fa;">
 							<tr>
 								<th style="width: 40px;" class="text-center">#</th>
