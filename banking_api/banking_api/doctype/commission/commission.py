@@ -449,8 +449,8 @@ flow_data AS (
         ON tdt.acid = g.acid
         AND tdt.flow_code = 'NI'
     WHERE tdt.flow_date BETWEEN
-        DATE '{dates["current_month_start"]}'
-        AND DATE '{dates["present_date"]}'
+        DATE '2026-09-01'
+        AND DATE '2026-09-30'
     GROUP BY
         d.rm_id,
         g.foracid,
@@ -477,26 +477,26 @@ tran_data AS (
         (
             (
                 dtt.tran_date BETWEEN
-                    DATE '{dates["current_month_start"]}'
-                    AND DATE '{dates["present_date"]}'
+                    DATE '2026-09-01'
+                    AND DATE '2026-09-30'
                 AND dtt.value_date >
-                    DATE '{dates["previous_month_end"]}'
+                    DATE '2026-08-31'
             )
             OR
             (
                 dtt.tran_date >
-                    DATE '{dates["current_month_end"]}'
+                    DATE '2026-09-30'
                 AND dtt.value_date BETWEEN
-                    DATE '{dates["current_month_start"]}'
-                    AND DATE '{dates["present_date"]}'
+                    DATE '2026-09-01'
+                    AND DATE '2026-09-30'
             )
             OR
             (
                 dtt.value_date BETWEEN
-                    DATE '{dates["current_month_start"]}'
-                    AND DATE '{dates["present_date"]}'
+                    DATE '2026-09-01'
+                    AND DATE '2026-09-30'
                 AND dtt.tran_date >
-                    DATE '{dates["current_month_end"]}'
+                    DATE '2026-09-30'
             )
         )
     GROUP BY
@@ -547,7 +547,7 @@ SELECT
     ) AS commission_amount,
     CASE
         WHEN ad.acct_opn_date + INTERVAL '1 year' >=
-            DATE '{dates["current_month_end"]}'
+            DATE '2026-09-30'
             THEN 'YES'
         ELSE 'NO'
     END AS one_year_completed,
@@ -618,8 +618,8 @@ WITH account_data AS (
             '9001','9002'
         )
         AND g.acct_opn_date BETWEEN
-            DATE '{dates["current_month_start"]}'
-            AND DATE '{dates["present_date"]}'
+            DATE '2026-09-01'
+            AND DATE '2026-09-30'
         AND g.acct_cls_flg = 'N'
     LEFT JOIN tbaadm.tam AS tam
         ON tam.acid = g.acid
@@ -627,20 +627,20 @@ WITH account_data AS (
         ON dtt.acid = g.acid
         AND dtt.flow_code = 'PI'
         AND dtt.tran_date BETWEEN
-            DATE '{dates["current_month_start"]}'
-            AND DATE '{dates["present_date"]}'
+            DATE '2026-09-01'
+            AND DATE '2026-09-30'
         AND NOT (
             dtt.value_date >=
-                DATE '{dates["previous_month_start"]}'
+                DATE '2026-08-01'
             AND dtt.value_date <
-                DATE '{dates["current_month_start"]}'
+                DATE '2026-09-01'
         )
     LEFT JOIN tbaadm.tdt AS tdt
         ON tdt.acid = g.acid
         AND tdt.flow_code = 'PI'
         AND tdt.flow_date BETWEEN
-            DATE '{dates["current_month_start"]}'
-            AND DATE '{dates["present_date"]}'
+            DATE '2026-09-01'
+            AND DATE '2026-09-30'
     LEFT JOIN custom.dsaauth AS d2
         ON UPPER(ds.rm_id) = UPPER(d2.user_id)
     LEFT JOIN tbaadm.get AS g2
@@ -701,7 +701,7 @@ SELECT
     ) AS commission_amount,
     CASE
         WHEN ad.acct_opn_date + INTERVAL '1 year' <=
-            DATE '{dates["current_month_end"]}'
+            DATE '2026-09-30'
             THEN 'YES'
         ELSE 'NO'
     END AS one_year_completed,
@@ -827,7 +827,8 @@ def _get_existing_commission_map():
 
 
 def _build_commission_tuple(row, is_query_2, now_ts, doc_name=None):
-    collection_val = row.get("total_tran_amt_dtt") if is_query_2 else row.get("total_tran_amt")
+    collection_val = row.get(
+        "total_tran_amt_dtt") if is_query_2 else row.get("total_tran_amt")
 
     return (
         doc_name or frappe.generate_hash(length=10),
@@ -1118,9 +1119,11 @@ def fetch_and_create_commission():
 
             existing_name = existing_map.get(key)
             if existing_name:
-                update_tuples.append(_build_commission_tuple(row, True, now_ts, doc_name=existing_name))
+                update_tuples.append(_build_commission_tuple(
+                    row, True, now_ts, doc_name=existing_name))
             else:
-                insert_tuples.append(_build_commission_tuple(row, True, now_ts))
+                insert_tuples.append(
+                    _build_commission_tuple(row, True, now_ts))
 
         # Process Query 1
         for row in query_1_rows:
@@ -1131,13 +1134,16 @@ def fetch_and_create_commission():
 
             existing_name = existing_map.get(key)
             if existing_name:
-                update_tuples.append(_build_commission_tuple(row, False, now_ts, doc_name=existing_name))
+                update_tuples.append(_build_commission_tuple(
+                    row, False, now_ts, doc_name=existing_name))
             else:
-                insert_tuples.append(_build_commission_tuple(row, False, now_ts))
+                insert_tuples.append(
+                    _build_commission_tuple(row, False, now_ts))
 
         # Execute Bulk Inserts
         if insert_tuples:
-            frappe.db.bulk_insert("Commission", COMMISSION_BULK_FIELDS, insert_tuples, chunk_size=5000)
+            frappe.db.bulk_insert(
+                "Commission", COMMISSION_BULK_FIELDS, insert_tuples, chunk_size=5000)
             frappe.db.commit()
 
         # Execute Bulk Updates
@@ -1206,7 +1212,8 @@ def run_fetch_and_create_commission_with_progress(limit=None):
         processed_keys = set()
 
         total_to_process = len(query_2_rows) + len(query_1_rows)
-        progress = tqdm(total=total_to_process, desc="Upserting Commission Docs", unit="doc")
+        progress = tqdm(total=total_to_process,
+                        desc="Upserting Commission Docs", unit="doc")
 
         insert_tuples = []
         update_tuples = []
@@ -1222,9 +1229,11 @@ def run_fetch_and_create_commission_with_progress(limit=None):
 
                 existing_name = existing_map.get(key)
                 if existing_name:
-                    update_tuples.append(_build_commission_tuple(row, True, now_ts, doc_name=existing_name))
+                    update_tuples.append(_build_commission_tuple(
+                        row, True, now_ts, doc_name=existing_name))
                 else:
-                    insert_tuples.append(_build_commission_tuple(row, True, now_ts))
+                    insert_tuples.append(
+                        _build_commission_tuple(row, True, now_ts))
                 progress.update(1)
 
             # Process Query 1
@@ -1237,13 +1246,16 @@ def run_fetch_and_create_commission_with_progress(limit=None):
 
                 existing_name = existing_map.get(key)
                 if existing_name:
-                    update_tuples.append(_build_commission_tuple(row, False, now_ts, doc_name=existing_name))
+                    update_tuples.append(_build_commission_tuple(
+                        row, False, now_ts, doc_name=existing_name))
                 else:
-                    insert_tuples.append(_build_commission_tuple(row, False, now_ts))
+                    insert_tuples.append(
+                        _build_commission_tuple(row, False, now_ts))
                 progress.update(1)
 
             if insert_tuples:
-                frappe.db.bulk_insert("Commission", COMMISSION_BULK_FIELDS, insert_tuples, chunk_size=5000)
+                frappe.db.bulk_insert(
+                    "Commission", COMMISSION_BULK_FIELDS, insert_tuples, chunk_size=5000)
                 frappe.db.commit()
 
             if update_tuples:
@@ -4402,6 +4414,154 @@ def calculate_commission_for_all():
             frappe.log_error(
                 frappe.get_traceback(),
                 f"Commission Calculation Error - {docname}",
+            )
+
+    return {
+        "status": "completed",
+        "total_processed": len(commission_names),
+        "success_count": success_count,
+        "error_count": error_count,
+        "errors": errors,
+    }
+
+
+@frappe.whitelist()
+def calculate_commission_for_all_with_progress_bar():
+    """
+    Calculate commission on all Commission documents with a terminal
+    progress bar using tqdm.
+
+    Displays progress, successful calculations, errors, and final status.
+    """
+    from tqdm import tqdm
+
+    frappe.only_for(("System Manager",))
+    _validate_commission_calculation_enabled()
+
+    commission_names = frappe.get_all(
+        "Commission",
+        filters={"docstatus": ("<", 2)},
+        pluck="name",
+    )
+
+    total_records = len(commission_names)
+    success_count = 0
+    error_count = 0
+    errors = []
+
+    if not commission_names:
+        result = {
+            "status": "completed",
+            "total_processed": 0,
+            "success_count": 0,
+            "error_count": 0,
+            "errors": [],
+        }
+        print("\nCommission Calculation Result")
+        print("Status: Completed")
+        print("Total Processed: 0")
+        print("Success Count: 0")
+        print("Error Count: 0")
+        return result
+
+    with tqdm(
+        total=total_records,
+        desc="Calculating Commission",
+        unit="record",
+        dynamic_ncols=True,
+        leave=True,
+    ) as progress:
+
+        for docname in commission_names:
+            try:
+                calculate_commission_amount(docname)
+                success_count += 1
+
+            except Exception:
+                error_count += 1
+                error_traceback = frappe.get_traceback()
+
+                errors.append({
+                    "docname": docname,
+                    "error": error_traceback,
+                })
+
+                frappe.log_error(
+                    error_traceback,
+                    f"Commission Calculation Error - {docname}",
+                )
+
+            finally:
+                progress.update(1)
+                progress.set_postfix(
+                    success=success_count,
+                    errors=error_count,
+                )
+
+    result = {
+        "status": "completed",
+        "total_processed": total_records,
+        "success_count": success_count,
+        "error_count": error_count,
+        "errors": errors,
+    }
+
+    print("\n\n========== Commission Calculation Result ==========")
+    print(f"Status          : {result['status'].upper()}")
+    print(f"Total Processed : {total_records}")
+    print(f"Success Count   : {success_count}")
+    print(f"Error Count     : {error_count}")
+    print("===================================================")
+
+    return result
+
+
+@frappe.whitelist()
+def calculate_commission_for_selected(commission_names):
+    """
+    Calculate commission only for the selected Commission documents.
+    Uses the existing calculate_commission_amount() method.
+    """
+    frappe.only_for(("System Manager",))
+    _validate_commission_calculation_enabled()
+
+    if isinstance(commission_names, str):
+        commission_names = frappe.parse_json(commission_names)
+
+    if not commission_names:
+        frappe.throw(_("Please select at least one Commission record."))
+
+    # Remove duplicates while preserving order.
+    commission_names = list(dict.fromkeys(commission_names))
+
+    success_count = 0
+    error_count = 0
+    errors = []
+
+    for docname in commission_names:
+        try:
+            # Validate that the document exists.
+            if not frappe.db.exists("Commission", docname):
+                frappe.throw(
+                    _("Commission document {0} does not exist.").format(
+                        docname
+                    )
+                )
+
+            # Run the existing calculation method.
+            calculate_commission_amount(docname)
+            success_count += 1
+
+        except Exception:
+            error_count += 1
+            errors.append({
+                "docname": docname,
+                "error": frappe.get_traceback(),
+            })
+
+            frappe.log_error(
+                frappe.get_traceback(),
+                f"Selected Commission Calculation Error - {docname}",
             )
 
     return {
