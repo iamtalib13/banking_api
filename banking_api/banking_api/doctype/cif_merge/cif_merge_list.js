@@ -56,21 +56,31 @@ frappe.listview_settings['CIF Merge'] = {
 					listview.filter_area.clear();
 				});
 
-				// Target only standard view switcher button (do NOT hide custom-actions container)
+				if (listview.page.custom_actions) {
+					listview.page.custom_actions.removeClass('hide');
+				}
+
 				if (listview.page.inner_toolbar) {
-					listview.page.inner_toolbar.find('.inner-group-button, .btn-group:has([data-toggle="dropdown"])').hide();
 					listview.page.inner_toolbar.append($container);
 				} else {
 					listview.page.add_inner_button($container);
 				}
 
-				frappe.dom.set_style(`
-					[data-page-route="List/CIF Merge/List"] .inner-group-button {
-						display: none !important;
-					}
-				`);
+				// Hide only the view switcher dropdown button
+				listview.page.wrapper.find('.custom-btn-group').hide();
 			}
 		});
+
+		// Explicitly add List Settings to Page Menu
+		listview.page.add_menu_item(__('List Settings'), function() {
+			listview.show_list_settings();
+		});
+	},
+	refresh: function(listview) {
+		// Ensure only view switcher is hidden and filters container remains visible
+		if (listview.page && listview.page.wrapper) {
+			listview.page.wrapper.find('.custom-btn-group').hide();
+		}
 	},
 	get_indicator: function(doc) {
 		if (doc.status === "Active") {
