@@ -12,6 +12,8 @@
   "total_cif_count",
   "column_break_wyxm",
   "status",
+  "column_break_cif_status",
+  "cif_status",
   "section_break_fnvz",
   "merge_widget",
   "cif_details"
@@ -68,6 +70,20 @@
    "in_standard_filter": 1,
    "label": "Status",
    "options": "Active\nInactive"
+  },
+  {
+   "fieldname": "column_break_cif_status",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Pending",
+   "fieldname": "cif_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "CIF Status",
+   "options": "Pending\nCompleted",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
@@ -106,6 +122,14 @@
   {
    "color": "Red",
    "title": "Inactive"
+  },
+  {
+   "title": "Pending",
+   "color": "Orange"
+  },
+  {
+   "title": "Completed",
+   "color": "Green"
   }
  ]
 }
