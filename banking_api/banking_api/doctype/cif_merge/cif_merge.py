@@ -47,6 +47,9 @@ class CIFMerge(Document):
 			self.total_cif_count = 0
 			self.status = "Inactive"
 
+		if not self.cif_status:
+			self.cif_status = "Pending"
+
 
 
 ACTIVE_CIF_QUERY = """
@@ -490,13 +493,14 @@ def _bulk_upsert_cif_records(grouped, status="Active"):
 			"owner": user,
 			"aadhar": aadhar,
 			"total_cif_count": len(items),
-			"status": status
+			"status": status,
+			"cif_status": "Pending"
 		})
 
 	# 1. Bulk insert parent table `tabCIF Merge`
 	frappe.db.bulk_insert(
 		"CIF Merge",
-		fields=["name", "creation", "modified", "modified_by", "owner", "aadhar", "total_cif_count", "status"],
+		fields=["name", "creation", "modified", "modified_by", "owner", "aadhar", "total_cif_count", "status", "cif_status"],
 		values=[list(d.values()) for d in parent_records],
 		ignore_duplicates=True
 	)
