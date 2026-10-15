@@ -1,23 +1,6 @@
 frappe.listview_settings['CIF Merge'] = {
 	onload: function(listview) {
-		// Single Count Filter Button
-		listview.page.add_inner_button(__('Count Filter'), function() {
-			frappe.call({
-				method: 'banking_api.banking_api.doctype.cif_merge.cif_merge.get_top_cif_counts',
-				freeze: true,
-				freeze_message: __('Top CIF counts load ho rahe hain...'),
-				callback: function(r) {
-					const data = r.message || [];
-					if (!data.length) {
-						frappe.msgprint(__('Koi CIF records nahi mile.'));
-						return;
-					}
-					show_top_cif_dialog(listview, data);
-				}
-			});
-		});
-
-		// Status Capsules (Active / Inactive / All)
+		// Status Capsules (Active / Inactive / All) & Count Filter
 		frappe.call({
 			method: 'banking_api.banking_api.doctype.cif_merge.cif_merge.get_status_summary',
 			callback: function(r) {
@@ -25,7 +8,10 @@ frappe.listview_settings['CIF Merge'] = {
 				const fmt = (num) => Number(num || 0).toLocaleString('en-IN');
 
 				const $container = $(`
-					<div class="cif-status-capsules d-flex align-items-center ml-2" style="gap: 6px; display: inline-flex;">
+					<div class="cif-custom-toolbar-filters d-flex align-items-center" style="gap: 6px; display: inline-flex;">
+						<button class="btn btn-xs btn-default cif-count-filter-btn text-muted font-weight-bold" style="border-radius: 12px; border: 1px solid #d1d5db;" title="${__('Filter by CIF count')}">
+							<i class="fa fa-filter mr-1"></i>${__('Count Filter')}
+						</button>
 						<button class="btn btn-xs btn-default text-success font-weight-bold" style="border-radius: 12px; border: 1px solid #86efac; background: #f0fdf4;" title="Filter Active CIFs">
 							● Active <span class="badge badge-success ml-1">${fmt(summary.Active)}</span>
 						</button>
@@ -38,6 +24,23 @@ frappe.listview_settings['CIF Merge'] = {
 					</div>
 				`);
 
+				// Count filter click
+				$container.find('.cif-count-filter-btn').on('click', function() {
+					frappe.call({
+						method: 'banking_api.banking_api.doctype.cif_merge.cif_merge.get_top_cif_counts',
+						freeze: true,
+						freeze_message: __('Top CIF counts load ho rahe hain...'),
+						callback: function(res) {
+							const data = res.message || [];
+							if (!data.length) {
+								frappe.msgprint(__('Koi CIF records nahi mile.'));
+								return;
+							}
+							show_top_cif_dialog(listview, data);
+						}
+					});
+				});
+
 				// Filter actions
 				$container.find('.text-success').on('click', function() {
 					listview.filter_area.clear();
@@ -49,11 +52,23 @@ frappe.listview_settings['CIF Merge'] = {
 					listview.filter_area.add([['CIF Merge', 'status', '=', 'Inactive']]);
 				});
 
-				$container.find('.text-muted').on('click', function() {
+				$container.find('.text-muted').not('.cif-count-filter-btn').on('click', function() {
 					listview.filter_area.clear();
 				});
 
-				listview.page.inner_toolbar ? listview.page.inner_toolbar.append($container) : listview.page.add_inner_button($container);
+				// Target only standard view switcher button (do NOT hide custom-actions container)
+				if (listview.page.inner_toolbar) {
+					listview.page.inner_toolbar.find('.inner-group-button, .btn-group:has([data-toggle="dropdown"])').hide();
+					listview.page.inner_toolbar.append($container);
+				} else {
+					listview.page.add_inner_button($container);
+				}
+
+				frappe.dom.set_style(`
+					[data-page-route="List/CIF Merge/List"] .inner-group-button {
+						display: none !important;
+					}
+				`);
 			}
 		});
 	},
