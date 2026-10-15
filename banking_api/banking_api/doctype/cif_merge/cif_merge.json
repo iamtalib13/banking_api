@@ -69,7 +69,8 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "Active\nInactive"
+   "options": "Active\nInactive",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_cif_status",
@@ -90,7 +91,7 @@
  "hide_toolbar": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-14 12:33:01.249902",
+ "modified": "2026-10-15 17:48:59.857199",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "CIF Merge",
@@ -124,12 +125,12 @@
    "title": "Inactive"
   },
   {
-   "title": "Pending",
-   "color": "Orange"
+   "color": "Orange",
+   "title": "Pending"
   },
   {
-   "title": "Completed",
-   "color": "Green"
+   "color": "Green",
+   "title": "Completed"
   }
  ]
 }
