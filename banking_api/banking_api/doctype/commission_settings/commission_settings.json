@@ -49,7 +49,9 @@
   "eligible_amount_scheme_groups",
   "demand_multiplier_settings",
   "demand_multiplier",
-  "demand_multiplier_scheme_codes"
+  "demand_multiplier_scheme_codes",
+  "eligible_amount_settings",
+  "eligible_amount_setting"
  ],
  "fields": [
   {
@@ -324,6 +326,20 @@
    "fieldname": "demand_multiplier_scheme_codes",
    "fieldtype": "Small Text",
    "label": "Selected Scheme Codes for Multiplier"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "eligible_amount_settings",
+   "fieldtype": "Section Break",
+   "label": "Eligible Amount Settings"
+  },
+  {
+   "default": "Whichever is minimum demand or collection",
+   "description": "Select whether eligible amount should be minimum or maximum of demand and collection",
+   "fieldname": "eligible_amount_setting",
+   "fieldtype": "Select",
+   "label": "Eligible Amount Setting",
+   "options": "Whichever is minimum demand or collection\nWhichever is maximum demand or collection"
   }
  ],
  "grid_page_length": 50,
