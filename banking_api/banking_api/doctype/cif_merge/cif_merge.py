@@ -621,6 +621,14 @@ def update_workflow_status(docname, action):
 		doc.save()
 		return {"status": doc.cif_status, "message": "CIF Merge record rejected."}
 
+	elif action == "no_action_needed":
+		# Both Maker and Checker can mark No Action Needed
+		if not (is_maker or is_checker):
+			frappe.throw("Only CIF Maker or Checker can take this action.")
+		doc.cif_status = "No Action Needed"
+		doc.save()
+		return {"status": doc.cif_status, "message": "Record marked as No Action Needed."}
+
 	else:
 		frappe.throw(f"Invalid action: {action}")
 
