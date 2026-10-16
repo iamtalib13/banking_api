@@ -124,13 +124,13 @@ function show_top_cif_dialog(listview, data) {
 	`).join('');
 
 	const d = new frappe.ui.Dialog({
-		title: __('Top 10 CIF Count Filter'),
+		title: __('CIF Count Filter'),
 		fields: [
 			{
 				fieldname: 'html_table',
 				fieldtype: 'HTML',
 				options: `
-					<div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+					<div class="table-responsive" style="max-height: 450px; overflow-y: auto;">
 						<table class="table table-bordered table-hover mb-0">
 							<thead class="thead-light">
 								<tr>
