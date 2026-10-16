@@ -339,14 +339,13 @@ def get_status_summary():
 
 @frappe.whitelist()
 def get_top_cif_counts():
-	"""Returns top distinct total_cif_count values with their record counts."""
+	"""Returns all distinct total_cif_count values (from 1 upwards) with their record counts."""
 	return frappe.db.sql("""
 		SELECT total_cif_count, COUNT(*) as doc_count
 		FROM `tabCIF Merge`
 		WHERE total_cif_count > 0
 		GROUP BY total_cif_count
-		ORDER BY total_cif_count DESC
-		LIMIT 10
+		ORDER BY total_cif_count ASC
 	""", as_dict=True)
 
 
