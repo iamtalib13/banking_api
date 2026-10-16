@@ -98,11 +98,17 @@ frappe.listview_settings['CIF Merge'] = {
 			}
 		},
 		cif_status: function(val) {
-			if (val === "Completed") {
-				return `<span class="indicator-pill green font-weight-bold">${__("Completed")}</span>`;
-			} else {
-				return `<span class="indicator-pill orange font-weight-bold">${__("Pending")}</span>`;
-			}
+			let status = val || "Draft";
+			let map = {
+				"Draft": { color: "gray", label: __("Draft") },
+				"Pending": { color: "orange", label: __("Pending") },
+				"Pending Verification": { color: "orange", label: __("Pending Verification") },
+				"Approved": { color: "green", label: __("Approved") },
+				"Completed": { color: "green", label: __("Approved") },
+				"Rejected": { color: "red", label: __("Rejected") }
+			};
+			let info = map[status] || { color: "gray", label: status };
+			return `<span class="indicator-pill ${info.color} font-weight-bold">${info.label}</span>`;
 		}
 	}
 };
