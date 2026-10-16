@@ -9,6 +9,9 @@ frappe.listview_settings['CIF Merge'] = {
 
 				const $container = $(`
 					<div class="cif-custom-toolbar-filters d-flex align-items-center" style="gap: 6px; display: inline-flex;">
+						<button class="btn btn-xs btn-default cif-report-btn text-primary font-weight-bold" style="border-radius: 12px; border: 1px solid #93c5fd; background: #eff6ff;" title="${__('View CIF Merge Status Report')}">
+							<i class="fa fa-bar-chart mr-1"></i>${__('Report')}
+						</button>
 						<button class="btn btn-xs btn-default cif-count-filter-btn text-muted font-weight-bold" style="border-radius: 12px; border: 1px solid #d1d5db;" title="${__('Filter by CIF count')}">
 							<i class="fa fa-filter mr-1"></i>${__('Count Filter')}
 						</button>
@@ -23,6 +26,11 @@ frappe.listview_settings['CIF Merge'] = {
 						</button>
 					</div>
 				`);
+
+				// Report shortcut button click
+				$container.find('.cif-report-btn').on('click', function() {
+					frappe.set_route('query-report', 'CIF Merge Status Report');
+				});
 
 				// Count filter click
 				$container.find('.cif-count-filter-btn').on('click', function() {
@@ -98,11 +106,18 @@ frappe.listview_settings['CIF Merge'] = {
 			}
 		},
 		cif_status: function(val) {
-			if (val === "Completed") {
-				return `<span class="indicator-pill green font-weight-bold">${__("Completed")}</span>`;
-			} else {
-				return `<span class="indicator-pill orange font-weight-bold">${__("Pending")}</span>`;
-			}
+			let status = val || "Draft";
+			let map = {
+				"Draft": { color: "gray", label: __("Draft") },
+				"Pending": { color: "orange", label: __("Pending") },
+				"Pending Verification": { color: "orange", label: __("Pending Verification") },
+				"Approved": { color: "green", label: __("Approved") },
+				"Completed": { color: "green", label: __("Approved") },
+				"Rejected": { color: "red", label: __("Rejected") },
+				"No Action Needed": { color: "blue", label: __("No Action Needed") }
+			};
+			let info = map[status] || { color: "gray", label: status };
+			return `<span class="indicator-pill ${info.color} font-weight-bold">${info.label}</span>`;
 		}
 	}
 };
@@ -118,13 +133,13 @@ function show_top_cif_dialog(listview, data) {
 	`).join('');
 
 	const d = new frappe.ui.Dialog({
-		title: __('Top 10 CIF Count Filter'),
+		title: __('CIF Count Filter'),
 		fields: [
 			{
 				fieldname: 'html_table',
 				fieldtype: 'HTML',
 				options: `
-					<div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+					<div class="table-responsive" style="max-height: 450px; overflow-y: auto;">
 						<table class="table table-bordered table-hover mb-0">
 							<thead class="thead-light">
 								<tr>

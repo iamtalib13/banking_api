@@ -8,34 +8,68 @@ frappe.ui.form.on("CIF Merge", {
 		let is_admin = frappe.user_roles.includes("System Manager") || frappe.session.user === "Administrator";
 		frm.toggle_display("cif_details", is_admin);
 
-		// Form header status indicator badge (Pending / Completed)
-		let is_completed = frm.doc.cif_status === "Completed";
-		frm.page.set_indicator(is_completed ? __("Completed") : __("Pending"), is_completed ? "green" : "orange");
+		// Workflow status indicator badge
+		let status = frm.doc.cif_status || "Draft";
+		let status_colors = {
+			"Draft": "gray",
+			"Pending Verification": "orange",
+			"Approved": "green",
+			"Rejected": "red",
+			"No Action Needed": "blue"
+		};
+		frm.page.set_indicator(__(status), status_colors[status] || "gray");
 
-		// Complete Button handling
-		frm.clear_custom_buttons();
-		let has_primary = (frm.doc.cif_details || []).some(r => r.primary);
+		// Role checks
+		let is_maker = frappe.user_roles.includes("CIF Maker") || is_admin;
+		let is_checker = frappe.user_roles.includes("CIF Checker") || is_admin;
 
-		if (frm.doc.cif_status === "Completed") {
-			frm.set_intro(__("This CIF Merge record is marked as <b>Completed</b>."), "green");
+		let handle_workflow_action = function(action, confirm_msg) {
+			frappe.confirm(confirm_msg, function() {
+				let call_action = function() {
+					frappe.call({
+						method: "banking_api.banking_api.doctype.cif_merge.cif_merge.update_workflow_status",
+						args: {
+							docname: frm.doc.name,
+							action: action
+						},
+						freeze: true,
+						freeze_message: __("Updating CIF Merge status..."),
+						callback: function(r) {
+							if (r.message) {
+								frappe.show_alert({ message: __(r.message.message), indicator: "green" });
+								frm.reload_doc();
+							}
+						}
+					});
+				};
+
+				if (action === "send_to_checker") {
+					// Maker sending to checker - always force save first
+					frm.dirty();
+					frm.save().then(() => {
+						call_action();
+					}).catch(() => {
+						frappe.msgprint(__("Error saving form before sending to checker."));
+					});
+				} else {
+					call_action();
+				}
+			});
+		};
+
+		if (status === "No Action Needed") {
+			frm.set_intro(__("This CIF Merge record is marked as <b>No Action Needed</b>."), "blue");
 			frm.set_read_only();
-		} else if (has_primary && !frm.is_new()) {
-			frm.add_custom_button(__("Complete"), function() {
-				frappe.confirm(
-					__("Are you sure you want to mark this CIF Merge as <b>Completed</b>? This will submit the record."),
-					function() {
-						frm.set_value("cif_status", "Completed");
-						frm.save().then(() => {
-							frappe.show_alert({
-								message: __("CIF Merge completed successfully!"),
-								indicator: "green"
-							});
-							frm.refresh();
-						});
-					}
-				);
-			}).addClass("btn-primary font-weight-bold");
+		} else if (status === "Approved") {
+			frm.set_intro(__("This CIF Merge record is <b>Approved</b>."), "green");
+			frm.set_read_only();
+		} else if (status === "Rejected") {
+			frm.set_intro(__("This CIF Merge record has been <b>Rejected</b> by Checker."), "red");
+		} else if (status === "Pending Verification") {
+			frm.set_intro(__("Record is pending verification by <b>CIF Checker</b>."), "orange");
 		}
+
+		// Standard Frappe Workflow renders all actions in Actions dropdown
 
 		frm.trigger("render_custom_table");
 	},
@@ -85,6 +119,8 @@ frappe.ui.form.on("CIF Merge", {
 						child.address_line_2 = row.address_line_2;
 						child.address_line_3 = row.address_line_3;
 						child.pin_code = row.pin_code;
+						child.active_accounts_count = row.active_accounts_count || 0;
+						child.active_account_numbers = row.active_account_numbers || "";
 						child.primary = row.primary || 0;
 						child.merge = row.merge || 0;
 						child.re_kyc = row.re_kyc || 0;
@@ -204,6 +240,13 @@ frappe.ui.form.on("CIF Merge", {
 			`;
 		}).join('') || '<span class="text-muted font-italic small">No duplicate string tokens detected</span>';
 
+		let is_admin = frappe.user_roles.includes("System Manager") || frappe.session.user === "Administrator";
+		let is_maker = frappe.user_roles.includes("CIF Maker") || is_admin;
+		let status = frm.doc.cif_status || "Draft";
+		let is_editable = (status === "Draft" || status === "Rejected") && is_maker;
+		let disabled_attr = is_editable ? '' : 'disabled';
+		let chk_cursor = is_editable ? 'cursor:pointer;' : 'cursor:not-allowed; opacity:0.65;';
+
 		let rows_html = data.map((row, idx) => {
 			let row_style = "";
 			let row_class = "";
@@ -229,13 +272,13 @@ frappe.ui.form.on("CIF Merge", {
 					<td>${render_token_name(row.last_name)}</td>
 					<td class="text-muted small">${format_date(row.cif_creation)}</td>
 					<td class="text-center">
-						<input type="checkbox" class="cif-primary-chk" data-idx="${idx}" ${row.primary ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px;">
+						<input type="checkbox" class="cif-primary-chk" data-idx="${idx}" ${row.primary ? 'checked' : ''} ${disabled_attr} style="${chk_cursor} width:16px; height:16px;">
 					</td>
 					<td class="text-center">
-						<input type="checkbox" class="cif-merge-chk" data-idx="${idx}" ${row.merge ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px;">
+						<input type="checkbox" class="cif-merge-chk" data-idx="${idx}" ${row.merge ? 'checked' : ''} ${disabled_attr} style="${chk_cursor} width:16px; height:16px;">
 					</td>
 					<td class="text-center">
-						<input type="checkbox" class="cif-rekyc-chk" data-idx="${idx}" ${row.re_kyc ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px;">
+						<input type="checkbox" class="cif-rekyc-chk" data-idx="${idx}" ${row.re_kyc ? 'checked' : ''} ${disabled_attr} style="${chk_cursor} width:16px; height:16px;">
 					</td>
 				</tr>
 			`;
@@ -291,9 +334,8 @@ frappe.ui.form.on("CIF Merge", {
 
 			<!-- Table 1: Actions & Deduplication Control -->
 			<div class="mb-3">
-				<h6 class="text-secondary font-weight-bold mb-1" style="font-size: 13px;"><i class="fa fa-sliders mr-1 text-primary"></i> 1. CIF Selection & Deduplication Table</h6>
-				<div class="cif-scroll-wrapper border rounded" style="max-height: 280px;">
-				<div class="table-responsive border rounded" style="overflow-x: auto; overflow-y: visible;">
+				<h6 class="text-secondary font-weight-bold mb-1" style="font-size: 13px;"><i class="fa fa-sliders mr-1 text-primary"></i> 1. CIF Selection & Deduplication Table (${data.length} CIFs)</h6>
+				<div class="cif-scroll-wrapper border rounded" style="max-height: 500px;">
 					<table class="table table-sm table-bordered m-0" style="vertical-align: middle; min-width: 600px;">
 						<thead class="thead-light small" style="position: sticky; top: 0; z-index: 2; background: #f8f9fa;">
 							<tr>
@@ -301,47 +343,19 @@ frappe.ui.form.on("CIF Merge", {
 								<th style="min-width: 120px;">CIF ID</th>
 								<th style="min-width: 140px;">First Name</th>
 								<th style="min-width: 140px;">Last Name</th>
+								<th style="min-width: 110px;">Creation Date</th>
 								<th style="width: 90px;" class="text-center bg-success text-white">Primary</th>
-								<th style="width: 90px;" class="text-center text-dark" style="background:#9333ea;">Merge</th>
+								<th style="width: 105px;" class="text-center text-dark" style="background:#e9d5ff;">
+									<div class="d-flex align-items-center justify-content-center gap-1">
+										<input type="checkbox" class="cif-merge-select-all" ${disabled_attr} style="${chk_cursor} width:15px; height:15px;" title="Select all except Primary" ${data.length > 1 && data.filter(r => !r.primary).every(r => r.merge) ? 'checked' : ''}>
+										<span>Merge</span>
+									</div>
+								</th>
 								<th style="width: 90px;" class="text-center bg-warning text-dark">Re KYC</th>
 							</tr>
 						</thead>
 						<tbody>
-							${data.map((row, idx) => {
-								let row_style = "";
-								let row_class = "";
-								if (row.primary) {
-									row_class = "table-success";
-									row_style = "border-left: 5px solid #16a34a; background-color: #f0fdf4;";
-								} else if (row.merge) {
-									row_style = "border-left: 5px solid #9333ea; background-color: #faf5ff;";
-								} else if (row.re_kyc) {
-									row_style = "border-left: 5px solid #d97706; background-color: #fffbeb;";
-								}
-
-								return `
-									<tr class="${row_class}" style="${row_style}" data-idx="${idx}">
-										<td class="text-center text-muted small">${idx + 1}</td>
-										<td>
-											<span class="font-weight-bold">${escape_html(row.cif_id)}</span>
-											${row.primary ? '<span class="badge badge-success ml-1">PRIMARY</span>' : ''}
-											${row.merge ? '<span class="badge ml-1" style="background:#9333ea; color:white;">MERGE</span>' : ''}
-											${row.re_kyc ? '<span class="badge badge-warning ml-1">RE-KYC</span>' : ''}
-										</td>
-										<td>${render_token_name(row.first_name)}</td>
-										<td>${render_token_name(row.last_name)}</td>
-										<td class="text-center">
-											<input type="checkbox" class="cif-primary-chk" data-idx="${idx}" ${row.primary ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px;">
-										</td>
-										<td class="text-center">
-											<input type="checkbox" class="cif-merge-chk" data-idx="${idx}" ${row.merge ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px;">
-										</td>
-										<td class="text-center">
-											<input type="checkbox" class="cif-rekyc-chk" data-idx="${idx}" ${row.re_kyc ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px;">
-										</td>
-									</tr>
-								`;
-							}).join('')}
+							${rows_html}
 						</tbody>
 					</table>
 				</div>
@@ -349,11 +363,9 @@ frappe.ui.form.on("CIF Merge", {
 
 			<!-- Table 2: User Other Details -->
 			<div class="mb-3">
-				<h6 class="text-secondary font-weight-bold mb-1" style="font-size: 13px;"><i class="fa fa-id-card-o mr-1 text-info"></i> 2. CIF User Full Details</h6>
-				<div class="cif-scroll-wrapper border rounded" style="max-height: 320px;">
+				<h6 class="text-secondary font-weight-bold mb-1" style="font-size: 13px;"><i class="fa fa-id-card-o mr-1 text-info"></i> 2. CIF User Full Details (${data.length} CIFs)</h6>
+				<div class="cif-scroll-wrapper border rounded" style="max-height: 500px;">
 					<table class="table table-sm table-hover table-bordered m-0" style="vertical-align: middle; min-width: 1350px;">
-				<div class="table-responsive border rounded" style="overflow-x: auto; overflow-y: visible;">
-					<table class="table table-sm table-hover table-bordered m-0" style="vertical-align: middle; min-width: 1050px;">
 						<thead class="thead-light small" style="position: sticky; top: 0; z-index: 2; background: #f8f9fa;">
 							<tr>
 								<th style="width: 40px;" class="text-center">#</th>
@@ -363,8 +375,11 @@ frappe.ui.form.on("CIF Merge", {
 								<th style="min-width: 130px;">Last Name</th>
 								<th style="min-width: 110px;">Date of Birth</th>
 								<th style="min-width: 110px;">Mobile</th>
+								<th style="min-width: 120px;">PAN</th>
 								<th style="width: 70px;" class="text-center">Sol ID</th>
 								<th style="min-width: 110px;">Creation Date</th>
+								<th style="min-width: 180px;">Active Accounts</th>
+								<th style="min-width: 90px;">Pin Code</th>
 								<th style="min-width: 180px;">Address</th>
 							</tr>
 						</thead>
@@ -395,8 +410,15 @@ frappe.ui.form.on("CIF Merge", {
 										<td>${escape_html(row.last_name || '-')}</td>
 										<td>${format_date(row.date_of_birth)}</td>
 										<td>${escape_html(row.mobile || '-')}</td>
+										<td><span class="badge badge-light border text-monospace font-weight-bold">${escape_html(row.pan || '-')}</span></td>
 										<td><span class="badge badge-light border">${escape_html(row.sol_id || '-')}</span></td>
 										<td class="text-muted small">${format_date(row.cif_creation)}</td>
+										<td>
+											${row.active_accounts_count > 0 
+												? `<span class="badge badge-success mb-1">${row.active_accounts_count} Active</span><div class="small font-weight-bold text-dark font-monospace" style="word-break: break-all;">${escape_html(row.active_account_numbers || '-')}</div>` 
+												: '<span class="badge badge-secondary">0 Active</span><div class="small text-muted font-italic">No active account</div>'}
+										</td>
+										<td><span class="badge badge-light border font-weight-bold">${escape_html(row.pin_code || '-')}</span></td>
 										<td class="small text-muted">${escape_html([row.address_line_1, row.address_line_2, row.address_line_3].filter(Boolean).join(', ') || '-')}</td>
 									</tr>
 								`;
@@ -464,14 +486,30 @@ frappe.ui.form.on("CIF Merge", {
 		wrapper.find('.cif-primary-chk').on('change', function() {
 			let idx = $(this).data('idx');
 			let is_checked = $(this).is(':checked');
-			frm.doc.cif_details.forEach((r, i) => {
-				r.primary = (i === idx && is_checked) ? 1 : 0;
-				if (r.primary) {
-					r.merge = 0;
-					r.re_kyc = 0;
+			(frm.doc.cif_details || []).forEach((r, i) => {
+				let val = (i === idx && is_checked) ? 1 : 0;
+				frappe.model.set_value(r.doctype, r.name, "primary", val);
+				if (val) {
+					frappe.model.set_value(r.doctype, r.name, "merge", 0);
+					frappe.model.set_value(r.doctype, r.name, "re_kyc", 0);
 				}
 			});
-			frm.refresh_field("cif_details");
+			frm.dirty();
+			frm.refresh();
+		});
+
+		// Event: Select All Merge Checkbox (Excludes Primary row)
+		wrapper.find('.cif-merge-select-all').on('change', function() {
+			let is_checked = $(this).is(':checked');
+			(frm.doc.cif_details || []).forEach(r => {
+				if (!r.primary) {
+					frappe.model.set_value(r.doctype, r.name, "merge", is_checked ? 1 : 0);
+					if (is_checked) {
+						frappe.model.set_value(r.doctype, r.name, "re_kyc", 0);
+					}
+				}
+			});
+			frm.dirty();
 			frm.refresh();
 		});
 
@@ -480,15 +518,15 @@ frappe.ui.form.on("CIF Merge", {
 			let idx = $(this).data('idx');
 			let is_checked = $(this).is(':checked');
 			let row = frm.doc.cif_details[idx];
-			if (is_checked) {
-				row.merge = 1;
-				row.re_kyc = 0;
-				row.primary = 0;
-			} else {
-				row.merge = 0;
+			if (row) {
+				frappe.model.set_value(row.doctype, row.name, "merge", is_checked ? 1 : 0);
+				if (is_checked) {
+					frappe.model.set_value(row.doctype, row.name, "re_kyc", 0);
+					frappe.model.set_value(row.doctype, row.name, "primary", 0);
+				}
+				frm.dirty();
+				frm.refresh();
 			}
-			frm.refresh_field("cif_details");
-			frm.trigger("render_custom_table");
 		});
 
 		// Event: Re-KYC Checkbox (Mutually exclusive with Merge & Primary)
@@ -496,15 +534,15 @@ frappe.ui.form.on("CIF Merge", {
 			let idx = $(this).data('idx');
 			let is_checked = $(this).is(':checked');
 			let row = frm.doc.cif_details[idx];
-			if (is_checked) {
-				row.re_kyc = 1;
-				row.merge = 0;
-				row.primary = 0;
-			} else {
-				row.re_kyc = 0;
+			if (row) {
+				frappe.model.set_value(row.doctype, row.name, "re_kyc", is_checked ? 1 : 0);
+				if (is_checked) {
+					frappe.model.set_value(row.doctype, row.name, "merge", 0);
+					frappe.model.set_value(row.doctype, row.name, "primary", 0);
+				}
+				frm.dirty();
+				frm.refresh();
 			}
-			frm.refresh_field("cif_details");
-			frm.trigger("render_custom_table");
 		});
 	}
 });

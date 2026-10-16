@@ -22,7 +22,9 @@
   "address_line_1",
   "address_line_2",
   "address_line_3",
-  "pin_code"
+  "pin_code",
+  "active_accounts_count",
+  "active_account_numbers"
  ],
  "fields": [
   {
@@ -128,6 +130,20 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Pin Code"
+  },
+  {
+   "fieldname": "active_accounts_count",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Active Accounts Count",
+   "read_only": 1
+  },
+  {
+   "fieldname": "active_account_numbers",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Active Account Numbers",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,

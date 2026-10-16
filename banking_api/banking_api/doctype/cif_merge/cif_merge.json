@@ -77,13 +77,13 @@
    "fieldtype": "Column Break"
   },
   {
-   "default": "Pending",
+   "default": "Draft",
    "fieldname": "cif_status",
    "fieldtype": "Select",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "CIF Status",
-   "options": "Pending\nCompleted",
+   "options": "Draft\nPending Verification\nApproved\nRejected\nNo Action Needed",
    "read_only": 1
   }
  ],
@@ -109,6 +109,42 @@
    "role": "System Manager",
    "share": 1,
    "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "CIF Maker",
+   "share": 0,
+   "write": 1
+  },
+  {
+   "create": 0,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "CIF Checker",
+   "share": 0,
+   "write": 1
+  },
+  {
+   "create": 0,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Employee",
+   "share": 0,
+   "write": 0
   }
  ],
  "row_format": "Dynamic",
@@ -125,12 +161,24 @@
    "title": "Inactive"
   },
   {
+   "color": "Gray",
+   "title": "Draft"
+  },
+  {
    "color": "Orange",
-   "title": "Pending"
+   "title": "Pending Verification"
   },
   {
    "color": "Green",
-   "title": "Completed"
+   "title": "Approved"
+  },
+  {
+   "color": "Red",
+   "title": "Rejected"
+  },
+  {
+   "color": "Blue",
+   "title": "No Action Needed"
   }
  ]
 }
