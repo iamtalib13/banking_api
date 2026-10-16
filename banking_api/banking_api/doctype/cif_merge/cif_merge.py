@@ -48,7 +48,7 @@ class CIFMerge(Document):
 			self.status = "Inactive"
 
 		if not self.cif_status:
-			self.cif_status = "Pending"
+			self.cif_status = "Draft"
 
 
 
@@ -569,3 +569,52 @@ def _bulk_upsert_cif_records(grouped, status="Active"):
 			ignore_duplicates=True
 		)
 
+
+
+@frappe.whitelist()
+def update_workflow_status(docname, action):
+	"""
+	Workflow transitions for CIF Merge:
+	- Maker: 'send_to_checker' -> Pending Verification
+	- Checker: 'approve' -> Approved
+	- Checker: 'send_to_maker' -> Draft
+	- Checker: 'reject' -> Rejected
+	"""
+	doc = frappe.get_doc("CIF Merge", docname)
+	user_roles = frappe.get_roles(frappe.session.user)
+	is_maker = "CIF Maker" in user_roles or "System Manager" in user_roles or frappe.session.user == "Administrator"
+	is_checker = "CIF Checker" in user_roles or "System Manager" in user_roles or frappe.session.user == "Administrator"
+
+	if action == "send_to_checker":
+		if not is_maker:
+			frappe.throw("Only CIF Maker can send records to checker.")
+		has_primary = any(int(getattr(r, "primary", 0) or 0) == 1 for r in (doc.cif_details or []))
+		if not has_primary:
+			frappe.throw("Kripya at least ek Primary CIF select karein.")
+		doc.cif_status = "Pending Verification"
+		doc.save()
+		return {"status": doc.cif_status, "message": "Sent to Checker for verification."}
+
+	elif action == "approve":
+		if not is_checker:
+			frappe.throw("Only CIF Checker can approve records.")
+		doc.cif_status = "Approved"
+		doc.save()
+		return {"status": doc.cif_status, "message": "CIF Merge record approved successfully."}
+
+	elif action == "send_to_maker":
+		if not is_checker:
+			frappe.throw("Only CIF Checker can send records back to maker.")
+		doc.cif_status = "Draft"
+		doc.save()
+		return {"status": doc.cif_status, "message": "Record sent back to Maker for changes."}
+
+	elif action == "reject":
+		if not is_checker:
+			frappe.throw("Only CIF Checker can reject records.")
+		doc.cif_status = "Rejected"
+		doc.save()
+		return {"status": doc.cif_status, "message": "CIF Merge record rejected."}
+
+	else:
+		frappe.throw(f"Invalid action: {action}")
