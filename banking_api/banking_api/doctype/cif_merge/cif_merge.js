@@ -21,9 +21,6 @@ frappe.ui.form.on("CIF Merge", {
 		// Role checks
 		let is_maker = frappe.user_roles.includes("CIF Maker") || is_admin;
 		let is_checker = frappe.user_roles.includes("CIF Checker") || is_admin;
-		frm.clear_custom_buttons();
-		frm.page.clear_primary_action();
-		frm.disable_save();
 
 		let handle_workflow_action = function(action, confirm_msg) {
 			frappe.confirm(confirm_msg, function() {
@@ -68,45 +65,7 @@ frappe.ui.form.on("CIF Merge", {
 			frm.set_intro(__("Record is pending verification by <b>CIF Checker</b>."), "orange");
 		}
 
-		// CIF Maker actions (when Draft or Rejected)
-		if ((status === "Draft" || status === "Rejected") && is_maker && !frm.is_new()) {
-			let has_primary = (frm.doc.cif_details || []).some(r => r.primary);
-			if (has_primary) {
-				frm.add_custom_button(__("Send to Checker"), function() {
-					handle_workflow_action(
-						"send_to_checker",
-						__("Are you sure you want to send this record to <b>CIF Checker</b> for verification?")
-					);
-				}).addClass("btn-primary font-weight-bold");
-			}
-		}
-
-		// CIF Checker actions (when Pending Verification)
-		if (status === "Pending Verification" && is_checker && !frm.is_new()) {
-			// 1. Approve
-			frm.add_custom_button(__("Approve"), function() {
-				handle_workflow_action(
-					"approve",
-					__("Are you sure you want to <b>Approve</b> this CIF Merge?")
-				);
-			}).addClass("btn-success font-weight-bold");
-
-			// 2. Send to Maker (Revision)
-			frm.add_custom_button(__("Send to Maker"), function() {
-				handle_workflow_action(
-					"send_to_maker",
-					__("Send this record back to <b>CIF Maker</b> for changes?")
-				);
-			}).addClass("btn-warning font-weight-bold");
-
-			// 3. Reject
-			frm.add_custom_button(__("Reject"), function() {
-				handle_workflow_action(
-					"reject",
-					__("Are you sure you want to <b>Reject</b> this CIF Merge record?")
-				);
-			}).addClass("btn-danger font-weight-bold");
-		}
+		// Standard Frappe Workflow renders actions automatically
 
 		frm.trigger("render_custom_table");
 	},
