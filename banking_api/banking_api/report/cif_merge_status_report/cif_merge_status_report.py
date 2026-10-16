@@ -3,7 +3,13 @@
 
 import frappe
 from frappe import _
+import io
+import csv
 
+def _has_report_access(user):
+  allowed_roles = {"System Manager", "CIF Checker", "CIF Maker", "Employee"}
+  user_roles = set(frappe.get_roles(user))
+  return bool(allowed_roles.intersection(user_roles))
 
 def execute(filters=None):
 	filters = filters or {}
@@ -261,3 +267,21 @@ def get_chart(data):
 		"type": "bar",
 		"colors": ["#16a34a", "#dc2626", "#2563eb"]
 	}
+
+@frappe.whitelist()
+def download_csv(filters=None):
+	if not _has_report_access(frappe.session.user):
+		frappe.throw(_("You don't have permission to get a report on: Employee"))
+
+	filters = frappe.parse_json(filters) if isinstance(filters, str) else (filters or {})
+	data = get_data(filters)
+	columns = [c["fieldname"] for c in get_columns()]
+	headers = [c["label"] for c in get_columns()]
+
+	output = io.StringIO()
+	writer = csv.writer(output)
+	writer.writerow(headers)
+	for row in data:
+		writer.writerow([row.get(col, "") for col in columns])
+
+	return output.getvalue()

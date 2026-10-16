@@ -60,6 +60,27 @@ frappe.query_reports["CIF Merge Status Report"] = {
 			}
 		}, 50);
 		setTimeout(() => clearInterval(hide_actions_interval), 2000);
+
+		// Add a "Download CSV" button to the report page
+		report.page.add_inner_button(__('Download CSV'), function () {
+			let filters = report.get_values();
+			frappe.call({
+				method: "banking_api.banking_api.report.cif_merge_status_report.cif_merge_status_report.download_csv",
+				args: { filters: JSON.stringify(filters) },
+				freeze: true,
+				callback: function(r) {
+					if (r.message) {
+						let blob = new Blob([r.message], { type: "text/csv" });
+						let url = window.URL.createObjectURL(blob);
+						let a = document.createElement("a");
+						a.href = url;
+						a.download = "CIF Merge Status Report.csv";
+						a.click();
+						window.URL.revokeObjectURL(url);
+					}
+				}
+			});
+		}).addClass('btn-primary');
 	}
 		
 };
