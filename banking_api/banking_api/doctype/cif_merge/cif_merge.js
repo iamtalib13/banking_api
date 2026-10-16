@@ -22,6 +22,8 @@ frappe.ui.form.on("CIF Merge", {
 		let is_maker = frappe.user_roles.includes("CIF Maker") || is_admin;
 		let is_checker = frappe.user_roles.includes("CIF Checker") || is_admin;
 		frm.clear_custom_buttons();
+		frm.page.clear_primary_action();
+		frm.disable_save();
 
 		let handle_workflow_action = function(action, confirm_msg) {
 			frappe.confirm(confirm_msg, function() {
