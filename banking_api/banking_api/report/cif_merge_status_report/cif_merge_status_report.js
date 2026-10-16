@@ -32,6 +32,22 @@ frappe.query_reports["CIF Merge Status Report"] = {
 			} else if (data.cif_status === "No Action Needed") {
 				value = `<span class="indicator-pill blue font-weight-bold">${__("No Action Needed")}</span>`;
 			}
+		} else if (column.fieldname === "cif_type") {
+			if (data.cif_type === "Primary") {
+				value = `<span class="badge badge-success px-2 py-0.5">${__("PRIMARY")}</span>`;
+			} else if (data.cif_type === "Merge") {
+				value = `<span class="badge px-2 py-0.5" style="background-color: #9333ea; color: white;">${__("MERGE")}</span>`;
+			} else if (data.cif_type === "Re-KYC") {
+				value = `<span class="badge badge-warning px-2 py-0.5">${__("RE-KYC")}</span>`;
+			}
+		} else if (column.fieldname === "pan") {
+			if (data.pan) {
+				value = `<span class="badge badge-light border text-monospace font-weight-bold">${data.pan}</span>`;
+			}
+		} else if (column.fieldname === "pin_code") {
+			if (data.pin_code) {
+				value = `<span class="badge badge-light border font-weight-bold">${data.pin_code}</span>`;
+			}
 		}
 		return value;
 	}
