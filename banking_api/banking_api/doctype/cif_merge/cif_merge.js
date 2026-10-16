@@ -341,7 +341,12 @@ frappe.ui.form.on("CIF Merge", {
 								<th style="min-width: 140px;">Last Name</th>
 								<th style="min-width: 110px;">Creation Date</th>
 								<th style="width: 90px;" class="text-center bg-success text-white">Primary</th>
-								<th style="width: 90px;" class="text-center text-dark" style="background:#e9d5ff;">Merge</th>
+								<th style="width: 105px;" class="text-center text-dark" style="background:#e9d5ff;">
+									<div class="d-flex align-items-center justify-content-center gap-1">
+										<input type="checkbox" class="cif-merge-select-all" ${disabled_attr} style="${chk_cursor} width:15px; height:15px;" title="Select all except Primary" ${data.length > 1 && data.filter(r => !r.primary).every(r => r.merge) ? 'checked' : ''}>
+										<span>Merge</span>
+									</div>
+								</th>
 								<th style="width: 90px;" class="text-center bg-warning text-dark">Re KYC</th>
 							</tr>
 						</thead>
@@ -479,6 +484,21 @@ frappe.ui.form.on("CIF Merge", {
 				if (val) {
 					frappe.model.set_value(r.doctype, r.name, "merge", 0);
 					frappe.model.set_value(r.doctype, r.name, "re_kyc", 0);
+				}
+			});
+			frm.dirty();
+			frm.refresh();
+		});
+
+		// Event: Select All Merge Checkbox (Excludes Primary row)
+		wrapper.find('.cif-merge-select-all').on('change', function() {
+			let is_checked = $(this).is(':checked');
+			(frm.doc.cif_details || []).forEach(r => {
+				if (!r.primary) {
+					frappe.model.set_value(r.doctype, r.name, "merge", is_checked ? 1 : 0);
+					if (is_checked) {
+						frappe.model.set_value(r.doctype, r.name, "re_kyc", 0);
+					}
 				}
 			});
 			frm.dirty();
