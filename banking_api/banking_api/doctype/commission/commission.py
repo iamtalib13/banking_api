@@ -766,7 +766,8 @@ def _get_demand_settings():
         settings = frappe.get_single("Commission Settings")
         multiplier = getattr(settings, "demand_multiplier", None)
         multiplier = float(multiplier) if multiplier not in (None, "") else 3.0
-        raw_schemes = getattr(settings, "demand_multiplier_scheme_codes", None) or ""
+        raw_schemes = getattr(
+            settings, "demand_multiplier_scheme_codes", None) or ""
         schemes = {
             s.strip()
             for line in str(raw_schemes).splitlines()
@@ -793,6 +794,46 @@ def _calculate_demand(total_flow_amount, scheme_code):
         return int(round(demand * multiplier))
 
     return demand
+
+
+def _get_eligible_amount_from_setting(demand, collection):
+    """
+    Return eligible_amount based on the 'Eligible Amount Setting'
+    configured in Commission Settings.
+
+    Options:
+        Whichever is minimum demand or collection  -> min(demand, collection)
+        Whichever is maximum demand or collection  -> max(demand, collection)
+
+    If either value is None the other is returned as-is.
+    If both are None, None is returned.
+    """
+    try:
+        settings = frappe.get_single("Commission Settings")
+        setting = (
+            getattr(settings, "eligible_amount_setting", None)
+            or "Whichever is minimum demand or collection"
+        )
+    except Exception:
+        setting = "Whichever is minimum demand or collection"
+
+    demand_int = _safe_int(demand)
+    collection_int = _safe_int(collection)
+
+    if demand_int is None and collection_int is None:
+        return None
+
+    if demand_int is None:
+        return collection_int
+
+    if collection_int is None:
+        return demand_int
+
+    if setting == "Whichever is maximum demand or collection":
+        return max(demand_int, collection_int)
+
+    # Default: minimum
+    return min(demand_int, collection_int)
 
 
 COMMISSION_BULK_FIELDS = [
@@ -867,6 +908,14 @@ def _build_commission_tuple(row, is_query_2, now_ts, doc_name=None):
     collection_val = row.get(
         "total_tran_amt_dtt") if is_query_2 else row.get("total_tran_amt")
 
+    demand_val = _safe_int(row.get("adjusted_flow_amount")) or 0
+    collection_int = _safe_int(collection_val) or 0
+
+    eligible_amount = _get_eligible_amount_from_setting(
+        demand_val,
+        collection_int,
+    )
+
     return (
         doc_name or frappe.generate_hash(length=10),
         now_ts,
@@ -882,9 +931,9 @@ def _build_commission_tuple(row, is_query_2, now_ts, doc_name=None):
         _safe_int(row.get("deposit_amount")) or 0,
         _safe_int(row.get("deposit_period_mths")) or 0,
         _safe_int(row.get("deposit_period_days")) or 0,
-        _safe_int(row.get("adjusted_flow_amount")) or 0,
-        _safe_int(collection_val) or 0,
-        _safe_str(row.get("commission_amount")),
+        demand_val,
+        collection_int,
+        eligible_amount,
         row.get("acct_opn_date"),
         _safe_str(row.get("one_year_completed")),
         _safe_str(row.get("referencenumber")),
@@ -991,8 +1040,12 @@ def _create_commission_from_query_1(row, commit=True):
             row.get("total_tran_amt")
         ),
 
-        "eligible_amount": _safe_int(
-            row.get("commission_amount")
+        "eligible_amount": _get_eligible_amount_from_setting(
+            _calculate_demand(
+                row.get("total_flow_amount"),
+                row.get("scheme_code"),
+            ),
+            _safe_int(row.get("total_tran_amt")),
         ),
         "account_opening_date": row.get(
             "acct_opn_date"
@@ -1065,8 +1118,12 @@ def _create_commission_from_query_2(row, commit=True):
             row.get("total_tran_amt_dtt")
         ),
 
-        "eligible_amount": _safe_int(
-            row.get("commission_amount")
+        "eligible_amount": _get_eligible_amount_from_setting(
+            _calculate_demand(
+                row.get("total_flow_amount"),
+                row.get("scheme_code"),
+            ),
+            _safe_int(row.get("total_tran_amt_dtt")),
         ),
         "account_opening_date": row.get(
             "acct_opn_date"
