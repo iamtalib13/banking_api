@@ -9,6 +9,9 @@ frappe.listview_settings['CIF Merge'] = {
 
 				const $container = $(`
 					<div class="cif-custom-toolbar-filters d-flex align-items-center" style="gap: 6px; display: inline-flex;">
+						<button class="btn btn-xs btn-default cif-report-btn text-primary font-weight-bold" style="border-radius: 12px; border: 1px solid #93c5fd; background: #eff6ff;" title="${__('View CIF Merge Status Report')}">
+							<i class="fa fa-bar-chart mr-1"></i>${__('Report')}
+						</button>
 						<button class="btn btn-xs btn-default cif-count-filter-btn text-muted font-weight-bold" style="border-radius: 12px; border: 1px solid #d1d5db;" title="${__('Filter by CIF count')}">
 							<i class="fa fa-filter mr-1"></i>${__('Count Filter')}
 						</button>
@@ -23,6 +26,11 @@ frappe.listview_settings['CIF Merge'] = {
 						</button>
 					</div>
 				`);
+
+				// Report shortcut button click
+				$container.find('.cif-report-btn').on('click', function() {
+					frappe.set_route('query-report', 'CIF Merge Status Report');
+				});
 
 				// Count filter click
 				$container.find('.cif-count-filter-btn').on('click', function() {
