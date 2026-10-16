@@ -105,7 +105,8 @@ frappe.listview_settings['CIF Merge'] = {
 				"Pending Verification": { color: "orange", label: __("Pending Verification") },
 				"Approved": { color: "green", label: __("Approved") },
 				"Completed": { color: "green", label: __("Approved") },
-				"Rejected": { color: "red", label: __("Rejected") }
+				"Rejected": { color: "red", label: __("Rejected") },
+				"No Action Needed": { color: "blue", label: __("No Action Needed") }
 			};
 			let info = map[status] || { color: "gray", label: status };
 			return `<span class="indicator-pill ${info.color} font-weight-bold">${info.label}</span>`;
