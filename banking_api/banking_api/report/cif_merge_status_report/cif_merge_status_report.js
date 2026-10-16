@@ -81,6 +81,11 @@ frappe.query_reports["CIF Merge Status Report"] = {
 				}
 			});
 		}).addClass('btn-primary');
+
+		// Add a "Clear Filters" button to the report page
+		report.page.add_inner_button(__('Clear Filters'), function () {
+			report.filters.forEach(f => f.set_value(''));
+			report.refresh();
+		}).addClass('btn-secondary');
 	}
-		
 };
