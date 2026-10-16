@@ -8,33 +8,102 @@ frappe.ui.form.on("CIF Merge", {
 		let is_admin = frappe.user_roles.includes("System Manager") || frappe.session.user === "Administrator";
 		frm.toggle_display("cif_details", is_admin);
 
-		// Form header status indicator badge (Pending / Completed)
-		let is_completed = frm.doc.cif_status === "Completed";
-		frm.page.set_indicator(is_completed ? __("Completed") : __("Pending"), is_completed ? "green" : "orange");
+		// Workflow status indicator badge
+		let status = frm.doc.cif_status || "Draft";
+		let status_colors = {
+			"Draft": "gray",
+			"Pending Verification": "orange",
+			"Approved": "green",
+			"Rejected": "red"
+		};
+		frm.page.set_indicator(__(status), status_colors[status] || "gray");
 
-		// Complete Button handling
+		// Role checks
+		let is_maker = frappe.user_roles.includes("CIF Maker") || is_admin;
+		let is_checker = frappe.user_roles.includes("CIF Checker") || is_admin;
 		frm.clear_custom_buttons();
-		let has_primary = (frm.doc.cif_details || []).some(r => r.primary);
 
-		if (frm.doc.cif_status === "Completed") {
-			frm.set_intro(__("This CIF Merge record is marked as <b>Completed</b>."), "green");
+		let handle_workflow_action = function(action, confirm_msg) {
+			frappe.confirm(confirm_msg, function() {
+				let call_action = function() {
+					frappe.call({
+						method: "banking_api.banking_api.doctype.cif_merge.cif_merge.update_workflow_status",
+						args: {
+							docname: frm.doc.name,
+							action: action
+						},
+						freeze: true,
+						freeze_message: __("Updating CIF Merge status..."),
+						callback: function(r) {
+							if (r.message) {
+								frappe.show_alert({ message: __(r.message.message), indicator: "green" });
+								frm.reload_doc();
+							}
+						}
+					});
+				};
+
+				if (action === "send_to_checker") {
+					// Maker sending to checker - always force save first
+					frm.dirty();
+					frm.save().then(() => {
+						call_action();
+					}).catch(() => {
+						frappe.msgprint(__("Error saving form before sending to checker."));
+					});
+				} else {
+					call_action();
+				}
+			});
+		};
+
+		if (status === "Approved") {
+			frm.set_intro(__("This CIF Merge record is <b>Approved</b>."), "green");
 			frm.set_read_only();
-		} else if (has_primary && !frm.is_new()) {
-			frm.add_custom_button(__("Complete"), function() {
-				frappe.confirm(
-					__("Are you sure you want to mark this CIF Merge as <b>Completed</b>? This will submit the record."),
-					function() {
-						frm.set_value("cif_status", "Completed");
-						frm.save().then(() => {
-							frappe.show_alert({
-								message: __("CIF Merge completed successfully!"),
-								indicator: "green"
-							});
-							frm.refresh();
-						});
-					}
+		} else if (status === "Rejected") {
+			frm.set_intro(__("This CIF Merge record has been <b>Rejected</b> by Checker."), "red");
+		} else if (status === "Pending Verification") {
+			frm.set_intro(__("Record is pending verification by <b>CIF Checker</b>."), "orange");
+		}
+
+		// CIF Maker actions (when Draft or Rejected)
+		if ((status === "Draft" || status === "Rejected") && is_maker && !frm.is_new()) {
+			let has_primary = (frm.doc.cif_details || []).some(r => r.primary);
+			if (has_primary) {
+				frm.add_custom_button(__("Send to Checker"), function() {
+					handle_workflow_action(
+						"send_to_checker",
+						__("Are you sure you want to send this record to <b>CIF Checker</b> for verification?")
+					);
+				}).addClass("btn-primary font-weight-bold");
+			}
+		}
+
+		// CIF Checker actions (when Pending Verification)
+		if (status === "Pending Verification" && is_checker && !frm.is_new()) {
+			// 1. Approve
+			frm.add_custom_button(__("Approve"), function() {
+				handle_workflow_action(
+					"approve",
+					__("Are you sure you want to <b>Approve</b> this CIF Merge?")
 				);
-			}).addClass("btn-primary font-weight-bold");
+			}).addClass("btn-success font-weight-bold");
+
+			// 2. Send to Maker (Revision)
+			frm.add_custom_button(__("Send to Maker"), function() {
+				handle_workflow_action(
+					"send_to_maker",
+					__("Send this record back to <b>CIF Maker</b> for changes?")
+				);
+			}).addClass("btn-warning font-weight-bold");
+
+			// 3. Reject
+			frm.add_custom_button(__("Reject"), function() {
+				handle_workflow_action(
+					"reject",
+					__("Are you sure you want to <b>Reject</b> this CIF Merge record?")
+				);
+			}).addClass("btn-danger font-weight-bold");
 		}
 
 		frm.trigger("render_custom_table");
@@ -204,6 +273,13 @@ frappe.ui.form.on("CIF Merge", {
 			`;
 		}).join('') || '<span class="text-muted font-italic small">No duplicate string tokens detected</span>';
 
+		let is_admin = frappe.user_roles.includes("System Manager") || frappe.session.user === "Administrator";
+		let is_maker = frappe.user_roles.includes("CIF Maker") || is_admin;
+		let status = frm.doc.cif_status || "Draft";
+		let is_editable = (status === "Draft" || status === "Rejected") && is_maker;
+		let disabled_attr = is_editable ? '' : 'disabled';
+		let chk_cursor = is_editable ? 'cursor:pointer;' : 'cursor:not-allowed; opacity:0.65;';
+
 		let rows_html = data.map((row, idx) => {
 			let row_style = "";
 			let row_class = "";
@@ -229,13 +305,13 @@ frappe.ui.form.on("CIF Merge", {
 					<td>${render_token_name(row.last_name)}</td>
 					<td class="text-muted small">${format_date(row.cif_creation)}</td>
 					<td class="text-center">
-						<input type="checkbox" class="cif-primary-chk" data-idx="${idx}" ${row.primary ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px;">
+						<input type="checkbox" class="cif-primary-chk" data-idx="${idx}" ${row.primary ? 'checked' : ''} ${disabled_attr} style="${chk_cursor} width:16px; height:16px;">
 					</td>
 					<td class="text-center">
-						<input type="checkbox" class="cif-merge-chk" data-idx="${idx}" ${row.merge ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px;">
+						<input type="checkbox" class="cif-merge-chk" data-idx="${idx}" ${row.merge ? 'checked' : ''} ${disabled_attr} style="${chk_cursor} width:16px; height:16px;">
 					</td>
 					<td class="text-center">
-						<input type="checkbox" class="cif-rekyc-chk" data-idx="${idx}" ${row.re_kyc ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px;">
+						<input type="checkbox" class="cif-rekyc-chk" data-idx="${idx}" ${row.re_kyc ? 'checked' : ''} ${disabled_attr} style="${chk_cursor} width:16px; height:16px;">
 					</td>
 				</tr>
 			`;
@@ -464,14 +540,15 @@ frappe.ui.form.on("CIF Merge", {
 		wrapper.find('.cif-primary-chk').on('change', function() {
 			let idx = $(this).data('idx');
 			let is_checked = $(this).is(':checked');
-			frm.doc.cif_details.forEach((r, i) => {
-				r.primary = (i === idx && is_checked) ? 1 : 0;
-				if (r.primary) {
-					r.merge = 0;
-					r.re_kyc = 0;
+			(frm.doc.cif_details || []).forEach((r, i) => {
+				let val = (i === idx && is_checked) ? 1 : 0;
+				frappe.model.set_value(r.doctype, r.name, "primary", val);
+				if (val) {
+					frappe.model.set_value(r.doctype, r.name, "merge", 0);
+					frappe.model.set_value(r.doctype, r.name, "re_kyc", 0);
 				}
 			});
-			frm.refresh_field("cif_details");
+			frm.dirty();
 			frm.refresh();
 		});
 
@@ -480,15 +557,15 @@ frappe.ui.form.on("CIF Merge", {
 			let idx = $(this).data('idx');
 			let is_checked = $(this).is(':checked');
 			let row = frm.doc.cif_details[idx];
-			if (is_checked) {
-				row.merge = 1;
-				row.re_kyc = 0;
-				row.primary = 0;
-			} else {
-				row.merge = 0;
+			if (row) {
+				frappe.model.set_value(row.doctype, row.name, "merge", is_checked ? 1 : 0);
+				if (is_checked) {
+					frappe.model.set_value(row.doctype, row.name, "re_kyc", 0);
+					frappe.model.set_value(row.doctype, row.name, "primary", 0);
+				}
+				frm.dirty();
+				frm.refresh();
 			}
-			frm.refresh_field("cif_details");
-			frm.trigger("render_custom_table");
 		});
 
 		// Event: Re-KYC Checkbox (Mutually exclusive with Merge & Primary)
@@ -496,15 +573,15 @@ frappe.ui.form.on("CIF Merge", {
 			let idx = $(this).data('idx');
 			let is_checked = $(this).is(':checked');
 			let row = frm.doc.cif_details[idx];
-			if (is_checked) {
-				row.re_kyc = 1;
-				row.merge = 0;
-				row.primary = 0;
-			} else {
-				row.re_kyc = 0;
+			if (row) {
+				frappe.model.set_value(row.doctype, row.name, "re_kyc", is_checked ? 1 : 0);
+				if (is_checked) {
+					frappe.model.set_value(row.doctype, row.name, "merge", 0);
+					frappe.model.set_value(row.doctype, row.name, "primary", 0);
+				}
+				frm.dirty();
+				frm.refresh();
 			}
-			frm.refresh_field("cif_details");
-			frm.trigger("render_custom_table");
 		});
 	}
 });
