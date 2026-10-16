@@ -83,7 +83,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "CIF Status",
-   "options": "Draft\nPending Verification\nApproved\nRejected",
+   "options": "Draft\nPending Verification\nApproved\nRejected\nNo Action Needed",
    "read_only": 1
   }
  ],
@@ -175,6 +175,10 @@
   {
    "color": "Red",
    "title": "Rejected"
+  },
+  {
+   "color": "Blue",
+   "title": "No Action Needed"
   }
  ]
 }
