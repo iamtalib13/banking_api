@@ -14,7 +14,8 @@ frappe.ui.form.on("CIF Merge", {
 			"Draft": "gray",
 			"Pending Verification": "orange",
 			"Approved": "green",
-			"Rejected": "red"
+			"Rejected": "red",
+			"No Action Needed": "blue"
 		};
 		frm.page.set_indicator(__(status), status_colors[status] || "gray");
 
@@ -56,7 +57,10 @@ frappe.ui.form.on("CIF Merge", {
 			});
 		};
 
-		if (status === "Approved") {
+		if (status === "No Action Needed") {
+			frm.set_intro(__("This CIF Merge record is marked as <b>No Action Needed</b>."), "blue");
+			frm.set_read_only();
+		} else if (status === "Approved") {
 			frm.set_intro(__("This CIF Merge record is <b>Approved</b>."), "green");
 			frm.set_read_only();
 		} else if (status === "Rejected") {
@@ -65,7 +69,7 @@ frappe.ui.form.on("CIF Merge", {
 			frm.set_intro(__("Record is pending verification by <b>CIF Checker</b>."), "orange");
 		}
 
-		// Standard Frappe Workflow renders actions automatically
+		// Standard Frappe Workflow renders all actions in Actions dropdown
 
 		frm.trigger("render_custom_table");
 	},
