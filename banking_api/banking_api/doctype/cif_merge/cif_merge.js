@@ -375,9 +375,11 @@ frappe.ui.form.on("CIF Merge", {
 								<th style="min-width: 130px;">Last Name</th>
 								<th style="min-width: 110px;">Date of Birth</th>
 								<th style="min-width: 110px;">Mobile</th>
+								<th style="min-width: 120px;">PAN</th>
 								<th style="width: 70px;" class="text-center">Sol ID</th>
 								<th style="min-width: 110px;">Creation Date</th>
 								<th style="min-width: 180px;">Active Accounts</th>
+								<th style="min-width: 90px;">Pin Code</th>
 								<th style="min-width: 180px;">Address</th>
 							</tr>
 						</thead>
@@ -408,6 +410,7 @@ frappe.ui.form.on("CIF Merge", {
 										<td>${escape_html(row.last_name || '-')}</td>
 										<td>${format_date(row.date_of_birth)}</td>
 										<td>${escape_html(row.mobile || '-')}</td>
+										<td><span class="badge badge-light border text-monospace font-weight-bold">${escape_html(row.pan || '-')}</span></td>
 										<td><span class="badge badge-light border">${escape_html(row.sol_id || '-')}</span></td>
 										<td class="text-muted small">${format_date(row.cif_creation)}</td>
 										<td>
@@ -415,6 +418,7 @@ frappe.ui.form.on("CIF Merge", {
 												? `<span class="badge badge-success mb-1">${row.active_accounts_count} Active</span><div class="small font-weight-bold text-dark font-monospace" style="word-break: break-all;">${escape_html(row.active_account_numbers || '-')}</div>` 
 												: '<span class="badge badge-secondary">0 Active</span><div class="small text-muted font-italic">No active account</div>'}
 										</td>
+										<td><span class="badge badge-light border font-weight-bold">${escape_html(row.pin_code || '-')}</span></td>
 										<td class="small text-muted">${escape_html([row.address_line_1, row.address_line_2, row.address_line_3].filter(Boolean).join(', ') || '-')}</td>
 									</tr>
 								`;
