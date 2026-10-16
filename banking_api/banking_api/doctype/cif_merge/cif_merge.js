@@ -328,9 +328,8 @@ frappe.ui.form.on("CIF Merge", {
 
 			<!-- Table 1: Actions & Deduplication Control -->
 			<div class="mb-3">
-				<h6 class="text-secondary font-weight-bold mb-1" style="font-size: 13px;"><i class="fa fa-sliders mr-1 text-primary"></i> 1. CIF Selection & Deduplication Table</h6>
-				<div class="cif-scroll-wrapper border rounded" style="max-height: 280px;">
-				<div class="table-responsive border rounded" style="overflow-x: auto; overflow-y: visible;">
+				<h6 class="text-secondary font-weight-bold mb-1" style="font-size: 13px;"><i class="fa fa-sliders mr-1 text-primary"></i> 1. CIF Selection & Deduplication Table (${data.length} CIFs)</h6>
+				<div class="cif-scroll-wrapper border rounded" style="max-height: 500px;">
 					<table class="table table-sm table-bordered m-0" style="vertical-align: middle; min-width: 600px;">
 						<thead class="thead-light small" style="position: sticky; top: 0; z-index: 2; background: #f8f9fa;">
 							<tr>
@@ -338,47 +337,14 @@ frappe.ui.form.on("CIF Merge", {
 								<th style="min-width: 120px;">CIF ID</th>
 								<th style="min-width: 140px;">First Name</th>
 								<th style="min-width: 140px;">Last Name</th>
+								<th style="min-width: 110px;">Creation Date</th>
 								<th style="width: 90px;" class="text-center bg-success text-white">Primary</th>
-								<th style="width: 90px;" class="text-center text-dark" style="background:#9333ea;">Merge</th>
+								<th style="width: 90px;" class="text-center text-dark" style="background:#e9d5ff;">Merge</th>
 								<th style="width: 90px;" class="text-center bg-warning text-dark">Re KYC</th>
 							</tr>
 						</thead>
 						<tbody>
-							${data.map((row, idx) => {
-								let row_style = "";
-								let row_class = "";
-								if (row.primary) {
-									row_class = "table-success";
-									row_style = "border-left: 5px solid #16a34a; background-color: #f0fdf4;";
-								} else if (row.merge) {
-									row_style = "border-left: 5px solid #9333ea; background-color: #faf5ff;";
-								} else if (row.re_kyc) {
-									row_style = "border-left: 5px solid #d97706; background-color: #fffbeb;";
-								}
-
-								return `
-									<tr class="${row_class}" style="${row_style}" data-idx="${idx}">
-										<td class="text-center text-muted small">${idx + 1}</td>
-										<td>
-											<span class="font-weight-bold">${escape_html(row.cif_id)}</span>
-											${row.primary ? '<span class="badge badge-success ml-1">PRIMARY</span>' : ''}
-											${row.merge ? '<span class="badge ml-1" style="background:#9333ea; color:white;">MERGE</span>' : ''}
-											${row.re_kyc ? '<span class="badge badge-warning ml-1">RE-KYC</span>' : ''}
-										</td>
-										<td>${render_token_name(row.first_name)}</td>
-										<td>${render_token_name(row.last_name)}</td>
-										<td class="text-center">
-											<input type="checkbox" class="cif-primary-chk" data-idx="${idx}" ${row.primary ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px;">
-										</td>
-										<td class="text-center">
-											<input type="checkbox" class="cif-merge-chk" data-idx="${idx}" ${row.merge ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px;">
-										</td>
-										<td class="text-center">
-											<input type="checkbox" class="cif-rekyc-chk" data-idx="${idx}" ${row.re_kyc ? 'checked' : ''} style="cursor:pointer; width:16px; height:16px;">
-										</td>
-									</tr>
-								`;
-							}).join('')}
+							${rows_html}
 						</tbody>
 					</table>
 				</div>
@@ -386,11 +352,9 @@ frappe.ui.form.on("CIF Merge", {
 
 			<!-- Table 2: User Other Details -->
 			<div class="mb-3">
-				<h6 class="text-secondary font-weight-bold mb-1" style="font-size: 13px;"><i class="fa fa-id-card-o mr-1 text-info"></i> 2. CIF User Full Details</h6>
-				<div class="cif-scroll-wrapper border rounded" style="max-height: 320px;">
+				<h6 class="text-secondary font-weight-bold mb-1" style="font-size: 13px;"><i class="fa fa-id-card-o mr-1 text-info"></i> 2. CIF User Full Details (${data.length} CIFs)</h6>
+				<div class="cif-scroll-wrapper border rounded" style="max-height: 500px;">
 					<table class="table table-sm table-hover table-bordered m-0" style="vertical-align: middle; min-width: 1350px;">
-				<div class="table-responsive border rounded" style="overflow-x: auto; overflow-y: visible;">
-					<table class="table table-sm table-hover table-bordered m-0" style="vertical-align: middle; min-width: 1050px;">
 						<thead class="thead-light small" style="position: sticky; top: 0; z-index: 2; background: #f8f9fa;">
 							<tr>
 								<th style="width: 40px;" class="text-center">#</th>
