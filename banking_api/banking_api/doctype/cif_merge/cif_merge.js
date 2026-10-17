@@ -71,12 +71,44 @@ frappe.ui.form.on("CIF Merge", {
 
 		// Standard Frappe Workflow renders all actions in Actions dropdown
 
-		frm.trigger("render_custom_table");
+		let expected_count = frm.doc.total_cif_count || 0;
+		let current_count = (frm.doc.cif_details || []).length;
+
+		if (!frm.is_new() && expected_count > current_count) {
+			frappe.call({
+				method: "banking_api.banking_api.doctype.cif_merge.cif_merge.get_full_cif_details",
+				args: { parent: frm.doc.name },
+				callback: function(r) {
+					if (r.message && r.message.length) {
+						frm.doc.cif_details = r.message;
+						frm.trigger("render_custom_table");
+					}
+				}
+			});
+		} else {
+			frm.trigger("render_custom_table");
+		}
 	},
 	cif_details_on_form_rendered(frm) {
 		let is_admin = frappe.user_roles.includes("System Manager") || frappe.session.user === "Administrator";
 		frm.toggle_display("cif_details", is_admin);
-		frm.trigger("render_custom_table");
+		let expected_count = frm.doc.total_cif_count || 0;
+		let current_count = (frm.doc.cif_details || []).length;
+
+		if (!frm.is_new() && expected_count > current_count) {
+			frappe.call({
+				method: "banking_api.banking_api.doctype.cif_merge.cif_merge.get_full_cif_details",
+				args: { parent: frm.doc.name },
+				callback: function(r) {
+					if (r.message && r.message.length) {
+						frm.doc.cif_details = r.message;
+						frm.trigger("render_custom_table");
+					}
+				}
+			});
+		} else {
+			frm.trigger("render_custom_table");
+		}
 	},
 	aadhar(frm) {
 		frm.trigger("fetch_cifs");
@@ -335,7 +367,7 @@ frappe.ui.form.on("CIF Merge", {
 			<!-- Table 1: Actions & Deduplication Control -->
 			<div class="mb-3">
 				<h6 class="text-secondary font-weight-bold mb-1" style="font-size: 13px;"><i class="fa fa-sliders mr-1 text-primary"></i> 1. CIF Selection & Deduplication Table (${data.length} CIFs)</h6>
-				<div class="cif-scroll-wrapper border rounded" style="max-height: 500px;">
+				<div class="cif-scroll-wrapper border rounded" style="max-height: none; overflow-y: visible;">
 					<table class="table table-sm table-bordered m-0" style="vertical-align: middle; min-width: 600px;">
 						<thead class="thead-light small" style="position: sticky; top: 0; z-index: 2; background: #f8f9fa;">
 							<tr>
@@ -364,7 +396,7 @@ frappe.ui.form.on("CIF Merge", {
 			<!-- Table 2: User Other Details -->
 			<div class="mb-3">
 				<h6 class="text-secondary font-weight-bold mb-1" style="font-size: 13px;"><i class="fa fa-id-card-o mr-1 text-info"></i> 2. CIF User Full Details (${data.length} CIFs)</h6>
-				<div class="cif-scroll-wrapper border rounded" style="max-height: 500px;">
+				<div class="cif-scroll-wrapper border rounded" style="max-height: none; overflow-y: visible;">
 					<table class="table table-sm table-hover table-bordered m-0" style="vertical-align: middle; min-width: 1350px;">
 						<thead class="thead-light small" style="position: sticky; top: 0; z-index: 2; background: #f8f9fa;">
 							<tr>
