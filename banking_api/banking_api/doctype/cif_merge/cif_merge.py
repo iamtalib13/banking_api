@@ -814,3 +814,21 @@ def fix_cif_counts_and_pans():
 			print(f"[PROGRESS] Updated PANs for {min(i + batch_size, len(pan_rows))}/{len(pan_rows)}...")
 
 	print("\n[COMPLETED] fix_cif_counts_and_pans executed successfully!")
+
+
+@frappe.whitelist()
+def get_full_cif_details(parent):
+	"""Returns all child rows of cif_details for a given parent document without pagination limit."""
+	return frappe.db.get_all(
+		"CIF Details",
+		filters={"parent": parent},
+		fields=[
+			"name", "cif_id", "first_name", "middle_name", "last_name",
+			"date_of_birth", "mobile", "pan", "sol_id", "cif_creation",
+			"active_accounts_count", "active_account_numbers", "pin_code",
+			"address_line_1", "address_line_2", "address_line_3",
+			"primary", "merge", "re_kyc"
+		],
+		order_by="primary desc, merge desc, idx asc",
+		limit_page_length=0
+	)
