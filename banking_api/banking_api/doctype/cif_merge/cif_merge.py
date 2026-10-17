@@ -70,9 +70,7 @@ SELECT
     ed.referencenumber                      AS "AADHAAR NUMBER",
     ed.docdescr                             AS "DOC DESCRIPTION",
     ed.orgkey                               AS "CIF ID",
-    pan.referencenumber                     AS "PAN NUMBER",
-    pan.doccode                             AS "PAN DOC CODE",
-    pan.docdescr                            AS "PAN DOC DESCRIPTION",
+    STRING_AGG(DISTINCT TRIM(pan.referencenumber), ', ') AS "PAN NUMBER",
     a.cust_first_name                       AS "FIRST NAME",
     a.cust_middle_name                      AS "MIDDLE NAME",
     a.cust_last_name                        AS "LAST NAME",
@@ -126,9 +124,6 @@ GROUP BY
     ed.referencenumber,
     ed.docdescr,
     ed.orgkey,
-    pan.referencenumber,
-    pan.doccode,
-    pan.docdescr,
     a.cust_first_name,
     a.cust_middle_name,
     a.cust_last_name,
@@ -167,9 +162,7 @@ SELECT
     ed.referencenumber            AS "AADHAAR NUMBER",
     ed.docdescr                   AS "DOC DESCRIPTION",
     ed.orgkey                     AS "CIF ID",
-    pan.referencenumber           AS "PAN NUMBER",
-    pan.doccode                   AS "PAN DOC CODE",
-    pan.docdescr                  AS "PAN DOC DESCRIPTION",
+    STRING_AGG(DISTINCT TRIM(pan.referencenumber), ', ') AS "PAN NUMBER",
     a.cust_first_name             AS "FIRST NAME",
     a.cust_middle_name            AS "MIDDLE NAME",
     a.cust_last_name              AS "LAST NAME",
@@ -223,9 +216,6 @@ GROUP BY
     ed.referencenumber,
     ed.docdescr,
     ed.orgkey,
-    pan.referencenumber,
-    pan.doccode,
-    pan.docdescr,
     a.cust_first_name,
     a.cust_middle_name,
     a.cust_last_name,
@@ -493,7 +483,7 @@ def _bulk_upsert_cif_records(grouped, status="Active"):
 			"modified_by": user,
 			"owner": user,
 			"aadhar": aadhar,
-			"total_cif_count": len(items),
+			"total_cif_count": len(set(r.get("CIF ID") for r in items if r.get("CIF ID"))),
 			"status": status,
 			"cif_status": "Pending"
 		})
@@ -754,3 +744,73 @@ def update_accounts_and_pincode_batch(batch_size=10000):
 		print(f"[PROGRESS] Updated {updated_count}/{total} records...")
 
 	print(f"\n[DONE] Successfully updated {updated_count} records.")
+
+
+@frappe.whitelist()
+def fix_cif_counts_and_pans():
+	"""
+	Command to execute on server terminal to correct total_cif_count and update multiple PANs:
+	bench --site <site_name> execute banking_api.banking_api.doctype.cif_merge.cif_merge.fix_cif_counts_and_pans
+	"""
+	print("\n[1/2] Updating total_cif_count to exact distinct CIF IDs...")
+	frappe.db.sql("""
+		UPDATE `tabCIF Merge` cm 
+		SET cm.total_cif_count = (
+			SELECT COUNT(DISTINCT cif_id) 
+			FROM `tabCIF Details` cd 
+			WHERE cd.parent = cm.name
+		)
+	""")
+	frappe.db.commit()
+	print("[DONE] total_cif_count updated accurately.")
+
+	print("\n[2/2] Fetching and aggregating multiple PANs from DR DB...")
+	conn = None
+	try:
+		conn = get_dr_connection()
+		with conn.cursor(cursor_factory=RealDictCursor) as cur:
+			cur.execute("""
+				SELECT 
+					TRIM(orgkey) as cif_id,
+					STRING_AGG(DISTINCT TRIM(referencenumber), ', ') as pan_numbers
+				FROM crmuser.entitydocument
+				WHERE doccode = 'PAN'
+				  AND UPPER(docdescr) LIKE 'PAN%'
+				  AND referencenumber IS NOT NULL
+				  AND TRIM(referencenumber) != ''
+				GROUP BY TRIM(orgkey)
+			""")
+			pan_rows = cur.fetchall() or []
+	except Exception as e:
+		print(f"[ERROR] Failed fetching PANs from DR DB: {str(e)}")
+		pan_rows = []
+	finally:
+		if conn:
+			try:
+				conn.close()
+			except Exception:
+				pass
+
+	if pan_rows:
+		print(f"[INFO] Updating {len(pan_rows)} CIF PAN mappings into MariaDB...")
+		batch_size = 5000
+		for i in range(0, len(pan_rows), batch_size):
+			chunk = pan_rows[i:i + batch_size]
+			cases = []
+			cifs = []
+			for r in chunk:
+				cid = frappe.db.escape(r["cif_id"])
+				p_num = frappe.db.escape(r["pan_numbers"])
+				cases.append(f"WHEN cif_id = {cid} THEN {p_num}")
+				cifs.append(cid)
+			
+			if cifs:
+				frappe.db.sql(f"""
+					UPDATE `tabCIF Details`
+					SET pan = CASE {' '.join(cases)} ELSE pan END
+					WHERE cif_id IN ({','.join(cifs)})
+				""")
+				frappe.db.commit()
+			print(f"[PROGRESS] Updated PANs for {min(i + batch_size, len(pan_rows))}/{len(pan_rows)}...")
+
+	print("\n[COMPLETED] fix_cif_counts_and_pans executed successfully!")
