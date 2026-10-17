@@ -275,7 +275,7 @@ frappe.ui.form.on("CIF Merge", {
 		let is_admin = frappe.user_roles.includes("System Manager") || frappe.session.user === "Administrator";
 		let is_maker = frappe.user_roles.includes("CIF Maker") || is_admin;
 		let status = frm.doc.cif_status || "Draft";
-		let is_editable = (status === "Draft" || status === "Rejected") && is_maker;
+		let is_editable = is_admin || ((status === "Draft" || status === "Rejected" || status === "Pending") && is_maker);
 		let disabled_attr = is_editable ? '' : 'disabled';
 		let chk_cursor = is_editable ? 'cursor:pointer;' : 'cursor:not-allowed; opacity:0.65;';
 
