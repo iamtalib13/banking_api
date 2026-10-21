@@ -402,6 +402,7 @@ WITH account_data AS (
         d2.operacc,
         g.cif_id,
         g.acct_opn_date,
+        g.acct_cls_date,
         a2.relationshipopeningdate AS cif_id_opening_date,
         g.foracid,
         g.sol_id,
@@ -418,6 +419,11 @@ WITH account_data AS (
         AND g.schm_code IN (
             '2004','2005','2006','2010','2011',
             '2012','2013','2014','2015'
+        )
+        -- Same month me open aur close hone wale accounts exclude karne ke liye:
+        AND (
+            g.acct_cls_date IS NULL
+            OR TO_CHAR(g.acct_opn_date, 'YYYYMM') <> TO_CHAR(g.acct_cls_date, 'YYYYMM')
         )
     LEFT JOIN tbaadm.tam tam
         ON tam.acid = g.acid
@@ -445,12 +451,17 @@ flow_data AS (
             '2004','2005','2006','2010','2011',
             '2012','2013','2014','2015'
         )
+        -- Flow data me bhi same month open-close filter
+        AND (
+            g.acct_cls_date IS NULL
+            OR TO_CHAR(g.acct_opn_date, 'YYYYMM') <> TO_CHAR(g.acct_cls_date, 'YYYYMM')
+        )
     INNER JOIN tbaadm.tdt tdt
         ON tdt.acid = g.acid
         AND tdt.flow_code = 'NI'
     WHERE tdt.flow_date BETWEEN
-        DATE '2026-09-01'
-        AND DATE '2026-09-30'
+        DATE '2026-10-01'
+        AND DATE '2026-10-20'
     GROUP BY
         d.rm_id,
         g.foracid,
@@ -470,6 +481,11 @@ tran_data AS (
             '2004','2005','2006','2010','2011',
             '2012','2013','2014','2015'
         )
+        -- Tran data me bhi same month open-close filter
+        AND (
+            g.acct_cls_date IS NULL
+            OR TO_CHAR(g.acct_opn_date, 'YYYYMM') <> TO_CHAR(g.acct_cls_date, 'YYYYMM')
+        )
     INNER JOIN tbaadm.dtt dtt
         ON dtt.acid = g.acid
         AND dtt.flow_code = 'NI'
@@ -477,26 +493,26 @@ tran_data AS (
         (
             (
                 dtt.tran_date BETWEEN
-                    DATE '2026-09-01'
-                    AND DATE '2026-09-30'
+                    DATE '2026-10-01'
+                    AND DATE '2026-10-20'
                 AND dtt.value_date >
-                    DATE '2026-08-31'
+                    DATE '2026-09-30'
             )
             OR
             (
                 dtt.tran_date >
-                    DATE '2026-09-30'
+                    DATE '2026-10-20'
                 AND dtt.value_date BETWEEN
-                    DATE '2026-09-01'
-                    AND DATE '2026-09-30'
+                    DATE '2026-10-01'
+                    AND DATE '2026-10-20'
             )
             OR
             (
                 dtt.value_date BETWEEN
-                    DATE '2026-09-01'
-                    AND DATE '2026-09-30'
+                    DATE '2026-10-01'
+                    AND DATE '2026-10-20'
                 AND dtt.tran_date >
-                    DATE '2026-09-30'
+                    DATE '2026-10-20'
             )
         )
     GROUP BY
@@ -522,7 +538,7 @@ SELECT
     ad.operacc,
     ad.cif_id,
     ad.acct_opn_date,
-    ad.acct_opn_date,
+    ad.acct_cls_date,                     -- (Optional: verification ke liye add kiya hai)
     ad.cif_id_opening_date,
     ad.foracid,
     ad.acct_name,
@@ -547,7 +563,7 @@ SELECT
     ) AS commission_amount,
     CASE
         WHEN ad.acct_opn_date + INTERVAL '1 year' >=
-            DATE '2026-09-30'
+            DATE '2026-10-20'
             THEN 'YES'
         ELSE 'NO'
     END AS one_year_completed,
@@ -578,7 +594,7 @@ AND (
 ORDER BY
     ad.foracid,
     ad.rm_id,
-    ad.scheme_code
+    ad.scheme_code;
 """
 
 
@@ -618,8 +634,8 @@ WITH account_data AS (
             '9001','9002'
         )
         AND g.acct_opn_date BETWEEN
-            DATE '2026-09-01'
-            AND DATE '2026-09-30'
+            DATE '2026-10-01'
+            AND DATE '2026-10-20'
         AND g.acct_cls_flg = 'N'
     LEFT JOIN tbaadm.tam AS tam
         ON tam.acid = g.acid
@@ -627,20 +643,20 @@ WITH account_data AS (
         ON dtt.acid = g.acid
         AND dtt.flow_code = 'PI'
         AND dtt.tran_date BETWEEN
-            DATE '2026-09-01'
-            AND DATE '2026-09-30'
+            DATE '2026-10-01'
+            AND DATE '2026-10-20'
         AND NOT (
             dtt.value_date >=
-                DATE '2026-08-01'
-            AND dtt.value_date <
                 DATE '2026-09-01'
+            AND dtt.value_date <
+                DATE '2026-10-01'
         )
     LEFT JOIN tbaadm.tdt AS tdt
         ON tdt.acid = g.acid
         AND tdt.flow_code = 'PI'
         AND tdt.flow_date BETWEEN
-            DATE '2026-09-01'
-            AND DATE '2026-09-30'
+            DATE '2026-10-01'
+            AND DATE '2026-10-20'
     LEFT JOIN custom.dsaauth AS d2
         ON UPPER(ds.rm_id) = UPPER(d2.user_id)
     LEFT JOIN tbaadm.get AS g2
@@ -701,7 +717,7 @@ SELECT
     ) AS commission_amount,
     CASE
         WHEN ad.acct_opn_date + INTERVAL '1 year' <=
-            DATE '2026-09-30'
+            DATE '2026-10-20'
             THEN 'YES'
         ELSE 'NO'
     END AS one_year_completed,
@@ -1561,26 +1577,138 @@ def _get_valid_deferred_schedule_rows(product_doc):
     return sorted(schedule_rows, key=lambda item: item["year_no"])
 
 
-def _create_deferred_commission_schedule(commission_doc, product_doc, eligible_amount):
+# def _create_deferred_commission_schedule(commission_doc, product_doc, eligible_amount):
+#     """
+#     Create deferred payout schedule rows in the current Commission document.
+
+#     Example:
+#     Commission document created on 2026-08-19:
+#     Year 1 due: 2026-09-01
+#     Year 2 due: 2027-09-01
+#     Year 3 due: 2028-09-01
+#     """
+#     commission_meta = frappe.get_meta("Commission")
+
+#     if not commission_meta.has_field("deferred_commission_details"):
+#         frappe.throw(
+#             _("Commission child table field 'deferred_commission_details' is missing")
+#         )
+
+#     if commission_doc.deferred_commission_details:
+#         frappe.throw(
+#             _("Deferred schedule already exists for Commission record: {0}").format(
+#                 commission_doc.name
+#             )
+#         )
+
+#     schedule_rows = _get_valid_deferred_schedule_rows(product_doc)
+
+#     source_date = getdate(commission_doc.creation)
+
+#     # First day of the next calendar month.
+#     first_due_date = add_to_date(
+#         source_date.replace(day=1),
+#         months=1,
+#         as_string=True,
+#     )
+
+#     total_commission = 0
+#     total_rate = 0
+
+#     for schedule in schedule_rows:
+#         year_no = schedule["year_no"]
+#         rate = schedule["rate"]
+
+#         # gross_commission = (eligible_amount * rate) / 100
+#         # tds = gross_commission * 0.02
+#         # security_deposit = gross_commission * 0.10
+#         # netpay = gross_commission - (tds + security_deposit)
+
+#         gross_commission = (
+#             eligible_amount * rate
+#         ) / 100
+
+#         financial_values = (
+#             _calculate_commission_financial_values(
+#                 commission_amount=gross_commission,
+#                 eligible_amount=eligible_amount,
+#                 pan_status=commission_doc.pan_status,
+#             )
+#         )
+
+#         gross_commission = flt(
+#             financial_values["commission_amount"]
+#         )
+
+#         tds = flt(
+#             financial_values["tds"]
+#         )
+
+#         security_deposit = flt(
+#             financial_values["security_deposit"]
+#         )
+
+#         netpay = flt(
+#             financial_values["netpay"]
+#         )
+
+#         due_date = add_to_date(
+#             first_due_date,
+#             years=year_no - 1,
+#             as_string=True,
+#         )
+
+#         commission_doc.append(
+#             "deferred_commission_details",
+#             {
+#                 "year_no": year_no,
+#                 "commission_rate": rate,
+#                 "eligible_amount": eligible_amount,
+#                 "gross_commission": gross_commission,
+#                 "due_date": due_date,
+#                 "status": "Pending",
+#                 "tds": tds,
+#                 "security_deposit": security_deposit,
+#                 "netpay": netpay,
+#                 "remarks": schedule["remarks"],
+#             },
+#         )
+
+#         total_commission += gross_commission
+#         total_rate += rate
+
+#     return {
+#         "total_commission": total_commission,
+#         "total_rate": total_rate,
+#         "first_due_date": first_due_date,
+#         "schedule_count": len(schedule_rows),
+#     }
+
+
+def _create_deferred_commission_schedule(
+    commission_doc,
+    product_doc,
+    eligible_amount,
+):
     """
-    Create deferred payout schedule rows in the current Commission document.
+    Create deferred payout schedule rows in Commission Item.
 
     Example:
-    Commission document created on 2026-08-19:
+    Commission created on 2026-08-19:
     Year 1 due: 2026-09-01
     Year 2 due: 2027-09-01
     Year 3 due: 2028-09-01
     """
     commission_meta = frappe.get_meta("Commission")
 
-    if not commission_meta.has_field("deferred_commission_details"):
+    if not commission_meta.has_field("commission_items"):
         frappe.throw(
-            _("Commission child table field 'deferred_commission_details' is missing")
+            _("Commission child table field 'commission_items' is missing")
         )
 
-    if commission_doc.deferred_commission_details:
+    if commission_doc.commission_items:
         frappe.throw(
-            _("Deferred schedule already exists for Commission record: {0}").format(
+            _("Commission Item rows already exist for Commission record: {0}").format(
                 commission_doc.name
             )
         )
@@ -1589,7 +1717,6 @@ def _create_deferred_commission_schedule(commission_doc, product_doc, eligible_a
 
     source_date = getdate(commission_doc.creation)
 
-    # First day of the next calendar month.
     first_due_date = add_to_date(
         source_date.replace(day=1),
         months=1,
@@ -1602,11 +1729,6 @@ def _create_deferred_commission_schedule(commission_doc, product_doc, eligible_a
     for schedule in schedule_rows:
         year_no = schedule["year_no"]
         rate = schedule["rate"]
-
-        # gross_commission = (eligible_amount * rate) / 100
-        # tds = gross_commission * 0.02
-        # security_deposit = gross_commission * 0.10
-        # netpay = gross_commission - (tds + security_deposit)
 
         gross_commission = (
             eligible_amount * rate
@@ -1643,8 +1765,9 @@ def _create_deferred_commission_schedule(commission_doc, product_doc, eligible_a
         )
 
         commission_doc.append(
-            "deferred_commission_details",
+            "commission_items",
             {
+                "commission_type": "Deferred",
                 "year_no": year_no,
                 "commission_rate": rate,
                 "eligible_amount": eligible_amount,
@@ -1667,6 +1790,47 @@ def _create_deferred_commission_schedule(commission_doc, product_doc, eligible_a
         "first_due_date": first_due_date,
         "schedule_count": len(schedule_rows),
     }
+
+
+def _create_normal_commission_item(
+    commission_doc,
+    commission_type,
+    rate,
+    eligible_amount,
+    commission_amount,
+    tds,
+    security_deposit,
+    netpay,
+):
+    """
+    Create one Commission Item row for non-Deferred commission types.
+
+    This stores the same calculated parent values in the child table.
+    It does not create an additional Commission Payment.
+    """
+    commission_meta = frappe.get_meta("Commission")
+
+    if not commission_meta.has_field("commission_items"):
+        frappe.throw(
+            _("Commission child table field 'commission_items' is missing")
+        )
+
+    commission_doc.append(
+        "commission_items",
+        {
+            "commission_type": "Normal",
+            "year_no": 1,
+            "commission_rate": flt(rate),
+            "eligible_amount": flt(eligible_amount),
+            "gross_commission": flt(commission_amount),
+            "due_date": getdate(commission_doc.creation),
+            "status": "Pending",
+            "tds": flt(tds),
+            "security_deposit": flt(security_deposit),
+            "netpay": flt(netpay),
+            "remarks": commission_type,
+        },
+    )
 
 
 # def _update_agent_deduction_and_final_net_pay(agent_code):
@@ -4082,6 +4246,18 @@ def calculate_commission_amount(docname):
     commission_doc.security_deposit = security_deposit
     commission_doc.netpay = netpay
 
+    if not is_deferred:
+        _create_normal_commission_item(
+            commission_doc=commission_doc,
+            commission_type=commission_type,
+            rate=rate,
+            eligible_amount=eligible_amount,
+            commission_amount=commission_amount,
+            tds=tds,
+            security_deposit=security_deposit,
+            netpay=netpay,
+        )
+
     if frappe.get_meta("Commission").has_field("applied_commission_rate"):
         commission_doc.applied_commission_rate = rate
 
@@ -4138,15 +4314,2588 @@ def calculate_commission_amount(docname):
     return response
 
 
+def _round_amount_with_settings(value, calculation_settings):
+    """
+    Same rounding rule as _round_calculation_amount(),
+    but accepts preloaded calculation settings.
+    """
+    amount = _decimal_amount(value)
+
+    if not calculation_settings["round_calculated_amounts"]:
+        return amount
+
+    return amount.quantize(
+        Decimal("1"),
+        rounding=ROUND_HALF_UP,
+    )
+
+
+def _calculate_tds_with_settings(
+    commission_amount,
+    eligible_amount,
+    calculation_settings,
+    security_deposit=Decimal("0"),
+    pan_status=None,
+):
+    """
+    Same TDS logic as _calculate_tds(),
+    but uses preloaded calculation settings.
+    """
+    if not calculation_settings["enable_tds"]:
+        return Decimal("0")
+
+    base_amount = _get_calculation_base(
+        base_name=calculation_settings["tds_base"],
+        commission_amount=commission_amount,
+        eligible_amount=eligible_amount,
+        security_deposit=security_deposit,
+    )
+
+    if _has_valid_pan_status(pan_status):
+        applicable_tds_percentage = calculation_settings[
+            "tds_percentage"
+        ]
+    else:
+        applicable_tds_percentage = calculation_settings[
+            "tds_percentage_without_valid_pan"
+        ]
+
+    percentage_amount = _calculate_base_percentage(
+        base_amount,
+        applicable_tds_percentage,
+    )
+
+    operation = calculation_settings["tds_operation"]
+
+    if operation == "Fixed Amount":
+        tds = _decimal_amount(
+            calculation_settings["tds_fixed_amount"]
+        )
+
+    elif operation == "Percentage Plus Security Deposit":
+        tds = (
+            percentage_amount
+            + _decimal_amount(security_deposit)
+        )
+
+    elif operation == "Percentage Minus Security Deposit":
+        tds = (
+            percentage_amount
+            - _decimal_amount(security_deposit)
+        )
+
+    else:
+        tds = percentage_amount
+
+    if tds < 0:
+        tds = Decimal("0")
+
+    tds = _apply_amount_limit(
+        tds,
+        calculation_settings["tds_maximum_amount"],
+    )
+
+    return _round_amount_with_settings(
+        tds,
+        calculation_settings,
+    )
+
+
+def _calculate_security_deposit_with_settings(
+    commission_amount,
+    eligible_amount,
+    tds,
+    calculation_settings,
+):
+    """
+    Same Security Deposit logic as _calculate_security_deposit(),
+    but uses preloaded calculation settings.
+    """
+    if not calculation_settings["enable_security_deposit"]:
+        return Decimal("0")
+
+    base_amount = _get_calculation_base(
+        base_name=calculation_settings["security_deposit_base"],
+        commission_amount=commission_amount,
+        eligible_amount=eligible_amount,
+        tds=tds,
+    )
+
+    operation = calculation_settings[
+        "security_deposit_operation"
+    ]
+
+    percentage_amount = _calculate_base_percentage(
+        base_amount,
+        calculation_settings[
+            "security_deposit_percentage"
+        ],
+    )
+
+    if operation == "Fixed Amount":
+        security_deposit = _decimal_amount(
+            calculation_settings[
+                "security_deposit_fixed_amount"
+            ]
+        )
+
+    elif operation == "Percentage Plus TDS":
+        security_deposit = (
+            percentage_amount
+            + _decimal_amount(tds)
+        )
+
+    elif operation == "Percentage Minus TDS":
+        security_deposit = (
+            percentage_amount
+            - _decimal_amount(tds)
+        )
+
+    else:
+        security_deposit = percentage_amount
+
+    if security_deposit < 0:
+        security_deposit = Decimal("0")
+
+    security_deposit = _apply_amount_limit(
+        security_deposit,
+        calculation_settings[
+            "security_deposit_maximum_amount"
+        ],
+    )
+
+    return _round_amount_with_settings(
+        security_deposit,
+        calculation_settings,
+    )
+
+
+def _calculate_netpay_with_settings(
+    commission_amount,
+    tds,
+    security_deposit,
+    calculation_settings,
+):
+    """
+    Same Net Pay logic as _calculate_netpay(),
+    but uses preloaded calculation settings.
+    """
+    commission_amount = _decimal_amount(
+        commission_amount
+    )
+    tds = _decimal_amount(tds)
+    security_deposit = _decimal_amount(
+        security_deposit
+    )
+
+    operation = calculation_settings[
+        "net_pay_operation"
+    ]
+
+    if operation == "Commission Amount - TDS":
+        netpay = commission_amount - tds
+
+    elif operation == "Commission Amount - Security Deposit":
+        netpay = (
+            commission_amount
+            - security_deposit
+        )
+
+    elif operation == (
+        "Commission Amount + TDS - Security Deposit"
+    ):
+        netpay = (
+            commission_amount
+            + tds
+            - security_deposit
+        )
+
+    elif operation == (
+        "Commission Amount - TDS + Security Deposit"
+    ):
+        netpay = (
+            commission_amount
+            - tds
+            + security_deposit
+        )
+
+    elif operation == (
+        "Commission Amount + TDS + Security Deposit"
+    ):
+        netpay = (
+            commission_amount
+            + tds
+            + security_deposit
+        )
+
+    elif operation == "Commission Amount + Security Deposit":
+        netpay = (
+            commission_amount
+            + security_deposit
+        )
+
+    elif operation == "Commission Amount":
+        netpay = commission_amount
+
+    elif operation == "Custom Fixed Adjustment":
+        netpay = (
+            commission_amount
+            + _decimal_amount(
+                calculation_settings[
+                    "net_pay_fixed_adjustment"
+                ]
+            )
+        )
+
+    else:
+        netpay = (
+            commission_amount
+            - tds
+            - security_deposit
+        )
+
+    minimum_amount = calculation_settings[
+        "net_pay_minimum_amount"
+    ]
+
+    maximum_amount = calculation_settings[
+        "net_pay_maximum_amount"
+    ]
+
+    if minimum_amount is not None:
+        netpay = max(
+            netpay,
+            _decimal_amount(minimum_amount),
+        )
+
+    if maximum_amount is not None:
+        netpay = min(
+            netpay,
+            _decimal_amount(maximum_amount),
+        )
+
+    return _round_amount_with_settings(
+        netpay,
+        calculation_settings,
+    )
+
+
+def _calculate_financial_values_with_settings(
+    commission_amount,
+    eligible_amount,
+    pan_status,
+    calculation_settings,
+):
+    """
+    Same result as _calculate_commission_financial_values(),
+    but accepts preloaded calculation settings.
+    """
+    commission_amount = _round_amount_with_settings(
+        commission_amount,
+        calculation_settings,
+    )
+
+    tds_operation = calculation_settings[
+        "tds_operation"
+    ]
+
+    preliminary_tds = _calculate_tds_with_settings(
+        commission_amount=commission_amount,
+        eligible_amount=eligible_amount,
+        calculation_settings=calculation_settings,
+        security_deposit=Decimal("0"),
+        pan_status=pan_status,
+    )
+
+    security_deposit = (
+        _calculate_security_deposit_with_settings(
+            commission_amount=commission_amount,
+            eligible_amount=eligible_amount,
+            tds=preliminary_tds,
+            calculation_settings=calculation_settings,
+        )
+    )
+
+    if tds_operation in (
+        "Percentage Plus Security Deposit",
+        "Percentage Minus Security Deposit",
+    ):
+        tds = _calculate_tds_with_settings(
+            commission_amount=commission_amount,
+            eligible_amount=eligible_amount,
+            calculation_settings=calculation_settings,
+            security_deposit=security_deposit,
+            pan_status=pan_status,
+        )
+    else:
+        tds = preliminary_tds
+
+    netpay = _calculate_netpay_with_settings(
+        commission_amount=commission_amount,
+        tds=tds,
+        security_deposit=security_deposit,
+        calculation_settings=calculation_settings,
+    )
+
+    return {
+        "commission_amount": commission_amount,
+        "tds": tds,
+        "security_deposit": security_deposit,
+        "netpay": netpay,
+    }
+
+
+def _preload_bulk_commission_data():
+    """
+    Load all static configuration once for the complete bulk run.
+    """
+    calculation_settings = (
+        _get_commission_calculation_settings()
+    )
+
+    products = frappe.get_all(
+        "Product",
+        fields=[
+            "name",
+            "commission_type",
+            "commission_rate",
+            "commission_rate_upto_one_year",
+            "commission_rate_above_one_year",
+            "slab_1_limit",
+            "slab_1_rate",
+            "slab_2_limit",
+            "slab_2_rate",
+            "slab_3_rate",
+        ],
+    )
+
+    product_map = {
+        product.name: product
+        for product in products
+    }
+
+    deferred_product_codes = {
+        product.name
+        for product in products
+        if product.commission_type == "Deferred"
+    }
+
+    deferred_product_docs = {}
+
+    for product_name in deferred_product_codes:
+        deferred_product_docs[product_name] = (
+            frappe.get_doc(
+                "Product",
+                product_name,
+            )
+        )
+
+    scheme_groups = (
+        _get_eligible_amount_scheme_groups()
+    )
+
+    commission_meta = frappe.get_meta("Commission")
+
+    return {
+        "calculation_settings": calculation_settings,
+        "product_map": product_map,
+        "deferred_product_codes": deferred_product_codes,
+        "deferred_product_docs": deferred_product_docs,
+        "scheme_groups": scheme_groups,
+        "has_applied_rate_field": commission_meta.has_field(
+            "applied_commission_rate"
+        ),
+        "has_commission_type_field": commission_meta.has_field(
+            "commission_type_applied"
+        ),
+    }
+
+
+def _get_bulk_commission_fields():
+    return [
+        "name",
+        "agent_code",
+        "agent_name",
+        "scheme_code",
+        "eligible_amount",
+        "remarks",
+        "pan_status",
+        "creation",
+        "docstatus",
+    ]
+
+
+def _bulk_update_commission_calculated_fields(
+    update_rows,
+    chunk_size=2000,
+):
+    """
+    Bulk update calculated Commission parent fields.
+    """
+    if not update_rows:
+        return
+
+    update_sql = """
+        UPDATE `tabCommission`
+        SET
+            modified = %s,
+            modified_by = %s,
+            eligible_amount = %s,
+            commission_amount = %s,
+            tds = %s,
+            security_deposit = %s,
+            netpay = %s,
+            applied_commission_rate = %s,
+            commission_type_applied = %s,
+            agent_total_eligible_collection = %s
+        WHERE name = %s
+    """
+
+    cursor = frappe.db._cursor
+
+    for i in range(
+        0,
+        len(update_rows),
+        chunk_size,
+    ):
+        chunk = update_rows[
+            i:i + chunk_size
+        ]
+
+        cursor.executemany(
+            update_sql,
+            chunk,
+        )
+
+    frappe.db.commit()
+
+
+def _bulk_insert_commission_items(
+    item_rows,
+    chunk_size=5000,
+):
+    """
+    Bulk insert Commission Item child rows.
+    """
+    if not item_rows:
+        return
+
+    fields = [
+        "name",
+        "creation",
+        "modified",
+        "modified_by",
+        "owner",
+        "docstatus",
+        "idx",
+        "parent",
+        "parentfield",
+        "parenttype",
+        "commission_type",
+        "year_no",
+        "commission_rate",
+        "eligible_amount",
+        "gross_commission",
+        "due_date",
+        "status",
+        "tds",
+        "security_deposit",
+        "netpay",
+        "remarks",
+    ]
+
+    frappe.db.bulk_insert(
+        "Commission Item",
+        fields,
+        item_rows,
+        chunk_size=chunk_size,
+    )
+
+    frappe.db.commit()
+
+
+def _bulk_update_agent_deduction(
+    agent_deduction_rows,
+    chunk_size=1000,
+):
+    """
+    Update deduction and final_net_pay once per agent.
+    """
+    if not agent_deduction_rows:
+        return
+
+    update_sql = """
+        UPDATE `tabCommission`
+        SET
+            deduction = %s,
+            final_net_pay = %s
+        WHERE agent_code = %s
+        AND docstatus < 2
+    """
+
+    cursor = frappe.db._cursor
+
+    for i in range(
+        0,
+        len(agent_deduction_rows),
+        chunk_size,
+    ):
+        chunk = agent_deduction_rows[
+            i:i + chunk_size
+        ]
+
+        cursor.executemany(
+            update_sql,
+            chunk,
+        )
+
+    frappe.db.commit()
+
+
+# @frappe.whitelist()
+# def calculate_commission_for_all_optimized(
+#     batch_size=5000,
+# ):
+#     """
+#     Optimized bulk commission calculation.
+
+#     Preserves the same calculation logic as
+#     calculate_commission_amount(docname), including:
+
+#     - Fixed Rate
+#     - Age Based
+#     - Eligible Amount Based slab selection
+#     - Deferred yearly schedule
+#     - PAN-based TDS
+#     - Security Deposit
+#     - Net Pay
+#     - Agent-level deduction and final net pay
+#     - Commission Item rows
+#     - Normal and Deferred Commission Payment creation
+
+#     Differences from the existing method:
+#     - Reads settings and Product data once
+#     - Calculates values in memory
+#     - Updates Commission parent records in batches
+#     - Inserts Commission Item rows in bulk
+#     - Updates agent deduction once per agent
+#     - Creates Normal Commission Payment once per agent
+#     - Commits in batches instead of after every record
+#     """
+#     frappe.only_for(("System Manager",))
+
+#     _validate_commission_calculation_enabled()
+
+#     batch_size = cint(batch_size) or 5000
+
+#     if batch_size < 100:
+#         batch_size = 100
+
+#     preloaded = _preload_bulk_commission_data()
+
+#     calculation_settings = preloaded[
+#         "calculation_settings"
+#     ]
+
+#     product_map = preloaded["product_map"]
+#     scheme_groups = preloaded["scheme_groups"]
+#     deferred_product_codes = preloaded[
+#         "deferred_product_codes"
+#     ]
+#     deferred_product_docs = preloaded[
+#         "deferred_product_docs"
+#     ]
+
+#     fields = _get_bulk_commission_fields()
+
+#     total_count = frappe.db.count(
+#         "Commission",
+#         {
+#             "docstatus": ("<", 2),
+#         },
+#     )
+
+#     if not total_count:
+#         return {
+#             "status": "completed",
+#             "total_processed": 0,
+#             "success_count": 0,
+#             "error_count": 0,
+#             "errors": [],
+#         }
+
+#     processed_count = 0
+#     success_count = 0
+#     error_count = 0
+#     errors = []
+
+#     normal_agent_codes = set()
+#     deferred_item_rows = []
+#     processed_deferred_keys = set()
+
+#     offset = 0
+
+#     while offset < total_count:
+#         commission_rows = frappe.db.sql(
+#             f"""
+#             SELECT
+#                 {", ".join(fields)}
+#             FROM `tabCommission`
+#             WHERE docstatus < 2
+#             ORDER BY creation ASC, name ASC
+#             LIMIT %s OFFSET %s
+#             """,
+#             (
+#                 batch_size,
+#                 offset,
+#             ),
+#             as_dict=True,
+#         )
+
+#         if not commission_rows:
+#             break
+
+#         offset += len(commission_rows)
+
+#         parent_update_rows = []
+#         commission_item_rows = []
+
+#         now_ts = now_datetime()
+#         current_user = frappe.session.user
+
+#         for row in commission_rows:
+#             try:
+#                 commission_name = row.name
+#                 scheme_code = str(
+#                     row.scheme_code or ""
+#                 ).strip()
+
+#                 if not scheme_code:
+#                     raise frappe.ValidationError(
+#                         _(
+#                             "Scheme Code is required in "
+#                             "Commission document"
+#                         )
+#                     )
+
+#                 if row.eligible_amount in (None, ""):
+#                     raise frappe.ValidationError(
+#                         _(
+#                             "Eligible Amount is required in "
+#                             "Commission document"
+#                         )
+#                     )
+
+#                 if not row.agent_code:
+#                     raise frappe.ValidationError(
+#                         _(
+#                             "Agent Code is required in "
+#                             "Commission document"
+#                         )
+#                     )
+
+#                 product = product_map.get(scheme_code)
+
+#                 if not product:
+#                     raise frappe.ValidationError(
+#                         _(
+#                             "No Product found with Product Code: {0}"
+#                         ).format(scheme_code)
+#                     )
+
+#                 commission_type = product.commission_type
+
+#                 if not commission_type:
+#                     raise frappe.ValidationError(
+#                         _(
+#                             "Commission Type is not configured "
+#                             "in Product: {0}"
+#                         ).format(scheme_code)
+#                     )
+
+#                 eligible_amount = flt(
+#                     row.eligible_amount
+#                 )
+
+#                 if eligible_amount < 0:
+#                     raise frappe.ValidationError(
+#                         _(
+#                             "Eligible Amount cannot be negative"
+#                         )
+#                     )
+
+#                 rate = None
+#                 is_deferred = False
+#                 commission_amount = 0
+#                 agent_total = None
+
+#                 if commission_type == "Fixed Rate":
+#                     if product.commission_rate in (None, ""):
+#                         raise frappe.ValidationError(
+#                             _(
+#                                 "Commission Rate is required for "
+#                                 "Product: {0}"
+#                             ).format(scheme_code)
+#                         )
+
+#                     rate = flt(
+#                         product.commission_rate
+#                     )
+
+#                 elif commission_type == "Age Based":
+#                     remarks = str(
+#                         row.remarks or ""
+#                     ).strip().upper()
+
+#                     if remarks == "YES":
+#                         if product.commission_rate_upto_one_year in (
+#                             None,
+#                             "",
+#                         ):
+#                             raise frappe.ValidationError(
+#                                 _(
+#                                     "Commission Rate Upto One Year is "
+#                                     "required for Product: {0}"
+#                                 ).format(scheme_code)
+#                             )
+
+#                         rate = flt(
+#                             product.commission_rate_upto_one_year
+#                         )
+
+#                     elif remarks == "NO":
+#                         if product.commission_rate_above_one_year in (
+#                             None,
+#                             "",
+#                         ):
+#                             raise frappe.ValidationError(
+#                                 _(
+#                                     "Commission Rate Above One Year is "
+#                                     "required for Product: {0}"
+#                                 ).format(scheme_code)
+#                             )
+
+#                         rate = flt(
+#                             product.commission_rate_above_one_year
+#                         )
+
+#                     else:
+#                         raise frappe.ValidationError(
+#                             _(
+#                                 "Remarks must be YES or NO for "
+#                                 "Age Based Product: {0}"
+#                             ).format(scheme_code)
+#                         )
+
+#                 elif commission_type == "Eligible Amount Based":
+#                     required_fields = {
+#                         "Slab 1 Limit": product.slab_1_limit,
+#                         "Slab 1 Rate": product.slab_1_rate,
+#                         "Slab 2 Limit": product.slab_2_limit,
+#                         "Slab 2 Rate": product.slab_2_rate,
+#                         "Slab 3 Rate": product.slab_3_rate,
+#                     }
+
+#                     for field_label, field_value in required_fields.items():
+#                         if field_value in (None, ""):
+#                             raise frappe.ValidationError(
+#                                 _(
+#                                     "{0} is required for Product: {1}"
+#                                 ).format(
+#                                     field_label,
+#                                     scheme_code,
+#                                 )
+#                             )
+
+#                     slab_1_limit = flt(
+#                         product.slab_1_limit
+#                     )
+#                     slab_2_limit = flt(
+#                         product.slab_2_limit
+#                     )
+
+#                     if slab_1_limit < 0:
+#                         raise frappe.ValidationError(
+#                             _(
+#                                 "Slab 1 Limit cannot be negative"
+#                             )
+#                         )
+
+#                     if slab_2_limit <= slab_1_limit:
+#                         raise frappe.ValidationError(
+#                             _(
+#                                 "Slab 2 Limit must be greater than "
+#                                 "Slab 1 Limit for Product: {0}"
+#                             ).format(scheme_code)
+#                         )
+
+#                     agent_code = str(
+#                         row.agent_code
+#                     ).strip()
+
+#                     eligible_scheme_group = (
+#                         scheme_groups.get(
+#                             scheme_code,
+#                             (scheme_code,),
+#                         )
+#                     )
+
+#                     group_values = [
+#                         agent_code
+#                     ] + list(eligible_scheme_group)
+
+#                     placeholders = ", ".join(
+#                         ["%s"] * len(
+#                             eligible_scheme_group
+#                         )
+#                     )
+
+#                     result = frappe.db.sql(
+#                         f"""
+#                         SELECT
+#                             COALESCE(
+#                                 SUM(
+#                                     CAST(
+#                                         NULLIF(
+#                                             TRIM(c.eligible_amount),
+#                                             ''
+#                                         ) AS DECIMAL(18, 2)
+#                                     )
+#                                 ),
+#                                 0
+#                             ) AS total
+#                         FROM `tabCommission` c
+#                         INNER JOIN `tabProduct` p
+#                             ON p.name = c.scheme_code
+#                         WHERE c.agent_code = %s
+#                         AND c.docstatus < 2
+#                         AND p.commission_type = 'Eligible Amount Based'
+#                         AND c.scheme_code IN ({placeholders})
+#                         """,
+#                         tuple(group_values),
+#                         as_dict=True,
+#                     )
+
+#                     agent_total = flt(
+#                         result[0].total
+#                         if result
+#                         and result[0].total is not None
+#                         else 0
+#                     )
+
+#                     agent_total = flt(
+#                         _round_amount_with_settings(
+#                             agent_total,
+#                             calculation_settings,
+#                         )
+#                     )
+
+#                     if agent_total <= 0:
+#                         raise frappe.ValidationError(
+#                             _(
+#                                 "Total eligible amount for Agent {0} "
+#                                 "and Scheme Group {1} is zero or invalid."
+#                             ).format(
+#                                 agent_code,
+#                                 ", ".join(
+#                                     eligible_scheme_group
+#                                 ),
+#                             )
+#                         )
+
+#                     if agent_total <= slab_1_limit:
+#                         rate = flt(
+#                             product.slab_1_rate
+#                         )
+
+#                     elif agent_total <= slab_2_limit:
+#                         rate = flt(
+#                             product.slab_2_rate
+#                         )
+
+#                     else:
+#                         rate = flt(
+#                             product.slab_3_rate
+#                         )
+
+#                 elif commission_type == "Deferred":
+#                     is_deferred = True
+
+#                     product_doc = deferred_product_docs.get(
+#                         scheme_code
+#                     )
+
+#                     if not product_doc:
+#                         raise frappe.ValidationError(
+#                             _(
+#                                 "Deferred Product configuration is "
+#                                 "missing for Product: {0}"
+#                             ).format(scheme_code)
+#                         )
+
+#                     schedule_rows = (
+#                         _get_valid_deferred_schedule_rows(
+#                             product_doc
+#                         )
+#                     )
+
+#                     source_date = getdate(
+#                         row.creation
+#                     )
+
+#                     first_due_date = add_to_date(
+#                         source_date.replace(day=1),
+#                         months=1,
+#                         as_string=True,
+#                     )
+
+#                     total_deferred_commission = 0
+#                     total_deferred_rate = 0
+
+#                     for schedule in schedule_rows:
+#                         year_no = schedule["year_no"]
+#                         schedule_rate = schedule["rate"]
+
+#                         item_gross = (
+#                             eligible_amount
+#                             * schedule_rate
+#                         ) / 100
+
+#                         item_financial = (
+#                             _calculate_financial_values_with_settings(
+#                                 commission_amount=item_gross,
+#                                 eligible_amount=eligible_amount,
+#                                 pan_status=row.pan_status,
+#                                 calculation_settings=calculation_settings,
+#                             )
+#                         )
+
+#                         item_gross = flt(
+#                             item_financial[
+#                                 "commission_amount"
+#                             ]
+#                         )
+
+#                         item_tds = flt(
+#                             item_financial["tds"]
+#                         )
+
+#                         item_security_deposit = flt(
+#                             item_financial[
+#                                 "security_deposit"
+#                             ]
+#                         )
+
+#                         item_netpay = flt(
+#                             item_financial["netpay"]
+#                         )
+
+#                         due_date = add_to_date(
+#                             first_due_date,
+#                             years=year_no - 1,
+#                             as_string=True,
+#                         )
+
+#                         deferred_item_rows.append(
+#                             (
+#                                 frappe.generate_hash(length=10),
+#                                 now_ts,
+#                                 now_ts,
+#                                 current_user,
+#                                 current_user,
+#                                 0,
+#                                 len(deferred_item_rows) + 1,
+#                                 commission_name,
+#                                 "commission_items",
+#                                 "Commission",
+#                                 "Deferred",
+#                                 year_no,
+#                                 schedule_rate,
+#                                 eligible_amount,
+#                                 item_gross,
+#                                 due_date,
+#                                 "Pending",
+#                                 item_tds,
+#                                 item_security_deposit,
+#                                 item_netpay,
+#                                 schedule["remarks"],
+#                             )
+#                         )
+
+#                         total_deferred_commission += item_gross
+#                         total_deferred_rate += schedule_rate
+
+#                     commission_amount = (
+#                         total_deferred_commission
+#                     )
+#                     rate = total_deferred_rate
+
+#                 else:
+#                     raise frappe.ValidationError(
+#                         _(
+#                             "Invalid Commission Type '{0}' in Product: {1}. "
+#                             "Allowed values are Fixed Rate, Age Based, "
+#                             "Eligible Amount Based, and Deferred."
+#                         ).format(
+#                             commission_type,
+#                             scheme_code,
+#                         )
+#                     )
+
+#                 if rate is None:
+#                     raise frappe.ValidationError(
+#                         _(
+#                             "Unable to determine commission rate "
+#                             "for Product: {0}"
+#                         ).format(scheme_code)
+#                     )
+
+#                 if rate < 0:
+#                     raise frappe.ValidationError(
+#                         _(
+#                             "Commission rate cannot be negative"
+#                         )
+#                     )
+
+#                 if not is_deferred:
+#                     commission_amount = (
+#                         eligible_amount * rate
+#                     ) / 100
+
+#                 financial_values = (
+#                     _calculate_financial_values_with_settings(
+#                         commission_amount=commission_amount,
+#                         eligible_amount=eligible_amount,
+#                         pan_status=row.pan_status,
+#                         calculation_settings=calculation_settings,
+#                     )
+#                 )
+
+#                 final_commission_amount = flt(
+#                     financial_values["commission_amount"]
+#                 )
+
+#                 final_tds = flt(
+#                     financial_values["tds"]
+#                 )
+
+#                 final_security_deposit = flt(
+#                     financial_values["security_deposit"]
+#                 )
+
+#                 final_netpay = flt(
+#                     financial_values["netpay"]
+#                 )
+
+#                 final_eligible_amount = flt(
+#                     _round_amount_with_settings(
+#                         eligible_amount,
+#                         calculation_settings,
+#                     )
+#                 )
+
+#                 final_commission_amount = flt(
+#                     _round_amount_with_settings(
+#                         final_commission_amount,
+#                         calculation_settings,
+#                     )
+#                 )
+
+#                 final_tds = flt(
+#                     _round_amount_with_settings(
+#                         final_tds,
+#                         calculation_settings,
+#                     )
+#                 )
+
+#                 final_security_deposit = flt(
+#                     _round_amount_with_settings(
+#                         final_security_deposit,
+#                         calculation_settings,
+#                     )
+#                 )
+
+#                 final_netpay = flt(
+#                     _round_amount_with_settings(
+#                         final_netpay,
+#                         calculation_settings,
+#                     )
+#                 )
+
+#                 if not is_deferred:
+#                     commission_item_rows.append(
+#                         (
+#                             frappe.generate_hash(length=10),
+#                             now_ts,
+#                             now_ts,
+#                             current_user,
+#                             current_user,
+#                             0,
+#                             1,
+#                             commission_name,
+#                             "commission_items",
+#                             "Commission",
+#                             "Normal",
+#                             1,
+#                             flt(rate),
+#                             final_eligible_amount,
+#                             final_commission_amount,
+#                             getdate(row.creation),
+#                             "Pending",
+#                             final_tds,
+#                             final_security_deposit,
+#                             final_netpay,
+#                             commission_type,
+#                         )
+#                     )
+
+#                     normal_agent_codes.add(
+#                         str(row.agent_code).strip()
+#                     )
+
+#                 parent_update_rows.append(
+#                     (
+#                         now_ts,
+#                         current_user,
+#                         final_eligible_amount,
+#                         final_commission_amount,
+#                         final_tds,
+#                         final_security_deposit,
+#                         final_netpay,
+#                         flt(rate)
+#                         if preloaded[
+#                             "has_applied_rate_field"
+#                         ]
+#                         else None,
+#                         commission_type
+#                         if preloaded[
+#                             "has_commission_type_field"
+#                         ]
+#                         else None,
+#                         agent_total,
+#                         commission_name,
+#                     )
+#                 )
+
+#                 success_count += 1
+
+#             except Exception:
+#                 error_count += 1
+
+#                 error_traceback = frappe.get_traceback()
+
+#                 errors.append({
+#                     "docname": row.get("name"),
+#                     "error": error_traceback,
+#                 })
+
+#                 frappe.log_error(
+#                     error_traceback,
+#                     (
+#                         "Optimized Commission Calculation Error - "
+#                         f"{row.get('name')}"
+#                     ),
+#                 )
+
+#         _bulk_update_commission_calculated_fields(
+#             parent_update_rows
+#         )
+
+#         _bulk_insert_commission_items(
+#             commission_item_rows
+#         )
+
+#         processed_count += len(commission_rows)
+
+#     if deferred_item_rows:
+#         _bulk_insert_commission_items(
+#             deferred_item_rows
+#         )
+
+#     _update_agent_deduction_for_all_agents_optimized()
+
+#     for agent_code in sorted(normal_agent_codes):
+#         try:
+#             _create_normal_agent_payment_if_missing(
+#                 agent_code
+#             )
+
+#         except Exception:
+#             error_count += 1
+
+#             error_traceback = frappe.get_traceback()
+
+#             errors.append({
+#                 "agent_code": agent_code,
+#                 "error": error_traceback,
+#             })
+
+#             frappe.log_error(
+#                 error_traceback,
+#                 (
+#                     "Optimized Normal Commission Payment Error - "
+#                     f"{agent_code}"
+#                 ),
+#             )
+
+#     _create_missing_deferred_payments_optimized()
+
+#     frappe.db.commit()
+
+#     return {
+#         "status": "completed",
+#         "total_processed": processed_count,
+#         "success_count": success_count,
+#         "error_count": error_count,
+#         "errors": errors,
+#     }
+
+
+@frappe.whitelist()
+def calculate_commission_for_all_optimized(
+    batch_size=5000,
+    show_progress=False,
+):
+    """
+    Optimized bulk commission calculation.
+
+    - Non-Deferred records are calculated in batches.
+    - Deferred records use the existing calculate_commission_amount()
+      method to preserve deferred schedule and payment behavior.
+    - show_progress=True displays a terminal progress bar.
+    """
+    frappe.only_for(("System Manager",))
+
+    _validate_commission_calculation_enabled()
+
+    batch_size = cint(batch_size) or 5000
+    show_progress = cint(show_progress)
+
+    commission_names = frappe.get_all(
+        "Commission",
+        filters={
+            "docstatus": ("<", 2),
+        },
+        pluck="name",
+        order_by="creation asc",
+    )
+
+    total_records = len(commission_names)
+
+    if not total_records:
+        return {
+            "status": "completed",
+            "total_processed": 0,
+            "success_count": 0,
+            "error_count": 0,
+            "errors": [],
+        }
+
+    success_count = 0
+    error_count = 0
+    errors = []
+
+    progress = None
+
+    if show_progress:
+        from tqdm import tqdm
+
+        progress = tqdm(
+            total=total_records,
+            desc="Calculating Commission",
+            unit="record",
+            dynamic_ncols=True,
+            leave=True,
+        )
+
+    try:
+        for start in range(0, total_records, batch_size):
+            batch_names = commission_names[
+                start:start + batch_size
+            ]
+
+            batch_result = (
+                _calculate_commission_batch(
+                    commission_names=batch_names,
+                )
+            )
+
+            success_count += batch_result[
+                "success_count"
+            ]
+
+            error_count += batch_result[
+                "error_count"
+            ]
+
+            errors.extend(
+                batch_result["errors"]
+            )
+
+            if progress:
+                progress.update(len(batch_names))
+                progress.set_postfix(
+                    success=success_count,
+                    errors=error_count,
+                )
+
+            frappe.db.commit()
+
+    except Exception:
+        frappe.db.rollback()
+        frappe.log_error(
+            frappe.get_traceback(),
+            "Optimized Commission Calculation Failed",
+        )
+        raise
+
+    finally:
+        if progress:
+            progress.close()
+
+    result = {
+        "status": "completed",
+        "total_processed": total_records,
+        "success_count": success_count,
+        "error_count": error_count,
+        "errors": errors,
+    }
+
+    if show_progress:
+        print("\n\n========== Commission Calculation Result ==========")
+        print(f"Status          : {result['status'].upper()}")
+        print(f"Total Processed : {total_records}")
+        print(f"Success Count   : {success_count}")
+        print(f"Error Count     : {error_count}")
+        print("===================================================")
+
+    return result
+
+
+def _calculate_commission_batch(commission_names):
+    """
+    Calculate one batch of Commission records.
+
+    Deferred records are processed using the existing method.
+    Non-Deferred records are calculated and updated in bulk.
+    """
+    success_count = 0
+    error_count = 0
+    errors = []
+
+    rows = frappe.db.sql(
+        """
+        SELECT
+            name,
+            agent_code,
+            scheme_code,
+            eligible_amount,
+            remarks,
+            pan_status,
+            creation
+        FROM `tabCommission`
+        WHERE name IN %s
+        AND docstatus < 2
+        """,
+        (tuple(commission_names),),
+        as_dict=True,
+    )
+
+    rows_by_name = {
+        row.name: row for row in rows
+    }
+
+    deferred_names = []
+    normal_names = []
+
+    product_cache = (
+        _get_product_calculation_cache()
+    )
+
+    for docname in commission_names:
+        row = rows_by_name.get(docname)
+
+        if not row:
+            error_count += 1
+            errors.append({
+                "docname": docname,
+                "error": "Commission record not found",
+            })
+            continue
+
+        scheme_code = str(
+            row.scheme_code or ""
+        ).strip()
+
+        product = product_cache.get(scheme_code)
+
+        if not product:
+            error_count += 1
+            errors.append({
+                "docname": docname,
+                "error": (
+                    f"No Product found with Product Code: "
+                    f"{scheme_code}"
+                ),
+            })
+            continue
+
+        if product.commission_type == "Deferred":
+            deferred_names.append(docname)
+        else:
+            normal_names.append(docname)
+
+    # Deferred records must use the existing full method
+    # because they create yearly schedule and payment records.
+    for docname in deferred_names:
+        try:
+            calculate_commission_amount(docname)
+            success_count += 1
+
+        except Exception:
+            error_count += 1
+            traceback = frappe.get_traceback()
+
+            errors.append({
+                "docname": docname,
+                "error": traceback,
+            })
+
+            frappe.log_error(
+                traceback,
+                f"Commission Calculation Error - {docname}",
+            )
+
+    # Non-Deferred records are calculated in bulk.
+    normal_result = (
+        _calculate_non_deferred_commission_batch(
+            commission_names=normal_names,
+            rows_by_name=rows_by_name,
+            product_cache=product_cache,
+            normal_names=normal_names,
+        )
+    )
+
+    success_count += normal_result[
+        "success_count"
+    ]
+
+    error_count += normal_result[
+        "error_count"
+    ]
+
+    errors.extend(
+        normal_result["errors"]
+    )
+
+    return {
+        "success_count": success_count,
+        "error_count": error_count,
+        "errors": errors,
+    }
+
+
+def _get_product_calculation_cache():
+    """
+    Load all Product calculation fields once.
+    """
+    products = frappe.get_all(
+        "Product",
+        fields=[
+            "name",
+            "commission_type",
+            "commission_rate",
+            "commission_rate_upto_one_year",
+            "commission_rate_above_one_year",
+            "slab_1_limit",
+            "slab_1_rate",
+            "slab_2_limit",
+            "slab_2_rate",
+            "slab_3_rate",
+        ],
+    )
+
+    return {
+        product.name: product
+        for product in products
+    }
+
+
+def _calculate_non_deferred_commission_batch(
+    commission_names,
+    rows_by_name,
+    product_cache,
+    normal_names,
+):
+    """
+    Calculate Fixed Rate, Age Based, and Eligible Amount Based
+    Commission records in bulk without changing calculation logic.
+    """
+    success_count = 0
+    error_count = 0
+    errors = []
+
+    calculation_settings = (
+        _get_commission_calculation_settings()
+    )
+
+    scheme_groups = (
+        _get_eligible_amount_scheme_groups()
+    )
+
+    update_values = []
+    commission_items = []
+
+    eligible_group_rows = []
+
+    now_ts = now_datetime()
+
+    for docname in commission_names:
+        row = rows_by_name[docname]
+
+        try:
+            scheme_code = str(
+                row.scheme_code or ""
+            ).strip()
+
+            product = product_cache[scheme_code]
+
+            commission_type = (
+                product.commission_type
+            )
+
+            eligible_amount = flt(
+                row.eligible_amount
+            )
+
+            if eligible_amount < 0:
+                raise Exception(
+                    "Eligible Amount cannot be negative"
+                )
+
+            rate = None
+
+            if commission_type == "Fixed Rate":
+                if product.commission_rate in (None, ""):
+                    raise Exception(
+                        f"Commission Rate is required for Product: {scheme_code}"
+                    )
+
+                rate = flt(
+                    product.commission_rate
+                )
+
+            elif commission_type == "Age Based":
+                remarks = str(
+                    row.remarks or ""
+                ).strip().upper()
+
+                if remarks == "YES":
+                    if product.commission_rate_upto_one_year in (None, ""):
+                        raise Exception(
+                            f"Commission Rate Upto One Year is required for Product: {scheme_code}"
+                        )
+
+                    rate = flt(
+                        product.commission_rate_upto_one_year
+                    )
+
+                elif remarks == "NO":
+                    if product.commission_rate_above_one_year in (None, ""):
+                        raise Exception(
+                            f"Commission Rate Above One Year is required for Product: {scheme_code}"
+                        )
+
+                    rate = flt(
+                        product.commission_rate_above_one_year
+                    )
+
+                else:
+                    raise Exception(
+                        f"Remarks must be YES or NO for Age Based Product: {scheme_code}"
+                    )
+
+            elif commission_type == "Eligible Amount Based":
+                required_fields = {
+                    "Slab 1 Limit": product.slab_1_limit,
+                    "Slab 1 Rate": product.slab_1_rate,
+                    "Slab 2 Limit": product.slab_2_limit,
+                    "Slab 2 Rate": product.slab_2_rate,
+                    "Slab 3 Rate": product.slab_3_rate,
+                }
+
+                for label, value in required_fields.items():
+                    if value in (None, ""):
+                        raise Exception(
+                            f"{label} is required for Product: {scheme_code}"
+                        )
+
+                eligible_group_rows.append({
+                    "docname": docname,
+                    "agent_code": str(
+                        row.agent_code or ""
+                    ).strip(),
+                    "scheme_code": scheme_code,
+                    "eligible_amount": eligible_amount,
+                    "product": product,
+                })
+
+                # Actual rate is calculated after agent-group totals.
+                update_values.append(None)
+                commission_items.append(None)
+                success_count += 1
+                continue
+
+            else:
+                raise Exception(
+                    f"Invalid Commission Type '{commission_type}' in Product: {scheme_code}"
+                )
+
+            if rate is None:
+                raise Exception(
+                    f"Unable to determine commission rate for Product: {scheme_code}"
+                )
+
+            if rate < 0:
+                raise Exception(
+                    "Commission rate cannot be negative"
+                )
+
+            commission_amount = (
+                eligible_amount * rate
+            ) / 100
+
+            financial_values = (
+                _calculate_commission_financial_values(
+                    commission_amount=commission_amount,
+                    eligible_amount=eligible_amount,
+                    pan_status=row.pan_status,
+                )
+            )
+
+            commission_amount = flt(
+                financial_values["commission_amount"]
+            )
+
+            tds = flt(
+                financial_values["tds"]
+            )
+
+            security_deposit = flt(
+                financial_values["security_deposit"]
+            )
+
+            netpay = flt(
+                financial_values["netpay"]
+            )
+
+            commission_amount = flt(
+                _round_calculation_amount(
+                    commission_amount,
+                    calculation_settings,
+                )
+            )
+
+            eligible_amount = flt(
+                _round_calculation_amount(
+                    eligible_amount,
+                    calculation_settings,
+                )
+            )
+
+            tds = flt(
+                _round_calculation_amount(
+                    tds,
+                    calculation_settings,
+                )
+            )
+
+            security_deposit = flt(
+                _round_calculation_amount(
+                    security_deposit,
+                    calculation_settings,
+                )
+            )
+
+            netpay = flt(
+                _round_calculation_amount(
+                    netpay,
+                    calculation_settings,
+                )
+            )
+
+            # update_values.append((
+            #     commission_amount,
+            #     tds,
+            #     security_deposit,
+            #     netpay,
+            #     rate,
+            #     commission_type,
+            #     eligible_amount,
+            #     docname,
+            # ))
+            update_values.append((
+                commission_amount,
+                tds,
+                security_deposit,
+                netpay,
+                eligible_amount,
+                docname,
+            ))
+
+            commission_items.append((
+                frappe.generate_hash(length=10),
+                now_ts,
+                now_ts,
+                "Administrator",
+                "Administrator",
+                docname,
+                "Commission",
+                "commission_items",
+                0,
+                1,
+                "Normal",
+                1,
+                rate,
+                eligible_amount,
+                commission_amount,
+                getdate(row.creation),
+                "Pending",
+                tds,
+                security_deposit,
+                netpay,
+                commission_type,
+            ))
+
+            success_count += 1
+
+        except Exception:
+            error_count += 1
+            traceback = frappe.get_traceback()
+
+            errors.append({
+                "docname": docname,
+                "error": traceback,
+            })
+
+            frappe.log_error(
+                traceback,
+                f"Commission Calculation Error - {docname}",
+            )
+
+    # Calculate Eligible Amount Based records using
+    # agent + scheme-group totals.
+    eligible_result = (
+        _calculate_eligible_amount_based_batch(
+            eligible_group_rows=eligible_group_rows,
+            calculation_settings=calculation_settings,
+            scheme_groups=scheme_groups,
+            now_ts=now_ts,
+        )
+    )
+
+    update_values.extend(
+        eligible_result["update_values"]
+    )
+
+    commission_items.extend(
+        eligible_result["commission_items"]
+    )
+
+    success_count = (
+        success_count
+        - len(eligible_group_rows)
+        + eligible_result["success_count"]
+    )
+
+    error_count += eligible_result[
+        "error_count"
+    ]
+
+    errors.extend(
+        eligible_result["errors"]
+    )
+
+    # Remove old non-deferred Commission Item rows
+    # before inserting fresh rows for this batch.
+    if normal_names:
+        frappe.db.sql(
+            """
+            DELETE FROM `tabCommission Item`
+            WHERE parenttype = 'Commission'
+            AND parentfield = 'commission_items'
+            AND commission_type = 'Normal'
+            AND parent IN %s
+            """,
+            (tuple(normal_names),),
+        )
+
+    # Bulk update parent Commission fields.
+    if update_values:
+        update_values = [
+            value for value in update_values
+            if value is not None
+        ]
+
+        # update_sql = """
+        #     UPDATE `tabCommission`
+        #     SET
+        #         commission_amount = %s,
+        #         tds = %s,
+        #         security_deposit = %s,
+        #         netpay = %s,
+        #         applied_commission_rate = %s,
+        #         commission_type_applied = %s,
+        #         eligible_amount = %s
+        #     WHERE name = %s
+        # """
+
+        update_sql = """
+            UPDATE `tabCommission`
+            SET
+                commission_amount = %s,
+                tds = %s,
+                security_deposit = %s,
+                netpay = %s,
+                eligible_amount = %s
+            WHERE name = %s
+        """
+
+        cursor = frappe.db._cursor
+
+        for i in range(
+            0,
+            len(update_values),
+            2000,
+        ):
+            cursor.executemany(
+                update_sql,
+                update_values[
+                    i:i + 2000
+                ],
+            )
+
+    # Bulk insert Commission Item rows.
+    item_values = [
+        value for value in commission_items
+        if value is not None
+    ]
+
+    if item_values:
+        frappe.db.bulk_insert(
+            "Commission Item",
+            [
+                "name",
+                "creation",
+                "modified",
+                "owner",
+                "modified_by",
+                "parent",
+                "parenttype",
+                "parentfield",
+                "docstatus",
+                "idx",
+                "commission_type",
+                "year_no",
+                "commission_rate",
+                "eligible_amount",
+                "gross_commission",
+                "due_date",
+                "status",
+                "tds",
+                "security_deposit",
+                "netpay",
+                "remarks",
+            ],
+            item_values,
+            chunk_size=5000,
+        )
+
+    # Update agent deduction and final net pay
+    # once per affected agent.
+    affected_agents = {
+        str(
+            rows_by_name[docname].agent_code or ""
+        ).strip()
+        for docname in commission_names
+        if rows_by_name.get(docname)
+        and rows_by_name[docname].agent_code
+    }
+
+    for agent_code in affected_agents:
+        _update_agent_deduction_and_final_net_pay(
+            agent_code
+        )
+
+    # Create or update Normal Commission Payment
+    # once per affected agent.
+    for agent_code in affected_agents:
+        try:
+            _create_normal_agent_payment_if_missing(
+                agent_code
+            )
+
+        except Exception:
+            traceback = frappe.get_traceback()
+
+            errors.append({
+                "docname": agent_code,
+                "error": traceback,
+            })
+
+            frappe.log_error(
+                traceback,
+                f"Normal Commission Payment Error - {agent_code}",
+            )
+
+    return {
+        "success_count": success_count,
+        "error_count": error_count,
+        "errors": errors,
+    }
+
+
+def _calculate_eligible_amount_based_batch(
+    eligible_group_rows,
+    calculation_settings,
+    scheme_groups,
+    now_ts,
+):
+    """
+    Calculate Eligible Amount Based records using one
+    agent + scheme-group total per group.
+    """
+    success_count = 0
+    error_count = 0
+    errors = []
+
+    update_values = []
+    commission_items = []
+
+    if not eligible_group_rows:
+        return {
+            "success_count": 0,
+            "error_count": 0,
+            "errors": [],
+            "update_values": update_values,
+            "commission_items": commission_items,
+        }
+
+    # Fetch agent-group totals once.
+    group_totals = {}
+
+    grouped = {}
+
+    for row in eligible_group_rows:
+        group = scheme_groups.get(
+            row["scheme_code"],
+            (row["scheme_code"],),
+        )
+
+        key = (
+            row["agent_code"],
+            group,
+        )
+
+        grouped.setdefault(
+            key,
+            [],
+        ).append(row)
+
+    for (
+        agent_code,
+        group,
+    ), rows in grouped.items():
+
+        placeholders = ", ".join(
+            ["%s"] * len(group)
+        )
+
+        result = frappe.db.sql(
+            f"""
+            SELECT
+                COALESCE(
+                    SUM(c.eligible_amount),
+                    0
+                ) AS total
+            FROM `tabCommission` c
+            INNER JOIN `tabProduct` p
+                ON p.name = c.scheme_code
+            WHERE c.agent_code = %s
+            AND c.docstatus < 2
+            AND p.commission_type = 'Eligible Amount Based'
+            AND c.scheme_code IN ({placeholders})
+            """,
+            tuple(
+                [agent_code]
+                + list(group)
+            ),
+            as_dict=True,
+        )
+
+        agent_total = flt(
+            result[0].total
+            if result
+            else 0
+        )
+
+        agent_total = flt(
+            _round_calculation_amount(
+                agent_total,
+                calculation_settings,
+            )
+        )
+
+        group_totals[
+            (agent_code, group)
+        ] = agent_total
+
+    for (
+        agent_code,
+        group,
+    ), rows in grouped.items():
+
+        agent_total = group_totals[
+            (agent_code, group)
+        ]
+
+        if agent_total <= 0:
+            for row in rows:
+                error_count += 1
+                errors.append({
+                    "docname": row["docname"],
+                    "error": (
+                        f"Total eligible amount for Agent {agent_code} "
+                        f"and Scheme Group {', '.join(group)} is zero or invalid."
+                    ),
+                })
+
+            continue
+
+        # Update agent total once per group.
+        placeholders = ", ".join(
+            ["%s"] * len(group)
+        )
+
+        frappe.db.sql(
+            f"""
+            UPDATE `tabCommission` c
+            INNER JOIN `tabProduct` p
+                ON p.name = c.scheme_code
+            SET c.agent_total_eligible_collection = %s
+            WHERE c.agent_code = %s
+            AND c.docstatus < 2
+            AND p.commission_type = 'Eligible Amount Based'
+            AND c.scheme_code IN ({placeholders})
+            """,
+            tuple(
+                [agent_total, agent_code]
+                + list(group)
+            ),
+        )
+
+        for row in rows:
+            try:
+                product = row["product"]
+
+                slab_1_limit = flt(
+                    product.slab_1_limit
+                )
+
+                slab_2_limit = flt(
+                    product.slab_2_limit
+                )
+
+                if agent_total <= slab_1_limit:
+                    rate = flt(
+                        product.slab_1_rate
+                    )
+
+                elif agent_total <= slab_2_limit:
+                    rate = flt(
+                        product.slab_2_rate
+                    )
+
+                else:
+                    rate = flt(
+                        product.slab_3_rate
+                    )
+
+                eligible_amount = row[
+                    "eligible_amount"
+                ]
+
+                commission_amount = (
+                    eligible_amount * rate
+                ) / 100
+
+                financial_values = (
+                    _calculate_commission_financial_values(
+                        commission_amount=commission_amount,
+                        eligible_amount=eligible_amount,
+                        pan_status=None,
+                    )
+                )
+
+                commission_amount = flt(
+                    financial_values["commission_amount"]
+                )
+
+                tds = flt(
+                    financial_values["tds"]
+                )
+
+                security_deposit = flt(
+                    financial_values[
+                        "security_deposit"
+                    ]
+                )
+
+                netpay = flt(
+                    financial_values["netpay"]
+                )
+
+                commission_amount = flt(
+                    _round_calculation_amount(
+                        commission_amount,
+                        calculation_settings,
+                    )
+                )
+
+                eligible_amount = flt(
+                    _round_calculation_amount(
+                        eligible_amount,
+                        calculation_settings,
+                    )
+                )
+
+                tds = flt(
+                    _round_calculation_amount(
+                        tds,
+                        calculation_settings,
+                    )
+                )
+
+                security_deposit = flt(
+                    _round_calculation_amount(
+                        security_deposit,
+                        calculation_settings,
+                    )
+                )
+
+                netpay = flt(
+                    _round_calculation_amount(
+                        netpay,
+                        calculation_settings,
+                    )
+                )
+
+                # update_values.append((
+                #     commission_amount,
+                #     tds,
+                #     security_deposit,
+                #     netpay,
+                #     rate,
+                #     "Eligible Amount Based",
+                #     eligible_amount,
+                #     row["docname"],
+                # ))
+                update_values.append((
+                    commission_amount,
+                    tds,
+                    security_deposit,
+                    netpay,
+                    eligible_amount,
+                    row["docname"],
+                ))
+
+                commission_items.append((
+                    frappe.generate_hash(length=10),
+                    now_ts,
+                    now_ts,
+                    "Administrator",
+                    "Administrator",
+                    row["docname"],
+                    "Commission",
+                    "commission_items",
+                    0,
+                    1,
+                    "Normal",
+                    1,
+                    rate,
+                    eligible_amount,
+                    commission_amount,
+                    getdate(
+                        frappe.db.get_value(
+                            "Commission",
+                            row["docname"],
+                            "creation",
+                        )
+                    ),
+                    "Pending",
+                    tds,
+                    security_deposit,
+                    netpay,
+                    "Eligible Amount Based",
+                ))
+
+                success_count += 1
+
+            except Exception:
+                error_count += 1
+                traceback = frappe.get_traceback()
+
+                errors.append({
+                    "docname": row["docname"],
+                    "error": traceback,
+                })
+
+                frappe.log_error(
+                    traceback,
+                    f"Eligible Amount Commission Error - {row['docname']}",
+                )
+
+    return {
+        "success_count": success_count,
+        "error_count": error_count,
+        "errors": errors,
+        "update_values": update_values,
+        "commission_items": commission_items,
+    }
+
+
+def _update_agent_deduction_for_all_agents_optimized():
+    """
+    Calculate agent-level deduction and final_net_pay once per agent.
+
+    This produces the same final values as updating the agent after
+    every individual Commission calculation.
+    """
+    agent_totals = frappe.db.sql(
+        """
+        SELECT
+            agent_code,
+            COALESCE(
+                SUM(
+                    CAST(
+                        NULLIF(TRIM(netpay), '')
+                        AS DECIMAL(18, 2)
+                    )
+                ),
+                0
+            ) AS agent_total_netpay
+        FROM `tabCommission`
+        WHERE agent_code IS NOT NULL
+        AND agent_code != ''
+        AND docstatus < 2
+        GROUP BY agent_code
+        """,
+        as_dict=True,
+    )
+
+    calculation_settings = (
+        _get_commission_calculation_settings()
+    )
+
+    agent_deduction_rows = []
+
+    for agent_total in agent_totals:
+        agent_code = str(
+            agent_total.agent_code
+        ).strip()
+
+        total_netpay = flt(
+            agent_total.agent_total_netpay
+        )
+
+        deduction, final_net_pay = (
+            _calculate_agent_deduction(
+                agent_total_netpay=total_netpay,
+                calculation_settings=calculation_settings,
+            )
+        )
+
+        agent_deduction_rows.append(
+            (
+                flt(deduction),
+                flt(final_net_pay),
+                agent_code,
+            )
+        )
+
+    _bulk_update_agent_deduction(
+        agent_deduction_rows
+    )
+
+
+def _create_missing_deferred_payments_optimized():
+    """
+    Create missing Deferred Commission Payment records from
+    Commission Item rows.
+
+    Existing Deferred payments are not changed.
+    """
+    deferred_items = frappe.db.sql(
+        """
+        SELECT
+            ci.name AS item_name,
+            ci.parent AS commission_name,
+            ci.year_no,
+            ci.due_date,
+            ci.gross_commission,
+            ci.tds,
+            ci.security_deposit,
+            ci.netpay,
+            ci.status,
+            c.agent_code,
+            c.agent_operative_account,
+            c.agent_saving_account
+        FROM `tabCommission Item` ci
+        INNER JOIN `tabCommission` c
+            ON c.name = ci.parent
+        WHERE ci.parenttype = 'Commission'
+        AND ci.parentfield = 'commission_items'
+        AND ci.commission_type = 'Deferred'
+        AND c.docstatus < 2
+        """,
+        as_dict=True,
+    )
+
+    if not deferred_items:
+        return
+
+    existing_payments = frappe.get_all(
+        "Commission Payment",
+        filters={
+            "payment_type": "Deferred",
+            "docstatus": ("<", 2),
+        },
+        fields=[
+            "name",
+            "commission",
+            "payment_year",
+        ],
+    )
+
+    existing_keys = {
+        (
+            payment.commission,
+            cint(payment.payment_year),
+        )
+        for payment in existing_payments
+    }
+
+    calculation_settings = (
+        _get_commission_calculation_settings()
+    )
+
+    for item in deferred_items:
+        payment_year = cint(item.year_no)
+
+        if payment_year <= 0:
+            continue
+
+        key = (
+            item.commission_name,
+            payment_year,
+        )
+
+        if key in existing_keys:
+            continue
+
+        payment_data = {
+            "doctype": "Commission Payment",
+            "commission": item.commission_name,
+            "agent_code": item.agent_code,
+            "agent_operative_account": (
+                item.agent_operative_account
+            ),
+            "agent_saving_account": (
+                item.agent_saving_account
+            ),
+            "payment_type": "Deferred",
+            "payment_year": payment_year,
+            "due_date": item.due_date,
+            "source_deferred_detail": item.item_name,
+            "gross_commission": flt(
+                item.gross_commission
+            ),
+            "tds_amount": flt(item.tds),
+            "security_deposit_amount": flt(
+                item.security_deposit
+            ),
+            "netpay_amount": flt(item.netpay),
+            "deduction_amount": 0,
+            "final_netpay": flt(item.netpay),
+            "payment_status": (
+                "Due"
+                if item.status == "Due"
+                else "Pending"
+            ),
+        }
+
+        payment_data = _round_payment_amounts(
+            payment_data
+        )
+
+        payment_doc = frappe.get_doc(
+            payment_data
+        )
+
+        payment_doc.insert(
+            ignore_permissions=True
+        )
+
+        existing_keys.add(key)
+
+    frappe.db.commit()
+
+
+# def _create_deferred_payment_records(commission_doc):
+#     """
+#     Create one Commission Payment document for each row in
+#     Commission.deferred_commission_details.
+
+#     Each Deferred payment remains linked to its individual Commission record,
+#     because every annual installment has its own source record, year, and due date.
+#     """
+#     if not commission_doc.deferred_commission_details:
+#         return {
+#             "created_count": 0,
+#             "existing_count": 0,
+#             "payments": [],
+#         }
+
+#     payment_results = []
+
+#     for deferred_row in commission_doc.deferred_commission_details:
+#         payment_year = int(deferred_row.year_no or 0)
+
+#         if payment_year <= 0:
+#             frappe.throw(
+#                 _("Invalid Deferred Year No in Commission: {0}").format(
+#                     commission_doc.name
+#                 )
+#             )
+
+#         if not deferred_row.due_date:
+#             frappe.throw(
+#                 _("Due Date is required for Deferred Year {0}").format(
+#                     payment_year
+#                 )
+#             )
+
+#         existing_payment = frappe.db.exists(
+#             "Commission Payment",
+#             {
+#                 "commission": commission_doc.name,
+#                 "payment_type": "Deferred",
+#                 "payment_year": payment_year,
+#                 "docstatus": ("<", 2),
+#             },
+#         )
+
+#         if existing_payment:
+#             payment_results.append({
+#                 "created": False,
+#                 "name": existing_payment,
+#             })
+#             continue
+
+#         # payment_doc = frappe.get_doc({
+#         #     "doctype": "Commission Payment",
+#         #     "commission": commission_doc.name,
+#         #     "agent_code": commission_doc.agent_code,
+#         #     "agent_operative_account": commission_doc.agent_operative_account,
+#         #     "agent_saving_account": commission_doc.agent_saving_account,
+#         #     "payment_type": "Deferred",
+#         #     "payment_year": payment_year,
+#         #     "due_date": deferred_row.due_date,
+#         #     "source_deferred_detail": deferred_row.name,
+#         #     "gross_commission": flt(deferred_row.gross_commission),
+#         #     "tds_amount": flt(deferred_row.tds),
+#         #     "security_deposit_amount": flt(
+#         #         deferred_row.security_deposit
+#         #     ),
+#         #     "netpay_amount": flt(deferred_row.netpay),
+#         #     "deduction_amount": 0,
+#         #     "final_netpay": flt(deferred_row.netpay),
+#         #     "payment_status": (
+#         #         "Due"
+#         #         if deferred_row.status == "Due"
+#         #         else "Pending"
+#         #     ),
+#         # })
+
+#         payment_data = {
+#             "doctype": "Commission Payment",
+#             "commission": commission_doc.name,
+#             "agent_code": commission_doc.agent_code,
+#             "agent_operative_account": (
+#                 commission_doc.agent_operative_account
+#             ),
+#             "agent_saving_account": (
+#                 commission_doc.agent_saving_account
+#             ),
+#             "payment_type": "Deferred",
+#             "payment_year": payment_year,
+#             "due_date": deferred_row.due_date,
+#             "source_deferred_detail": deferred_row.name,
+#             "gross_commission": flt(
+#                 deferred_row.gross_commission
+#             ),
+#             "tds_amount": flt(
+#                 deferred_row.tds
+#             ),
+#             "security_deposit_amount": flt(
+#                 deferred_row.security_deposit
+#             ),
+#             "netpay_amount": flt(
+#                 deferred_row.netpay
+#             ),
+#             "deduction_amount": 0,
+#             "final_netpay": flt(
+#                 deferred_row.netpay
+#             ),
+#             "payment_status": (
+#                 "Due"
+#                 if deferred_row.status == "Due"
+#                 else "Pending"
+#             ),
+#         }
+
+#         payment_data = _round_payment_amounts(
+#             payment_data
+#         )
+
+#         payment_doc = frappe.get_doc(
+#             payment_data
+#         )
+
+#         payment_doc.insert(ignore_permissions=True)
+
+#         payment_results.append({
+#             "created": True,
+#             "name": payment_doc.name,
+#         })
+
+#     return {
+#         "created_count": sum(
+#             1 for payment in payment_results if payment["created"]
+#         ),
+#         "existing_count": sum(
+#             1 for payment in payment_results if not payment["created"]
+#         ),
+#         "payments": payment_results,
+#     }
+
+
 def _create_deferred_payment_records(commission_doc):
     """
-    Create one Commission Payment document for each row in
-    Commission.deferred_commission_details.
-
-    Each Deferred payment remains linked to its individual Commission record,
-    because every annual installment has its own source record, year, and due date.
+    Create one Commission Payment document for each Deferred row in
+    Commission.commission_items.
     """
-    if not commission_doc.deferred_commission_details:
+    if not commission_doc.commission_items:
         return {
             "created_count": 0,
             "existing_count": 0,
@@ -4155,7 +6904,10 @@ def _create_deferred_payment_records(commission_doc):
 
     payment_results = []
 
-    for deferred_row in commission_doc.deferred_commission_details:
+    for deferred_row in commission_doc.commission_items:
+        if deferred_row.commission_type != "Deferred":
+            continue
+
         payment_year = int(deferred_row.year_no or 0)
 
         if payment_year <= 0:
@@ -4188,31 +6940,6 @@ def _create_deferred_payment_records(commission_doc):
                 "name": existing_payment,
             })
             continue
-
-        # payment_doc = frappe.get_doc({
-        #     "doctype": "Commission Payment",
-        #     "commission": commission_doc.name,
-        #     "agent_code": commission_doc.agent_code,
-        #     "agent_operative_account": commission_doc.agent_operative_account,
-        #     "agent_saving_account": commission_doc.agent_saving_account,
-        #     "payment_type": "Deferred",
-        #     "payment_year": payment_year,
-        #     "due_date": deferred_row.due_date,
-        #     "source_deferred_detail": deferred_row.name,
-        #     "gross_commission": flt(deferred_row.gross_commission),
-        #     "tds_amount": flt(deferred_row.tds),
-        #     "security_deposit_amount": flt(
-        #         deferred_row.security_deposit
-        #     ),
-        #     "netpay_amount": flt(deferred_row.netpay),
-        #     "deduction_amount": 0,
-        #     "final_netpay": flt(deferred_row.netpay),
-        #     "payment_status": (
-        #         "Due"
-        #         if deferred_row.status == "Due"
-        #         else "Pending"
-        #     ),
-        # })
 
         payment_data = {
             "doctype": "Commission Payment",
@@ -4467,149 +7194,175 @@ def _generate_deferred_commission_schedule(commission_doc, product_doc, eligible
     }
 
 
+# @frappe.whitelist()
+# def calculate_commission_for_all():
+#     """
+#     Calculate commission on ALL Commission documents.
+#     Calls calculate_commission_amount(docname) for each document.
+#     """
+#     frappe.only_for(("System Manager",))
+#     _validate_commission_calculation_enabled()
+
+#     # Get all Commission names
+#     commission_names = frappe.get_all(
+#         "Commission",
+#         filters={"docstatus": ("<", 2)},  # ignore cancelled if any
+#         pluck="name",
+#     )
+
+#     if not commission_names:
+#         return {
+#             "status": "completed",
+#             "total_processed": 0,
+#             "success_count": 0,
+#             "error_count": 0,
+#             "errors": [],
+#         }
+
+#     success_count = 0
+#     error_count = 0
+#     errors = []
+
+#     for docname in commission_names:
+#         try:
+#             # Call existing method
+#             calculate_commission_amount(docname)
+#             success_count += 1
+#         except Exception:
+#             error_count += 1
+#             errors.append(
+#                 f"{docname}: {frappe.get_traceback()}"
+#             )
+#             # Optionally log
+#             frappe.log_error(
+#                 frappe.get_traceback(),
+#                 f"Commission Calculation Error - {docname}",
+#             )
+
+#     return {
+#         "status": "completed",
+#         "total_processed": len(commission_names),
+#         "success_count": success_count,
+#         "error_count": error_count,
+#         "errors": errors,
+#     }
+
+
+# @frappe.whitelist()
+# def calculate_commission_for_all_with_progress_bar():
+#     """
+#     Calculate commission on all Commission documents with a terminal
+#     progress bar using tqdm.
+
+#     Displays progress, successful calculations, errors, and final status.
+#     """
+#     from tqdm import tqdm
+
+#     frappe.only_for(("System Manager",))
+#     _validate_commission_calculation_enabled()
+
+#     commission_names = frappe.get_all(
+#         "Commission",
+#         filters={"docstatus": ("<", 2)},
+#         pluck="name",
+#     )
+
+#     total_records = len(commission_names)
+#     success_count = 0
+#     error_count = 0
+#     errors = []
+
+#     if not commission_names:
+#         result = {
+#             "status": "completed",
+#             "total_processed": 0,
+#             "success_count": 0,
+#             "error_count": 0,
+#             "errors": [],
+#         }
+#         print("\nCommission Calculation Result")
+#         print("Status: Completed")
+#         print("Total Processed: 0")
+#         print("Success Count: 0")
+#         print("Error Count: 0")
+#         return result
+
+#     with tqdm(
+#         total=total_records,
+#         desc="Calculating Commission",
+#         unit="record",
+#         dynamic_ncols=True,
+#         leave=True,
+#     ) as progress:
+
+#         for docname in commission_names:
+#             try:
+#                 calculate_commission_amount(docname)
+#                 success_count += 1
+
+#             except Exception:
+#                 error_count += 1
+#                 error_traceback = frappe.get_traceback()
+
+#                 errors.append({
+#                     "docname": docname,
+#                     "error": error_traceback,
+#                 })
+
+#                 frappe.log_error(
+#                     error_traceback,
+#                     f"Commission Calculation Error - {docname}",
+#                 )
+
+#             finally:
+#                 progress.update(1)
+#                 progress.set_postfix(
+#                     success=success_count,
+#                     errors=error_count,
+#                 )
+
+#     result = {
+#         "status": "completed",
+#         "total_processed": total_records,
+#         "success_count": success_count,
+#         "error_count": error_count,
+#         "errors": errors,
+#     }
+
+#     print("\n\n========== Commission Calculation Result ==========")
+#     print(f"Status          : {result['status'].upper()}")
+#     print(f"Total Processed : {total_records}")
+#     print(f"Success Count   : {success_count}")
+#     print(f"Error Count     : {error_count}")
+#     print("===================================================")
+
+#     return result
+
+
 @frappe.whitelist()
 def calculate_commission_for_all():
     """
-    Calculate commission on ALL Commission documents.
-    Calls calculate_commission_amount(docname) for each document.
+    Calculate commission on all Commission documents
+    using the optimized bulk calculation method.
     """
-    frappe.only_for(("System Manager",))
-    _validate_commission_calculation_enabled()
-
-    # Get all Commission names
-    commission_names = frappe.get_all(
-        "Commission",
-        filters={"docstatus": ("<", 2)},  # ignore cancelled if any
-        pluck="name",
+    return calculate_commission_for_all_optimized(
+        batch_size=5000,
+        show_progress=False,
     )
-
-    if not commission_names:
-        return {
-            "status": "completed",
-            "total_processed": 0,
-            "success_count": 0,
-            "error_count": 0,
-            "errors": [],
-        }
-
-    success_count = 0
-    error_count = 0
-    errors = []
-
-    for docname in commission_names:
-        try:
-            # Call existing method
-            calculate_commission_amount(docname)
-            success_count += 1
-        except Exception:
-            error_count += 1
-            errors.append(
-                f"{docname}: {frappe.get_traceback()}"
-            )
-            # Optionally log
-            frappe.log_error(
-                frappe.get_traceback(),
-                f"Commission Calculation Error - {docname}",
-            )
-
-    return {
-        "status": "completed",
-        "total_processed": len(commission_names),
-        "success_count": success_count,
-        "error_count": error_count,
-        "errors": errors,
-    }
 
 
 @frappe.whitelist()
 def calculate_commission_for_all_with_progress_bar():
     """
-    Calculate commission on all Commission documents with a terminal
-    progress bar using tqdm.
-
-    Displays progress, successful calculations, errors, and final status.
+    Calculate commission on all Commission documents
+    using the optimized bulk calculation method.
+    Shows a terminal progress bar.
     """
-    from tqdm import tqdm
-
-    frappe.only_for(("System Manager",))
-    _validate_commission_calculation_enabled()
-
-    commission_names = frappe.get_all(
-        "Commission",
-        filters={"docstatus": ("<", 2)},
-        pluck="name",
+    return calculate_commission_for_all_optimized(
+        batch_size=5000,
+        show_progress=True,
     )
-
-    total_records = len(commission_names)
-    success_count = 0
-    error_count = 0
-    errors = []
-
-    if not commission_names:
-        result = {
-            "status": "completed",
-            "total_processed": 0,
-            "success_count": 0,
-            "error_count": 0,
-            "errors": [],
-        }
-        print("\nCommission Calculation Result")
-        print("Status: Completed")
-        print("Total Processed: 0")
-        print("Success Count: 0")
-        print("Error Count: 0")
-        return result
-
-    with tqdm(
-        total=total_records,
-        desc="Calculating Commission",
-        unit="record",
-        dynamic_ncols=True,
-        leave=True,
-    ) as progress:
-
-        for docname in commission_names:
-            try:
-                calculate_commission_amount(docname)
-                success_count += 1
-
-            except Exception:
-                error_count += 1
-                error_traceback = frappe.get_traceback()
-
-                errors.append({
-                    "docname": docname,
-                    "error": error_traceback,
-                })
-
-                frappe.log_error(
-                    error_traceback,
-                    f"Commission Calculation Error - {docname}",
-                )
-
-            finally:
-                progress.update(1)
-                progress.set_postfix(
-                    success=success_count,
-                    errors=error_count,
-                )
-
-    result = {
-        "status": "completed",
-        "total_processed": total_records,
-        "success_count": success_count,
-        "error_count": error_count,
-        "errors": errors,
-    }
-
-    print("\n\n========== Commission Calculation Result ==========")
-    print(f"Status          : {result['status'].upper()}")
-    print(f"Total Processed : {total_records}")
-    print(f"Success Count   : {success_count}")
-    print(f"Error Count     : {error_count}")
-    print("===================================================")
-
-    return result
+#
 
 
 @frappe.whitelist()
@@ -4669,10 +7422,41 @@ def calculate_commission_for_selected(commission_names):
     }
 
 
+# @frappe.whitelist()
+# def mark_due_deferred_commissions(payment_date=None):
+#     """
+#     Mark deferred schedule rows as Due when their due_date has arrived.
+#     Actual payment remains a manual action.
+#     """
+#     frappe.only_for(("System Manager",))
+
+#     payment_date = getdate(payment_date) if payment_date else getdate()
+
+#     result = frappe.db.sql(
+#         """
+#         UPDATE `tabDeferred Commission Detail`
+#         SET status = 'Due'
+#         WHERE parenttype = 'Commission'
+#         AND parentfield = 'deferred_commission_details'
+#         AND status = 'Pending'
+#         AND due_date <= %s
+#         """,
+#         payment_date,
+#     )
+
+#     frappe.db.commit()
+
+#     return {
+#         "status": "success",
+#         "payment_date": payment_date,
+#         "message": _("Deferred commission rows marked as Due"),
+#     }
+
+
 @frappe.whitelist()
 def mark_due_deferred_commissions(payment_date=None):
     """
-    Mark deferred schedule rows as Due when their due_date has arrived.
+    Mark Deferred Commission Item rows as Due when their due_date has arrived.
     Actual payment remains a manual action.
     """
     frappe.only_for(("System Manager",))
@@ -4681,10 +7465,11 @@ def mark_due_deferred_commissions(payment_date=None):
 
     result = frappe.db.sql(
         """
-        UPDATE `tabDeferred Commission Detail`
+        UPDATE `tabCommission Item`
         SET status = 'Due'
         WHERE parenttype = 'Commission'
-        AND parentfield = 'deferred_commission_details'
+        AND parentfield = 'commission_items'
+        AND commission_type = 'Deferred'
         AND status = 'Pending'
         AND due_date <= %s
         """,
@@ -4700,10 +7485,53 @@ def mark_due_deferred_commissions(payment_date=None):
     }
 
 
+# @frappe.whitelist()
+# def get_due_deferred_commissions(payment_date=None):
+#     """
+#     Return Deferred Commission Detail rows that are due and not yet paid.
+#     """
+#     frappe.only_for(("System Manager",))
+
+#     payment_date = getdate(payment_date) if payment_date else getdate()
+
+#     return frappe.db.sql(
+#         """
+#         SELECT
+#             c.name AS commission_name,
+#             c.agent_code,
+#             c.agent_name,
+#             c.scheme_code,
+#             c.customer_account_number,
+#             c.customer_account_name,
+#             d.name AS deferred_detail_name,
+#             d.year_no,
+#             d.commission_rate,
+#             d.eligible_amount,
+#             d.gross_commission,
+#             d.tds,
+#             d.security_deposit,
+#             d.netpay,
+#             d.due_date,
+#             d.status
+#         FROM `tabDeferred Commission Detail` d
+#         INNER JOIN `tabCommission` c
+#             ON c.name = d.parent
+#         WHERE d.parenttype = 'Commission'
+#         AND d.parentfield = 'deferred_commission_details'
+#         AND d.status IN ('Pending', 'Due')
+#         AND d.due_date <= %s
+#         AND c.docstatus < 2
+#         ORDER BY d.due_date, c.agent_code, c.name
+#         """,
+#         payment_date,
+#         as_dict=True,
+#     )
+
+
 @frappe.whitelist()
 def get_due_deferred_commissions(payment_date=None):
     """
-    Return Deferred Commission Detail rows that are due and not yet paid.
+    Return Deferred Commission Item rows that are due and not yet paid.
     """
     frappe.only_for(("System Manager",))
 
@@ -4728,11 +7556,12 @@ def get_due_deferred_commissions(payment_date=None):
             d.netpay,
             d.due_date,
             d.status
-        FROM `tabDeferred Commission Detail` d
+        FROM `tabCommission Item` d
         INNER JOIN `tabCommission` c
             ON c.name = d.parent
         WHERE d.parenttype = 'Commission'
-        AND d.parentfield = 'deferred_commission_details'
+        AND d.parentfield = 'commission_items'
+        AND d.commission_type = 'Deferred'
         AND d.status IN ('Pending', 'Due')
         AND d.due_date <= %s
         AND c.docstatus < 2
@@ -4741,6 +7570,69 @@ def get_due_deferred_commissions(payment_date=None):
         payment_date,
         as_dict=True,
     )
+
+
+# @frappe.whitelist()
+# def mark_deferred_commission_paid(
+#     commission_name,
+#     deferred_detail_name,
+#     payment_reference=None,
+#     paid_on=None,
+# ):
+#     """
+#     Mark exactly one deferred annual installment as paid.
+#     Stops duplicate payment of the same year.
+#     """
+#     frappe.only_for(("System Manager",))
+
+#     paid_on = getdate(paid_on) if paid_on else getdate()
+
+#     commission_doc = frappe.get_doc("Commission", commission_name)
+
+#     deferred_row = next(
+#         (
+#             row for row in commission_doc.deferred_commission_details
+#             if row.name == deferred_detail_name
+#         ),
+#         None,
+#     )
+
+#     if not deferred_row:
+#         frappe.throw(_("Deferred Commission Detail row not found"))
+
+#     if deferred_row.status == "Paid":
+#         frappe.throw(
+#             _("Deferred commission for Year {0} is already paid").format(
+#                 deferred_row.year_no
+#             )
+#         )
+
+#     if getdate(deferred_row.due_date) > paid_on:
+#         frappe.throw(
+#             _("This deferred commission is not due until {0}").format(
+#                 deferred_row.due_date
+#             )
+#         )
+
+#     deferred_row.status = "Paid"
+#     deferred_row.paid_on = paid_on
+#     deferred_row.payment_reference = payment_reference
+
+#     commission_doc.save(ignore_permissions=True)
+#     frappe.db.commit()
+
+#     return {
+#         "status": "success",
+#         "commission_name": commission_doc.name,
+#         "year_no": deferred_row.year_no,
+#         "gross_commission": deferred_row.gross_commission,
+#         "tds": deferred_row.tds,
+#         "security_deposit": deferred_row.security_deposit,
+#         "netpay": deferred_row.netpay,
+#         "paid_on": paid_on,
+#         "payment_reference": payment_reference,
+#         "message": _("Deferred commission installment marked as paid"),
+#     }
 
 
 @frappe.whitelist()
@@ -4762,14 +7654,19 @@ def mark_deferred_commission_paid(
 
     deferred_row = next(
         (
-            row for row in commission_doc.deferred_commission_details
+            row for row in commission_doc.commission_items
             if row.name == deferred_detail_name
         ),
         None,
     )
 
     if not deferred_row:
-        frappe.throw(_("Deferred Commission Detail row not found"))
+        frappe.throw(_("Commission Item row not found"))
+
+    if deferred_row.commission_type != "Deferred":
+        frappe.throw(
+            _("Commission Item row is not a Deferred commission row")
+        )
 
     if deferred_row.status == "Paid":
         frappe.throw(

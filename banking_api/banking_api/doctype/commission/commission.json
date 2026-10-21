@@ -36,7 +36,7 @@
   "agent_saving_account",
   "final_net_pay",
   "section_break_vlms",
-  "deferred_commission_details"
+  "commission_items"
  ],
  "fields": [
   {
@@ -210,11 +210,11 @@
    "fieldname": "section_break_vlms",
    "fieldtype": "Section Break"
   },
-  {
-   "fieldname": "deferred_commission_details",
-   "fieldtype": "Table",
-   "label": "Deferred Commission Details",
-   "options": "Deferred Commission Detail"
+ {
+    "fieldname": "commission_items",
+    "fieldtype": "Table",
+    "label": "Commission Items",
+    "options": "Commission Item"
   },
   {
    "fieldname": "deduction",
