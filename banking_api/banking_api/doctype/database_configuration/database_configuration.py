@@ -101,6 +101,30 @@ def test_connection_for_doc(docname):
 	return doc.test_connection()
 
 
+def get_db_connection(name=None, database=None, database_name=None, **kwargs):
+	"""
+	Helper function to easily get a PostgreSQL connection anywhere in the codebase.
+	Usage:
+		from banking_api.banking_api.doctype.database_configuration.database_configuration import get_db_connection
+		conn = get_db_connection("DC-00001") # or get_db_connection(database="CBS")
+	"""
+	filters = {}
+	if name:
+		filters["name"] = name
+	elif database_name:
+		filters["database_name"] = database_name
+	elif database:
+		filters["database"] = database
+
+	docname = frappe.db.get_value("Database Configuration", filters, "name") if filters else None
+	if not docname:
+		frappe.throw(_("Database Configuration not found for: {0}").format(filters or name or database))
+
+	doc = frappe.get_doc("Database Configuration", docname)
+	return doc.get_connection(**kwargs)
+
+
+
 
 
 
