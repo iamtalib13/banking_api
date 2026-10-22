@@ -248,6 +248,7 @@ ALLOWED_EXPORT_FIELDS = [
     "final_net_pay",
     "scheme_code",
     "scheme_description",
+    "`tabCommission Item`.commission_type",
 ]
 
 
@@ -366,7 +367,8 @@ def download_commission_report(
         COMMISSION_DOCTYPE,
         filters=filters,
         fields=ALLOWED_EXPORT_FIELDS,
-        order_by="creation asc, sol_id asc, agent_code asc, scheme_code asc",
+        group_by="`tabCommission`.name",
+        order_by="`tabCommission`.creation asc, `tabCommission`.sol_id asc, `tabCommission`.agent_code asc, `tabCommission`.scheme_code asc",
         limit_page_length=0,
     )
 
@@ -379,6 +381,7 @@ def download_commission_report(
         "SOL Name",
         "Scheme Code",
         "Scheme Description",
+        "Commission Type",
         "Agent Code",
         "Agent Name",
         "PAN",
@@ -405,6 +408,7 @@ def download_commission_report(
             row.get("sol_description") or "",
             row.get("scheme_code") or "",
             row.get("scheme_description") or "",
+            row.get("commission_type") or "",
             row.get("agent_code") or "",
             row.get("agent_name") or "",
             row.get("pan_card") or "",
