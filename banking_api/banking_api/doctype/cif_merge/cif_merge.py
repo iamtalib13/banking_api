@@ -8,7 +8,7 @@ from psycopg2.extras import RealDictCursor
 class CIFMerge(Document):
 	def validate(self):
 		if not self.aadhar:
-			frappe.throw("Kripya Aadhar fill karein.")
+			frappe.throw(_("Please enter Aadhaar number."))
 
 		# Agar user ne child table me already data edit/add kiya hai, to use overwrite mat karo
 		if not self.cif_details and self.aadhar:
@@ -344,13 +344,13 @@ def get_top_cif_counts():
 @frappe.whitelist()
 def trigger_sync_all():
 	if "System Manager" not in frappe.get_roles():
-		frappe.throw("Sirf System Manager hi sync trigger kar sakte hain.")
+		frappe.throw(_("Only System Manager can trigger sync."))
 	frappe.enqueue(
 		"banking_api.banking_api.doctype.cif_merge.cif_merge.sync_all_cif_merge_records",
 		queue="long",
 		timeout=3600
 	)
-	return {"status": "queued", "message": "Bulk CIF Sync background me start ho gaya hai."}
+	return {"status": "queued", "message": _("Bulk CIF Sync has started in the background.")}
 
 
 @frappe.whitelist()
@@ -585,7 +585,7 @@ def update_workflow_status(docname, action):
 			frappe.throw("Only CIF Maker can send records to checker.")
 		has_primary = any(int(getattr(r, "primary", 0) or 0) == 1 for r in (doc.cif_details or []))
 		if not has_primary:
-			frappe.throw("Kripya at least ek Primary CIF select karein.")
+			frappe.throw(_("Please select at least one Primary CIF."))
 		doc.cif_status = "Pending Verification"
 		doc.save()
 		return {"status": doc.cif_status, "message": "Sent to Checker for verification."}
