@@ -37,11 +37,11 @@ frappe.listview_settings['CIF Merge'] = {
 					frappe.call({
 						method: 'banking_api.banking_api.doctype.cif_merge.cif_merge.get_top_cif_counts',
 						freeze: true,
-						freeze_message: __('Top CIF counts load ho rahe hain...'),
+						freeze_message: __('Loading CIF counts...'),
 						callback: function(res) {
 							const data = res.message || [];
 							if (!data.length) {
-								frappe.msgprint(__('Koi CIF records nahi mile.'));
+								frappe.msgprint(__('No CIF records found.'));
 								return;
 							}
 							show_top_cif_dialog(listview, data);

@@ -487,7 +487,7 @@ frappe.ui.form.on("CIF Merge", {
 					</span>
 				</div>
 				<div class="text-muted" style="font-size: 11px;">
-					<i class="fa fa-info-circle mr-1"></i>Merge aur Re-KYC mutually exclusive hain
+					<i class="fa fa-info-circle mr-1"></i>Merge and Re-KYC are mutually exclusive
 				</div>
 			</div>
 		</div>`;
