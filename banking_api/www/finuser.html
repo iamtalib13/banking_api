@@ -241,14 +241,18 @@ body.dr main, body.dr #users-view{margin-right:440px}
         <div class="um-field"><span class="um-flabel">Zone</span><span class="um-fval" id="um-zone-val"></span></div>
         <div class="um-field"><span class="um-flabel">Current Role</span><span class="um-fval" id="um-cur-role"></span></div>
       </div>
+      {% if can_update_role %}
       <div class="um-section">
         <span class="um-slabel">Change Role</span>
         <select id="um-role-sel" class="um-role-sel"></select>
       </div>
+      {% endif %}
     </div>
     <div class="um-foot">
-      <button class="btn-cancel" id="um-cancel">Cancel</button>
+      <button class="btn-cancel" id="um-cancel">Close</button>
+      {% if can_update_role %}
       <button class="btn-update" id="um-update">Update Role</button>
+      {% endif %}
     </div>
   </div>
 </div>
@@ -730,7 +734,7 @@ $("tabs").addEventListener("click", e => {
 
 const closeBranchDrawer = () => {
   ov.classList.remove("on");
-  if (!ovResigned.classList.contains("on")) {
+  if (!ovResigned || !ovResigned.classList.contains("on")) {
     document.body.classList.remove("dr");
   }
   grid.querySelectorAll(".sel").forEach(e => e.classList.remove("sel"));
@@ -738,7 +742,7 @@ const closeBranchDrawer = () => {
 
 const closeResignedDrawer = () => {
   if (ovResigned) ovResigned.classList.remove("on");
-  if (!ov.classList.contains("on")) {
+  if (!ov || !ov.classList.contains("on")) {
     document.body.classList.remove("dr");
   }
 };
@@ -800,12 +804,13 @@ async function executeDisable(item) {
     btn.textContent = "Disabling...";
   }
 
+  const csrfToken = (window.frappe && window.frappe.csrf_token) || "";
   try {
     const res = await fetch(`/api/method/banking_api.www.finuser.disable_finacle_user`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Frappe-CSRF-Token": frappe.csrf_token || ""
+        "X-Frappe-CSRF-Token": csrfToken
       },
       body: JSON.stringify({ user_id: uid, emp_id: emp })
     });
@@ -864,13 +869,17 @@ function openUserModal(uid, roleId, tr) {
   $("um-zone-val").textContent = u.zone || "N/A";
   $("um-cur-role").textContent = u.role_id || "N/A";
 
-  $("um-role-sel").innerHTML = allRoles.map(r =>
-    `<option value="${escapeHtml(r)}"${r === u.role_id ? " selected" : ""}>${escapeHtml(r)}</option>`
-  ).join("");
+  if ($("um-role-sel")) {
+    $("um-role-sel").innerHTML = allRoles.map(r =>
+      `<option value="${escapeHtml(r)}"${r === u.role_id ? " selected" : ""}>${escapeHtml(r)}</option>`
+    ).join("");
+  }
 
   const btn = $("um-update");
-  btn.disabled = false;
-  btn.textContent = "Update Role";
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = "Update Role";
+  }
   userModal.classList.add("on");
 }
 
@@ -883,50 +892,53 @@ $("um-close").onclick = closeUserModal;
 $("um-cancel").onclick = closeUserModal;
 userModal.addEventListener("click", e => { if (e.target === userModal) closeUserModal(); });
 
-$("um-update").onclick = async () => {
-  if (!activeUser) return;
-  const newRole = $("um-role-sel").value;
-  if (newRole === activeUser.role_id) { closeUserModal(); return; }
+if ($("um-update")) {
+  $("um-update").onclick = async () => {
+    if (!activeUser || !$("um-role-sel")) return;
+    const newRole = $("um-role-sel").value;
+    if (newRole === activeUser.role_id) { closeUserModal(); return; }
 
-  const btn = $("um-update");
-  btn.disabled = true;
-  btn.textContent = "Updating...";
+    const btn = $("um-update");
+    btn.disabled = true;
+    btn.textContent = "Updating...";
 
-  try {
-    const res = await fetch("/api/method/banking_api.www.finuser.update_user_role", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Frappe-CSRF-Token": frappe.csrf_token || "" },
-      body: JSON.stringify({ user_id: activeUser.user_id, old_role: activeUser.role_id, new_role: newRole })
-    });
-    const data = await res.json();
-    const result = data.message || {};
+    try {
+      const csrfToken = (window.frappe && window.frappe.csrf_token) || "";
+      const res = await fetch("/api/method/banking_api.www.finuser.update_user_role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Frappe-CSRF-Token": csrfToken },
+        body: JSON.stringify({ user_id: activeUser.user_id, old_role: activeUser.role_id, new_role: newRole })
+      });
+      const data = await res.json();
+      const result = data.message || {};
 
-    if (result.status === "success") {
-      // Update ALL_USERS in memory
-      const idx = ALL_USERS.findIndex(x => x.user_id === activeUser.user_id && x.role_id === activeUser.role_id);
-      if (idx !== -1) ALL_USERS[idx].role_id = newRole;
-      // Update the DOM row
-      const tr = activeUser._tr;
-      if (tr) {
-        tr.dataset.role = newRole;
-        tr.dataset.s = (activeUser.user_id + " " + activeUser.name + " " + activeUser.sol_id + " " + activeUser.branch_name + " " + newRole).toLowerCase();
-        const roleEl = tr.querySelector(".tbl-role");
-        if (roleEl) roleEl.textContent = newRole;
+      if (result.status === "success") {
+        // Update ALL_USERS in memory
+        const idx = ALL_USERS.findIndex(x => x.user_id === activeUser.user_id && x.role_id === activeUser.role_id);
+        if (idx !== -1) ALL_USERS[idx].role_id = newRole;
+        // Update the DOM row
+        const tr = activeUser._tr;
+        if (tr) {
+          tr.dataset.role = newRole;
+          tr.dataset.s = (activeUser.user_id + " " + activeUser.name + " " + activeUser.sol_id + " " + activeUser.branch_name + " " + newRole).toLowerCase();
+          const roleEl = tr.querySelector(".tbl-role");
+          if (roleEl) roleEl.textContent = newRole;
+        }
+        if (window.frappe && frappe.show_alert) frappe.show_alert({ message: result.message || "Role updated", indicator: "green" });
+        closeUserModal();
+      } else {
+        if (window.frappe && frappe.msgprint) frappe.msgprint({ title: "Error", indicator: "red", message: result.message || "Update failed" });
+        else alert(result.message || "Update failed");
+        btn.disabled = false;
+        btn.textContent = "Update Role";
       }
-      if (window.frappe && frappe.show_alert) frappe.show_alert({ message: result.message || "Role updated", indicator: "green" });
-      closeUserModal();
-    } else {
-      if (window.frappe && frappe.msgprint) frappe.msgprint({ title: "Error", indicator: "red", message: result.message || "Update failed" });
-      else alert(result.message || "Update failed");
+    } catch (err) {
+      alert("Request failed: " + err.message);
       btn.disabled = false;
       btn.textContent = "Update Role";
     }
-  } catch (err) {
-    alert("Request failed: " + err.message);
-    btn.disabled = false;
-    btn.textContent = "Update Role";
-  }
-};
+  };
+}
 
 // Row click → open modal
 usersView.addEventListener("click", e => {

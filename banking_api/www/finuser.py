@@ -38,20 +38,37 @@ ALLOWED_ROLES = {"Operations Support Executive", "CBS Support Executive", "Syste
 RESIGNED_ACCESS_ROLES = {"CBS Support Executive", "System Manager", "Administrator"}
 
 
+ROLE_UPDATE_ACCESS_ROLES = {"CBS Support Executive", "System Manager", "Administrator"}
+
+
 def check_access():
     if not frappe.session.user or frappe.session.user == "Guest":
-        frappe.throw(_("Please login to access this page."), frappe.PermissionError)
+        frappe.throw(_("Access Denied: Please login to access this page."), frappe.PermissionError)
 
     user_roles = set(frappe.get_roles(frappe.session.user))
     if frappe.session.user != "Administrator" and not (user_roles & ALLOWED_ROLES):
-        frappe.throw(_("You do not have permission to access Finacle User Management."), frappe.PermissionError)
+        frappe.throw(_("Access Denied: You do not have permission to access Finacle User Management."), frappe.PermissionError)
+
+
+def check_role_update_access():
+    check_access()
+    user_roles = set(frappe.get_roles(frappe.session.user))
+    if frappe.session.user != "Administrator" and not (user_roles & ROLE_UPDATE_ACCESS_ROLES):
+        frappe.throw(_("Access Denied: Only CBS Support Executive can update roles."), frappe.PermissionError)
+
+
+def can_update_role():
+    if frappe.session.user == "Administrator":
+        return True
+    user_roles = set(frappe.get_roles(frappe.session.user))
+    return bool(user_roles & ROLE_UPDATE_ACCESS_ROLES)
 
 
 def check_resigned_access():
     check_access()
     user_roles = set(frappe.get_roles(frappe.session.user))
     if frappe.session.user != "Administrator" and not (user_roles & RESIGNED_ACCESS_ROLES):
-        frappe.throw(_("Only CBS Support Executive or Admin can access resigned employee management."), frappe.PermissionError)
+        frappe.throw(_("Access Denied: Only CBS Support Executive or Admin can access resigned employee management."), frappe.PermissionError)
 
 
 def can_manage_resigned():
@@ -73,6 +90,7 @@ def get_context(context):
 
     check_access()
     context.can_manage_resigned = can_manage_resigned()
+    context.can_update_role = can_update_role()
 
     context.is_guest = False
 
@@ -346,7 +364,7 @@ def get_resigned_employees():
 
 @frappe.whitelist()
 def update_user_role(user_id, old_role, new_role):
-    check_access()
+    check_role_update_access()
 
     if not user_id or not new_role:
         frappe.throw(_("User ID and new role are required."))
