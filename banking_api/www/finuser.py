@@ -58,10 +58,7 @@ def check_role_update_access():
 
 
 def can_update_role():
-    if frappe.session.user == "Administrator":
-        return True
-    user_roles = set(frappe.get_roles(frappe.session.user))
-    return bool(user_roles & ROLE_UPDATE_ACCESS_ROLES)
+    return False
 
 
 def check_resigned_access():
@@ -78,6 +75,10 @@ def can_manage_resigned():
     return bool(user_roles & RESIGNED_ACCESS_ROLES)
 
 
+def can_disable_user():
+    return False
+
+
 def get_finacle_dr_connection():
     from banking_api.banking_api.doctype.database_configuration.database_configuration import (
         get_db_connection,
@@ -91,6 +92,7 @@ def get_context(context):
     check_access()
     context.can_manage_resigned = can_manage_resigned()
     context.can_update_role = can_update_role()
+    context.can_disable_user = can_disable_user()
 
     context.is_guest = False
 

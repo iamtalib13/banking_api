@@ -261,6 +261,7 @@ body.dr main, body.dr #users-view{margin-right:440px}
 const BRANCHES = {{ (branches or []) | tojson }};
 const ALL_USERS = {{ (all_users or []) | tojson }};
 const TOTAL_RECORDS = {{ total_query_records or 1054 }};
+const CAN_DISABLE_USER = {{ (can_disable_user or false) | tojson }};
 const USERS_CACHE = {};
 let RESIGNED_CACHE = null;
 let currentTab = "branches"; // 'branches' | 'users'
@@ -698,11 +699,12 @@ function renderResignedList() {
             <span class="rcard-val" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(e.designation)}">${escapeHtml(e.designation || 'Staff')}</span>
           </div>
         </div>
+        ${CAN_DISABLE_USER ? `
         <div class="rcard-foot">
           <button class="btn-disable" data-uid="${escapeHtml(e.finacle_user_id)}" data-emp="${escapeHtml(e.emp_id)}" data-name="${escapeHtml(e.name)}">
             Disable User
           </button>
-        </div>
+        </div>` : ''}
       </div>
     `;
   }).join("");
