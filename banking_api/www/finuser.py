@@ -159,16 +159,18 @@ def get_context(context):
             "role_id": u_role,
             "work_class": u_work_class,
         })
-    # Enrich with ERPNext employee ID and designation
+    # Enrich with ERPNext employee ID and designation (strictly numeric emp id only, strictly exclude prefix)
     erp_emps = frappe.db.sql(
-        "SELECT name, IFNULL(designation, '') AS designation FROM `tabEmployee` WHERE IFNULL(name, '') != ''",
+        "SELECT name, IFNULL(designation, '') AS designation FROM `tabEmployee` WHERE name REGEXP '^[0-9]+$'",
         as_dict=True,
     )
     emp_meta = {}
     for emp in erp_emps:
-        emp_code = re.sub(r"^[^\d]*0*", "", str(emp.name or "").strip())
-        if emp_code:
-            emp_meta[emp_code] = {"emp_id": str(emp.name), "designation": str(emp.designation or "")}
+        raw_name = str(emp.name or "").strip()
+        if raw_name.isdigit():
+            emp_code = raw_name.lstrip("0")
+            if emp_code:
+                emp_meta[emp_code] = {"emp_id": raw_name, "designation": str(emp.designation or "")}
 
     for u in all_users_list:
         digits = re.sub(r"^[^\d]*0*", "", u["user_id"])
@@ -240,17 +242,19 @@ def get_branch_users(sol_id):
     counts.update(role_counts)
     sorted_roles = sorted(roles_set, key=lambda x: role_counts.get(x, 0), reverse=True)
 
-    # Enrich with ERPNext employee designation
+    # Enrich with ERPNext employee designation (strictly numeric emp id only, strictly exclude prefix)
     if users_list:
         erp_emps = frappe.db.sql(
-            "SELECT name, IFNULL(designation, '') AS designation FROM `tabEmployee` WHERE IFNULL(name, '') != ''",
+            "SELECT name, IFNULL(designation, '') AS designation FROM `tabEmployee` WHERE name REGEXP '^[0-9]+$'",
             as_dict=True,
         )
         emp_meta = {}
         for emp in erp_emps:
-            emp_code = re.sub(r"^[^\d]*0*", "", str(emp.name or "").strip())
-            if emp_code:
-                emp_meta[emp_code] = str(emp.designation or "")
+            raw_name = str(emp.name or "").strip()
+            if raw_name.isdigit():
+                emp_code = raw_name.lstrip("0")
+                if emp_code:
+                    emp_meta[emp_code] = str(emp.designation or "")
 
         for u in users_list:
             digits = re.sub(r"^[^\d]*0*", "", u["user_id"])
