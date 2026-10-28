@@ -195,10 +195,11 @@ body.dr main, body.dr #users-view{margin-right:440px}
 {% if can_manage_resigned %}
 <div id="ov-resigned" class="drawer" role="complementary" aria-label="Resigned employees"><div class="pop">
 <div class="ph">
-  <div>
+  <div style="flex:1;min-width:0;">
     <h2 style="color:var(--danger);"><span class="dot red"></span>Action Required: Resigned Employees</h2>
     <p id="resigned-sub">Left in ERPNext but still ACTIVE in Finacle Production DR</p>
   </div>
+  <button id="exp-resigned" class="f" style="padding:4px 10px;font-size:12px;margin-left:auto;margin-right:6px;" title="Export Resigned List to CSV">Export</button>
   <button id="x-resigned" aria-label="Close">✕</button>
 </div>
 <input id="rq" type="search" placeholder="Search by Employee ID, Name or Finacle ID" aria-label="Search resigned" autocomplete="off" style="margin-top:12px;">
@@ -752,6 +753,40 @@ const closeResignedDrawer = () => {
 $("x").onclick = closeBranchDrawer;
 if ($("x-resigned")) $("x-resigned").onclick = closeResignedDrawer;
 if ($("rq")) $("rq").addEventListener("input", () => renderResignedList());
+
+if ($("exp-resigned")) {
+  $("exp-resigned").onclick = () => {
+    const emps = (RESIGNED_CACHE && RESIGNED_CACHE.employees) || [];
+    if (!emps.length) {
+      alert("No resigned employee data to export.");
+      return;
+    }
+    const q = $("rq") ? $("rq").value.trim().toLowerCase() : "";
+    const listToExport = q
+      ? emps.filter(e =>
+          e.name.toLowerCase().includes(q) ||
+          String(e.emp_id).toLowerCase().includes(q) ||
+          (e.finacle_user_id && e.finacle_user_id.toLowerCase().includes(q)) ||
+          (e.sol_id && String(e.sol_id).toLowerCase().includes(q))
+        )
+      : emps;
+
+    const rows = [["Employee ID", "Employee Name", "Designation", "SOL ID", "Branch Name", "Relieving Date", "Finacle User ID", "Finacle Roles"]];
+    listToExport.forEach(e => {
+      rows.push([
+        e.emp_id || "",
+        e.name || "",
+        e.designation || "",
+        e.sol_id || "",
+        e.branch_name || "",
+        e.relieving_date || "",
+        e.finacle_user_id || "",
+        e.finacle_roles || ""
+      ]);
+    });
+    downloadCsv(rows, "resigned-active-finacle-users.csv");
+  };
+}
 
 /* Modal & Disable action handlers */
 let pendingDisableUser = null;
