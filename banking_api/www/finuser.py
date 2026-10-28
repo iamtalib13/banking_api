@@ -235,6 +235,22 @@ def get_branch_users(sol_id):
     counts.update(role_counts)
     sorted_roles = sorted(roles_set, key=lambda x: role_counts.get(x, 0), reverse=True)
 
+    # Enrich with ERPNext employee designation
+    if users_list:
+        erp_emps = frappe.db.sql(
+            "SELECT name, IFNULL(designation, '') AS designation FROM `tabEmployee` WHERE IFNULL(name, '') != ''",
+            as_dict=True,
+        )
+        emp_meta = {}
+        for emp in erp_emps:
+            emp_code = re.sub(r"^[^\d]*0*", "", str(emp.name or "").strip())
+            if emp_code:
+                emp_meta[emp_code] = str(emp.designation or "")
+
+        for u in users_list:
+            digits = re.sub(r"^[^\d]*0*", "", u["user_id"])
+            u["designation"] = emp_meta.get(digits, "")
+
     return {
         "users": users_list,
         "roles": sorted_roles,
