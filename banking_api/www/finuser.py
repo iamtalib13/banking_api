@@ -125,6 +125,9 @@ def get_context(context):
         total_query_records = len(all_rows)
 
         for r in all_rows:
+            uid = str(r[0] or "").strip()
+            if uid.upper().startswith("P"):
+                continue
             sol = str(r[2] or "").strip()
             if sol:
                 fin_counts[sol] = fin_counts.get(sol, 0) + 1
@@ -146,6 +149,8 @@ def get_context(context):
 
     for r in all_rows:
         u_id = str(r[0] or "").strip()
+        if u_id.upper().startswith("P"):
+            continue
         u_name = str(r[1] or "").strip() or u_id
         u_sol = str(r[2] or "").strip()
         u_role = str(r[3] or "").strip()
@@ -159,16 +164,18 @@ def get_context(context):
             "role_id": u_role,
             "work_class": u_work_class,
         })
-    # Enrich with ERPNext employee ID and designation
+    # Enrich with ERPNext employee ID and designation (strictly numeric emp id only, strictly exclude prefix)
     erp_emps = frappe.db.sql(
-        "SELECT name, IFNULL(designation, '') AS designation FROM `tabEmployee` WHERE IFNULL(name, '') != ''",
+        "SELECT name, IFNULL(designation, '') AS designation FROM `tabEmployee` WHERE name REGEXP '^[0-9]+$'",
         as_dict=True,
     )
     emp_meta = {}
     for emp in erp_emps:
-        emp_code = re.sub(r"^[^\d]*0*", "", str(emp.name or "").strip())
-        if emp_code:
-            emp_meta[emp_code] = {"emp_id": str(emp.name), "designation": str(emp.designation or "")}
+        raw_name = str(emp.name or "").strip()
+        if raw_name.isdigit():
+            emp_code = raw_name.lstrip("0")
+            if emp_code:
+                emp_meta[emp_code] = {"emp_id": raw_name, "designation": str(emp.designation or "")}
 
     for u in all_users_list:
         digits = re.sub(r"^[^\d]*0*", "", u["user_id"])
@@ -213,6 +220,8 @@ def get_branch_users(sol_id):
 
     for r in rows:
         user_id = str(r[0] or "").strip()
+        if user_id.upper().startswith("P"):
+            continue
         emp_name = str(r[1] or "").strip() or user_id
         solid = str(r[2] or "").strip()
         role_id = str(r[3] or "").strip()
@@ -240,17 +249,19 @@ def get_branch_users(sol_id):
     counts.update(role_counts)
     sorted_roles = sorted(roles_set, key=lambda x: role_counts.get(x, 0), reverse=True)
 
-    # Enrich with ERPNext employee designation
+    # Enrich with ERPNext employee designation (strictly numeric emp id only, strictly exclude prefix)
     if users_list:
         erp_emps = frappe.db.sql(
-            "SELECT name, IFNULL(designation, '') AS designation FROM `tabEmployee` WHERE IFNULL(name, '') != ''",
+            "SELECT name, IFNULL(designation, '') AS designation FROM `tabEmployee` WHERE name REGEXP '^[0-9]+$'",
             as_dict=True,
         )
         emp_meta = {}
         for emp in erp_emps:
-            emp_code = re.sub(r"^[^\d]*0*", "", str(emp.name or "").strip())
-            if emp_code:
-                emp_meta[emp_code] = str(emp.designation or "")
+            raw_name = str(emp.name or "").strip()
+            if raw_name.isdigit():
+                emp_code = raw_name.lstrip("0")
+                if emp_code:
+                    emp_meta[emp_code] = str(emp.designation or "")
 
         for u in users_list:
             digits = re.sub(r"^[^\d]*0*", "", u["user_id"])
