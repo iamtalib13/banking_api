@@ -239,6 +239,7 @@ body.dr main, body.dr #users-view{margin-right:440px}
       <div class="um-grid">
         <div class="um-field"><span class="um-flabel">SOL ID</span><span class="um-fval" id="um-sol"></span></div>
         <div class="um-field"><span class="um-flabel">Branch</span><span class="um-fval" id="um-branch"></span></div>
+        <div class="um-field"><span class="um-flabel">Designation</span><span class="um-fval" id="um-desig"></span></div>
         <div class="um-field"><span class="um-flabel">Zone</span><span class="um-fval" id="um-zone-val"></span></div>
         <div class="um-field"><span class="um-flabel">Current Role</span><span class="um-fval" id="um-cur-role"></span></div>
       </div>
@@ -320,6 +321,7 @@ function buildUsers() {
             <tr>
               <th style="width:140px;">Finacle User ID</th>
               <th>Employee Name</th>
+              <th>Designation</th>
               <th style="width:90px;">SOL ID</th>
               <th>Branch Name</th>
               <th>Zone</th>
@@ -351,7 +353,7 @@ function buildUsers() {
   ALL_USERS.forEach(u => {
     const tr = document.createElement("tr");
     tr.className = "user-row";
-    tr.dataset.s = (String(u.user_id||"")+" "+String(u.name||"")+" "+String(u.sol_id||"")+" "+String(u.branch_name||"")+" "+String(u.role_id||"")).toLowerCase();
+    tr.dataset.s = (String(u.user_id||"")+" "+String(u.name||"")+" "+String(u.designation||"")+" "+String(u.sol_id||"")+" "+String(u.branch_name||"")+" "+String(u.role_id||"")).toLowerCase();
     tr.dataset.uid = u.user_id || "";
     tr.dataset.role = u.role_id || "";
     tr.dataset.zone = u.zone || "";
@@ -360,6 +362,7 @@ function buildUsers() {
     tr.innerHTML = `
       <td><span class="tbl-uid">${escapeHtml(u.user_id)}</span></td>
       <td><span class="tbl-name"><span class="av">${initials}</span>${escapeHtml(u.name)}</span></td>
+      <td>${escapeHtml(u.designation||'N/A')}</td>
       <td><span class="tbl-sol">${escapeHtml(u.sol_id||'N/A')}</span></td>
       <td>${escapeHtml(u.branch_name||'N/A')}</td>
       <td><span class="tbl-zone">${escapeHtml(u.zone||'N/A')}</span></td>
@@ -903,6 +906,7 @@ function openUserModal(uid, roleId, tr) {
   $("um-uid").textContent = u.user_id;
   $("um-sol").textContent = u.sol_id || "N/A";
   $("um-branch").textContent = u.branch_name || "N/A";
+  if ($("um-desig")) $("um-desig").textContent = u.designation || "N/A";
   $("um-zone-val").textContent = u.zone || "N/A";
   $("um-cur-role").textContent = u.role_id || "N/A";
 
