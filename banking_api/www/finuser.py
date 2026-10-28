@@ -9,6 +9,7 @@ EXACT_SQL_QUERY = """SELECT DISTINCT
     g.emp_name,
     g.sol_id,
     u.role_id,
+    upr.user_work_class,
     c.disabled_from_date,
     c.disabled_upto_date,
     p.del_flg
@@ -19,15 +20,15 @@ LEFT JOIN finfadm.user_creds_tbl c
     ON u.user_id = c.user_id
 LEFT JOIN finfadm.user_profile_tbl p
     ON u.user_id = p.user_id
+LEFT JOIN finfadm.upr_coreserver upr
+    ON u.user_id = upr.user_id
 WHERE p.del_flg = 'N'
   AND (
       c.disabled_from_date IS NULL
       OR c.disabled_upto_date IS NULL
-      OR NOT (
-          CURRENT_DATE BETWEEN
-              c.disabled_from_date::date
-              AND c.disabled_upto_date::date
-      )
+      OR CURRENT_DATE NOT BETWEEN
+          c.disabled_from_date::date
+          AND c.disabled_upto_date::date
   )
 ORDER BY
     u.user_id,
@@ -148,6 +149,7 @@ def get_context(context):
         u_name = str(r[1] or "").strip() or u_id
         u_sol = str(r[2] or "").strip()
         u_role = str(r[3] or "").strip()
+        u_work_class = str(r[4] or "").strip()
         all_users_list.append({
             "user_id": u_id,
             "name": u_name,
@@ -155,6 +157,7 @@ def get_context(context):
             "branch_name": branch_map.get(u_sol, "N/A"),
             "zone": zone_map.get(u_sol, "Other"),
             "role_id": u_role,
+            "work_class": u_work_class,
         })
     # Enrich with ERPNext employee ID and designation
     erp_emps = frappe.db.sql(
@@ -213,9 +216,10 @@ def get_branch_users(sol_id):
         emp_name = str(r[1] or "").strip() or user_id
         solid = str(r[2] or "").strip()
         role_id = str(r[3] or "").strip()
-        dis_from = str(r[4]) if r[4] else ""
-        dis_upto = str(r[5]) if r[5] else ""
-        del_flg = str(r[6] or "").strip()
+        work_class = str(r[4] or "").strip()
+        dis_from = str(r[5]) if r[5] else ""
+        dis_upto = str(r[6]) if r[6] else ""
+        del_flg = str(r[7] or "").strip()
 
         if role_id:
             roles_set.add(role_id)
@@ -226,6 +230,7 @@ def get_branch_users(sol_id):
             "name": emp_name,
             "sol_id": solid,
             "role_id": role_id,
+            "work_class": work_class,
             "disabled_from_date": dis_from,
             "disabled_upto_date": dis_upto,
             "del_flg": del_flg,
