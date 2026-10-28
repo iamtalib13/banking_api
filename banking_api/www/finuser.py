@@ -125,6 +125,9 @@ def get_context(context):
         total_query_records = len(all_rows)
 
         for r in all_rows:
+            uid = str(r[0] or "").strip()
+            if uid.upper().startswith("P"):
+                continue
             sol = str(r[2] or "").strip()
             if sol:
                 fin_counts[sol] = fin_counts.get(sol, 0) + 1
@@ -146,6 +149,8 @@ def get_context(context):
 
     for r in all_rows:
         u_id = str(r[0] or "").strip()
+        if u_id.upper().startswith("P"):
+            continue
         u_name = str(r[1] or "").strip() or u_id
         u_sol = str(r[2] or "").strip()
         u_role = str(r[3] or "").strip()
@@ -215,6 +220,8 @@ def get_branch_users(sol_id):
 
     for r in rows:
         user_id = str(r[0] or "").strip()
+        if user_id.upper().startswith("P"):
+            continue
         emp_name = str(r[1] or "").strip() or user_id
         solid = str(r[2] or "").strip()
         role_id = str(r[3] or "").strip()
