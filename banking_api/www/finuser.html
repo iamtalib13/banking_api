@@ -626,6 +626,7 @@ function render() {
         <div style="flex:1;min-width:0;">
           <div class="n">${escapeHtml(u.name)} <span style="font-weight:400;color:var(--mute);font-size:12px;">(${escapeHtml(u.user_id)})</span></div>
           <div class="m">${escapeHtml(u.designation || 'N/A')}</div>
+          <div class="m" style="font-size:11px;color:var(--mute);">Work Class: <b>${escapeHtml(u.work_class || 'N/A')}</b></div>
         </div>
         <span class="rl">${escapeHtml(u.role_id || 'USER')}</span>
       </div>
