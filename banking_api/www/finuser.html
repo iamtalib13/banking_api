@@ -174,7 +174,7 @@ body.dr main, body.dr #users-view{margin-right:440px}
 <button id="grp" class="f on">Group by zone</button>
 {% if can_manage_resigned %}
 <button id="btn-resigned" class="f resigned-btn">
-  <span class="dot red"></span>Resigned Employees
+  <span class="dot red"></span>Resigned Employees <span id="resigned-cnt" class="badge-cnt" style="background:#fee2e2;color:#b91c1c;margin-left:4px;">0</span>
 </button>
 {% endif %}
 <button id="exp" class="f">Export</button>
@@ -631,25 +631,42 @@ function render() {
 }
 
 /* ===== RESIGNED EMPLOYEES DRAWER LOGIC ===== */
+function updateResignedBadge(count) {
+  const badge = $("resigned-cnt");
+  if (badge) {
+    badge.textContent = count != null ? count : 0;
+    badge.style.display = "inline-block";
+  }
+}
+
+async function fetchResignedCache() {
+  if (RESIGNED_CACHE) return RESIGNED_CACHE;
+  try {
+    const res = await fetch(`/api/method/banking_api.www.finuser.get_resigned_employees`);
+    const data = await res.json();
+    RESIGNED_CACHE = data.message || { employees: [], total: 0, active_in_finacle_count: 0 };
+    updateResignedBadge((RESIGNED_CACHE.employees || []).length);
+    return RESIGNED_CACHE;
+  } catch(err) {
+    return null;
+  }
+}
+
 if ($("btn-resigned")) {
+  // Pre-fetch count in background
+  fetchResignedCache();
+
   $("btn-resigned").onclick = async () => {
     closeBranchDrawer();
     ovResigned.classList.add("on");
     document.body.classList.add("dr");
     $("rq").value = "";
-    $("resigned-list").innerHTML = '<div class="none">Loading resigned employees...</div>';
 
     if (!RESIGNED_CACHE) {
-      try {
-        const res = await fetch(`/api/method/banking_api.www.finuser.get_resigned_employees`);
-        const data = await res.json();
-        RESIGNED_CACHE = data.message || { employees: [], total: 0, active_in_finacle_count: 0 };
-      } catch(err) {
-        $("resigned-list").innerHTML = '<div class="none">Failed to load resigned employees.</div>';
-        return;
-      }
+      $("resigned-list").innerHTML = '<div class="none">Loading resigned employees...</div>';
+      await fetchResignedCache();
     }
-    const emps = RESIGNED_CACHE.employees || [];
+    const emps = (RESIGNED_CACHE && RESIGNED_CACHE.employees) || [];
     $("resigned-sub").innerHTML = `<b style="color:var(--danger);">${emps.length} users</b> left organization but STILL ACTIVE in Finacle`;
     renderResignedList();
   };
@@ -866,6 +883,7 @@ async function executeDisable(item) {
       // Remove from cached list
       if (RESIGNED_CACHE && RESIGNED_CACHE.employees) {
         RESIGNED_CACHE.employees = RESIGNED_CACHE.employees.filter(e => e.finacle_user_id !== uid);
+        updateResignedBadge(RESIGNED_CACHE.employees.length);
         renderResignedList();
         $("resigned-sub").innerHTML = `<b style="color:var(--danger);">${RESIGNED_CACHE.employees.length} users</b> left organization but STILL ACTIVE in Finacle`;
       }
