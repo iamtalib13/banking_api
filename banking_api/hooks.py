@@ -195,8 +195,8 @@ scheduler_events = {
     ],
 
     "cron": {
-        # Daily Commission auto-fetch at 2:00 AM
-        "0 2 * * *": [
+        # Daily Commission auto-fetch at
+        "35 11 * * *": [
             "banking_api.banking_api.doctype.commission.commission.fetch_and_create_commission"
         ],
 
