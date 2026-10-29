@@ -776,6 +776,18 @@ const closeResignedDrawer = () => {
 
 $("x").onclick = closeBranchDrawer;
 if ($("x-resigned")) $("x-resigned").onclick = closeResignedDrawer;
+
+// Close branch drawer when clicking outside
+document.addEventListener("click", e => {
+  if (ov && ov.classList.contains("on")) {
+    const isInsideDrawer = ov.contains(e.target);
+    const isBranchBtn = e.target.closest(".cap");
+    if (!isInsideDrawer && !isBranchBtn) {
+      closeBranchDrawer();
+    }
+  }
+});
+
 if ($("rq")) $("rq").addEventListener("input", () => renderResignedList());
 
 if ($("exp-resigned")) {
