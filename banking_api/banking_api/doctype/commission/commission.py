@@ -7709,7 +7709,8 @@ def get_commission_status_counts():
     Return total, calculated, and not-calculated Commission counts.
     A Commission is calculated when netpay has a value.
     """
-    frappe.only_for(("System Manager",))
+    # frappe.only_for(("System Manager",))
+    frappe.only_for(("System Manager", "Commission Admin User"))
 
     result = frappe.db.sql(
         """
