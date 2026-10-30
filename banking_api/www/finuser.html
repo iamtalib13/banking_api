@@ -122,7 +122,9 @@ body.dr main, body.dr #users-view{margin-right:440px}
 @media(max-width:520px){ #grid{grid-template-columns:repeat(2,1fr)}}
 /* Users view sidebar */
 .ut-sidebar{width:196px;flex-shrink:0;position:sticky;top:var(--hdr-h,51px);max-height:calc(100vh - var(--hdr-h,51px));overflow-y:auto;border-right:1px solid var(--line);background:var(--surf);padding:8px 0;scrollbar-width:thin}
-.ut-sb-head{padding:6px 14px 4px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--mute)}
+.ut-sb-head{padding:6px 10px 6px;display:flex;gap:4px;border-bottom:1px solid var(--line);background:var(--bg)}
+.ut-sb-tab{flex:1;border:none;background:transparent;color:var(--mute);padding:4px 6px;border-radius:6px;font:inherit;font-size:11px;font-weight:700;cursor:pointer;text-align:center;transition:all .12s}
+.ut-sb-tab.on{background:var(--surf);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
 .ut-sb-item{display:flex;align-items:center;gap:8px;width:100%;padding:7px 14px;border:none;background:transparent;color:var(--ink);font:inherit;cursor:pointer;text-align:left;transition:background .1s}
 .ut-sb-item:hover{background:var(--bg)}
 .ut-sb-item.on{background:var(--accbg);color:var(--acc)}
@@ -280,27 +282,49 @@ const $ = id => document.getElementById(id);
 const grid = $("grid"), usersView = $("users-view"), ov = $("ov"), ovResigned = $("ov-resigned");
 let cur = null, role = "ALL";
 let sortK = "code", grouped = true;
-let utRole = "ALL", utZone = "ALL";
+let utRole = "ALL", utWorkClass = "ALL", utZone = "ALL", utSidebarTab = "roles";
 const act = c => A[c] ? A[c].active_total : 0;
 
-function buildUsers() {
-  const roleCounts = {};
-  const zoneSet = new Set();
-  ALL_USERS.forEach(u => {
-    const r = u.role_id || "Unknown";
-    roleCounts[r] = (roleCounts[r] || 0) + 1;
-    if (u.zone) zoneSet.add(u.zone);
-  });
-  const roles = Object.entries(roleCounts).sort((a, b) => b[1] - a[1]);
-  const zones = Array.from(zoneSet).sort();
+function renderSidebarItems() {
+  const container = $("ut-sb-items");
+  if (!container) return;
   const total = ALL_USERS.length;
 
-  const sidebarItems = [
-    `<button class="ut-sb-item on" data-r="ALL"><span class="ut-sb-label">All Roles</span><span class="ut-sb-count">${total}</span></button>`,
-    ...roles.map(([r, c]) =>
-      `<button class="ut-sb-item" data-r="${escapeHtml(r)}"><span class="ut-sb-label">${escapeHtml(r)}</span><span class="ut-sb-count">${c}</span></button>`
-    )
-  ].join("");
+  if (utSidebarTab === "roles") {
+    const roleCounts = {};
+    ALL_USERS.forEach(u => {
+      const r = u.role_id || "Unknown";
+      roleCounts[r] = (roleCounts[r] || 0) + 1;
+    });
+    const roles = Object.entries(roleCounts).sort((a, b) => b[1] - a[1]);
+    container.innerHTML = [
+      `<button class="ut-sb-item${utRole === 'ALL' ? ' on' : ''}" data-val="ALL"><span class="ut-sb-label">All Roles</span><span class="ut-sb-count">${total}</span></button>`,
+      ...roles.map(([r, c]) =>
+        `<button class="ut-sb-item${utRole === r ? ' on' : ''}" data-val="${escapeHtml(r)}"><span class="ut-sb-label">${escapeHtml(r)}</span><span class="ut-sb-count">${c}</span></button>`
+      )
+    ].join("");
+  } else {
+    const wcCounts = {};
+    ALL_USERS.forEach(u => {
+      const w = u.work_class || "N/A";
+      wcCounts[w] = (wcCounts[w] || 0) + 1;
+    });
+    const wcs = Object.entries(wcCounts).sort((a, b) => b[1] - a[1]);
+    container.innerHTML = [
+      `<button class="ut-sb-item${utWorkClass === 'ALL' ? ' on' : ''}" data-val="ALL"><span class="ut-sb-label">All Work Classes</span><span class="ut-sb-count">${total}</span></button>`,
+      ...wcs.map(([w, c]) =>
+        `<button class="ut-sb-item${utWorkClass === w ? ' on' : ''}" data-val="${escapeHtml(w)}"><span class="ut-sb-label">${escapeHtml(w)}</span><span class="ut-sb-count">${c}</span></button>`
+      )
+    ].join("");
+  }
+}
+
+function buildUsers() {
+  const zoneSet = new Set();
+  ALL_USERS.forEach(u => {
+    if (u.zone) zoneSet.add(u.zone);
+  });
+  const zones = Array.from(zoneSet).sort();
 
   const zoneOpts = ["ALL", ...zones].map(z =>
     `<option value="${escapeHtml(z)}">${z === "ALL" ? "All Zones" : escapeHtml(z)}</option>`
@@ -308,8 +332,11 @@ function buildUsers() {
 
   usersView.innerHTML = `
     <div class="ut-sidebar" id="ut-sidebar">
-      <div class="ut-sb-head">Roles</div>
-      ${sidebarItems}
+      <div class="ut-sb-head">
+        <button id="sb-tab-roles" class="ut-sb-tab on">Roles</button>
+        <button id="sb-tab-workclass" class="ut-sb-tab">Work Class</button>
+      </div>
+      <div id="ut-sb-items"></div>
     </div>
     <div class="ut-main">
       <div class="ut-bar">
@@ -336,11 +363,35 @@ function buildUsers() {
     </div>
   `;
 
-  $("ut-sidebar").addEventListener("click", e => {
+  renderSidebarItems();
+
+  $("sb-tab-roles").addEventListener("click", () => {
+    if (utSidebarTab === "roles") return;
+    utSidebarTab = "roles";
+    $("sb-tab-roles").classList.add("on");
+    $("sb-tab-workclass").classList.remove("on");
+    renderSidebarItems();
+    apply();
+  });
+
+  $("sb-tab-workclass").addEventListener("click", () => {
+    if (utSidebarTab === "workclass") return;
+    utSidebarTab = "workclass";
+    $("sb-tab-workclass").classList.add("on");
+    $("sb-tab-roles").classList.remove("on");
+    renderSidebarItems();
+    apply();
+  });
+
+  $("ut-sb-items").addEventListener("click", e => {
     const item = e.target.closest(".ut-sb-item");
     if (!item) return;
-    utRole = item.dataset.r;
-    $("ut-sidebar").querySelectorAll(".ut-sb-item").forEach(i => i.classList.toggle("on", i.dataset.r === utRole));
+    if (utSidebarTab === "roles") {
+      utRole = item.dataset.val;
+    } else {
+      utWorkClass = item.dataset.val;
+    }
+    $("ut-sb-items").querySelectorAll(".ut-sb-item").forEach(i => i.classList.toggle("on", i.dataset.val === item.dataset.val));
     apply();
   });
 
@@ -358,6 +409,7 @@ function buildUsers() {
     tr.dataset.s = (String(u.user_id||"")+" "+String(u.name||"")+" "+String(u.designation||"")+" "+String(u.work_class||"")+" "+String(u.sol_id||"")+" "+String(u.branch_name||"")+" "+String(u.role_id||"")).toLowerCase();
     tr.dataset.uid = u.user_id || "";
     tr.dataset.role = u.role_id || "";
+    tr.dataset.workclass = u.work_class || "N/A";
     tr.dataset.zone = u.zone || "";
 
     const initials = escapeHtml((u.name || u.user_id || "U").split(" ").map(w => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase());
@@ -445,28 +497,38 @@ function apply() {
     $("empty").style.display = n ? "none" : "block";
   } else {
     let n = 0;
-    const roleTally = {};
+    const tally = {};
     const rows = $("tbl-body") ? $("tbl-body").children : [];
     for (const el of rows) {
       const matchText = !v || el.dataset.s.includes(v);
       const matchRole = utRole === "ALL" || el.dataset.role === utRole;
+      const matchWorkClass = utWorkClass === "ALL" || el.dataset.workclass === utWorkClass;
       const matchZone = utZone === "ALL" || el.dataset.zone === utZone;
-      const m = matchText && matchRole && matchZone;
+      const m = matchText && matchRole && matchWorkClass && matchZone;
       el.classList.toggle("hide", !m);
       if (m) { n++; }
-      // Tally per role (ignoring role filter itself, so counts reflect text+zone)
+      // Tally for active sidebar tab
       if (matchText && matchZone) {
-        const r = el.dataset.role || "Unknown";
-        roleTally[r] = (roleTally[r] || 0) + 1;
+        if (utSidebarTab === "roles") {
+          if (matchWorkClass) {
+            const key = el.dataset.role || "Unknown";
+            tally[key] = (tally[key] || 0) + 1;
+          }
+        } else {
+          if (matchRole) {
+            const key = el.dataset.workclass || "N/A";
+            tally[key] = (tally[key] || 0) + 1;
+          }
+        }
       }
     }
     // Update sidebar counts
-    const sidebar = $("ut-sidebar");
+    const sidebar = $("ut-sb-items");
     if (sidebar) {
-      const totalFiltered = Object.values(roleTally).reduce((a, b) => a + b, 0);
+      const totalFiltered = Object.values(tally).reduce((a, b) => a + b, 0);
       sidebar.querySelectorAll(".ut-sb-item").forEach(item => {
-        const r = item.dataset.r;
-        const cnt = r === "ALL" ? totalFiltered : (roleTally[r] || 0);
+        const val = item.dataset.val;
+        const cnt = val === "ALL" ? totalFiltered : (tally[val] || 0);
         const countEl = item.querySelector(".ut-sb-count");
         if (countEl) countEl.textContent = cnt;
       });
@@ -776,6 +838,18 @@ const closeResignedDrawer = () => {
 
 $("x").onclick = closeBranchDrawer;
 if ($("x-resigned")) $("x-resigned").onclick = closeResignedDrawer;
+
+// Close branch drawer when clicking outside
+document.addEventListener("click", e => {
+  if (ov && ov.classList.contains("on")) {
+    const isInsideDrawer = ov.contains(e.target);
+    const isBranchBtn = e.target.closest(".cap");
+    if (!isInsideDrawer && !isBranchBtn) {
+      closeBranchDrawer();
+    }
+  }
+});
+
 if ($("rq")) $("rq").addEventListener("input", () => renderResignedList());
 
 if ($("exp-resigned")) {
