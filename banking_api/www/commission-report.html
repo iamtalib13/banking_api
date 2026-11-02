@@ -21,6 +21,16 @@
             </div>
 
             <form id="commission-report-form" class="report-form">
+                <!-- <div class="section-label">Report Type</div> -->
+
+                <div class="form-group full-width">
+                    <label for="report_type">Report Type <span>*</span></label>
+                    <select id="report_type" name="report_type" class="report-type-select" required>
+                        <option value="product_wise_summary">Product Wise Summary</option>
+                        <option value="agent_wise_summary">Agent Wise Summary</option>
+                        <option value="commission_detailed_report" selected>Commission Detailed Report</option>
+                    </select>
+                </div>
                 <div class="section-label">Report Period</div>
 
                 <div class="form-grid">
@@ -167,6 +177,14 @@
                 values: [],
                 selected: new Set()
             }
+        };
+
+        // Map report type to its download API method
+        // Later, change the method names for product/agent wise summary here
+        const REPORT_TYPE_METHODS = {
+            product_wise_summary: "banking_api.www.commission-report.download_commission_report",
+            agent_wise_summary: "banking_api.www.commission-report.download_commission_report",
+            commission_detailed_report: "banking_api.www.commission-report.download_commission_report"
         };
 
         const form = document.getElementById("commission-report-form");
@@ -586,8 +604,15 @@
                 scheme_code: document.getElementById("scheme_code").value
             });
 
+            // const downloadUrl =
+            //     "/api/method/banking_api.www.commission-report.download_commission_report?"
+            //     + params.toString();
+
+            const reportType = document.getElementById("report_type").value;
+            const downloadMethod = REPORT_TYPE_METHODS[reportType] || REPORT_TYPE_METHODS.commission_detailed_report;
+
             const downloadUrl =
-                "/api/method/banking_api.www.commission-report.download_commission_report?"
+                "/api/method/" + downloadMethod + "?"
                 + params.toString();
 
             downloadBtn.disabled = true;
