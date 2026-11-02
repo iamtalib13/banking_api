@@ -461,7 +461,7 @@ flow_data AS (
         AND tdt.flow_code = 'NI'
     WHERE tdt.flow_date BETWEEN
         DATE '2026-10-01'
-        AND DATE '2026-10-27'
+        AND DATE '2026-10-31'
     GROUP BY
         d.rm_id,
         g.foracid,
@@ -494,25 +494,25 @@ tran_data AS (
             (
                 dtt.tran_date BETWEEN
                     DATE '2026-10-01'
-                    AND DATE '2026-10-27'
+                    AND DATE '2026-10-31'
                 AND dtt.value_date >
                     DATE '2026-09-30'
             )
             OR
             (
                 dtt.tran_date >
-                    DATE '2026-10-27'
+                    DATE '2026-10-31'
                 AND dtt.value_date BETWEEN
                     DATE '2026-10-01'
-                    AND DATE '2026-10-27'
+                    AND DATE '2026-10-31'
             )
             OR
             (
                 dtt.value_date BETWEEN
                     DATE '2026-10-01'
-                    AND DATE '2026-10-27'
+                    AND DATE '2026-10-31'
                 AND dtt.tran_date >
-                    DATE '2026-10-27'
+                    DATE '2026-10-31'
             )
         )
     GROUP BY
@@ -563,7 +563,7 @@ SELECT
     ) AS commission_amount,
     CASE
         WHEN ad.acct_opn_date + INTERVAL '1 year' >=
-            DATE '2026-10-27'
+            DATE '2026-10-31'
             THEN 'YES'
         ELSE 'NO'
     END AS one_year_completed,
@@ -635,7 +635,7 @@ WITH account_data AS (
         )
         AND g.acct_opn_date BETWEEN
             DATE '2026-10-01'
-            AND DATE '2026-10-27'
+            AND DATE '2026-10-31'
         AND g.acct_cls_flg = 'N'
     LEFT JOIN tbaadm.tam AS tam
         ON tam.acid = g.acid
@@ -644,7 +644,7 @@ WITH account_data AS (
         AND dtt.flow_code = 'PI'
         AND dtt.tran_date BETWEEN
             DATE '2026-10-01'
-            AND DATE '2026-10-27'
+            AND DATE '2026-10-31'
         AND NOT (
             dtt.value_date >=
                 DATE '2026-09-01'
@@ -656,7 +656,7 @@ WITH account_data AS (
         AND tdt.flow_code = 'PI'
         AND tdt.flow_date BETWEEN
             DATE '2026-10-01'
-            AND DATE '2026-10-27'
+            AND DATE '2026-10-31'
     LEFT JOIN custom.dsaauth AS d2
         ON UPPER(ds.rm_id) = UPPER(d2.user_id)
     LEFT JOIN tbaadm.get AS g2
@@ -717,7 +717,7 @@ SELECT
     ) AS commission_amount,
     CASE
         WHEN ad.acct_opn_date + INTERVAL '1 year' <=
-            DATE '2026-10-27'
+            DATE '2026-10-31'
             THEN 'YES'
         ELSE 'NO'
     END AS one_year_completed,
@@ -812,7 +812,7 @@ def _calculate_demand(total_flow_amount, scheme_code):
     return demand
 
 
-def _get_eligible_amount_from_setting(demand, collection):
+def _get_eligible_amount_from_setting(demand, collection, eligible_setting=None):
     """
     Return eligible_amount based on the 'Eligible Amount Setting'
     configured in Commission Settings.
@@ -824,14 +824,17 @@ def _get_eligible_amount_from_setting(demand, collection):
     If either value is None the other is returned as-is.
     If both are None, None is returned.
     """
-    try:
-        settings = frappe.get_single("Commission Settings")
-        setting = (
-            getattr(settings, "eligible_amount_setting", None)
-            or "Whichever is minimum demand or collection"
-        )
-    except Exception:
-        setting = "Whichever is minimum demand or collection"
+    if eligible_setting is None:
+        try:
+            settings = frappe.get_single("Commission Settings")
+            setting = (
+                getattr(settings, "eligible_amount_setting", None)
+                or "Whichever is minimum demand or collection"
+            )
+        except Exception:
+            setting = "Whichever is minimum demand or collection"
+    else:
+        setting = eligible_setting
 
     demand_int = _safe_int(demand)
     collection_int = _safe_int(collection)
@@ -920,7 +923,7 @@ def _get_existing_commission_map():
     return {r["key"]: r["name"] for r in rows if r.get("key")}
 
 
-def _build_commission_tuple(row, is_query_2, now_ts, doc_name=None):
+def _build_commission_tuple(row, is_query_2, now_ts, doc_name=None, eligible_setting=None):
     collection_val = row.get(
         "total_tran_amt_dtt") if is_query_2 else row.get("total_tran_amt")
 
@@ -930,6 +933,7 @@ def _build_commission_tuple(row, is_query_2, now_ts, doc_name=None):
     eligible_amount = _get_eligible_amount_from_setting(
         demand_val,
         collection_int,
+        eligible_setting=eligible_setting,
     )
 
     return (
@@ -1204,6 +1208,15 @@ def fetch_and_create_commission():
         existing_map = _get_existing_commission_map()
         processed_keys = set()
 
+        try:
+            settings_doc = frappe.get_single("Commission Settings")
+            eligible_setting = (
+                getattr(settings_doc, "eligible_amount_setting", None)
+                or "Whichever is minimum demand or collection"
+            )
+        except Exception:
+            eligible_setting = "Whichever is minimum demand or collection"
+
         # Fetch rows from external Postgres immediately while connection is fresh
         query_2_rows = _run_query(
             conn,
@@ -1232,10 +1245,10 @@ def fetch_and_create_commission():
             existing_name = existing_map.get(key)
             if existing_name:
                 update_tuples.append(_build_commission_tuple(
-                    row, True, now_ts, doc_name=existing_name))
+                    row, True, now_ts, doc_name=existing_name, eligible_setting=eligible_setting))
             else:
                 insert_tuples.append(
-                    _build_commission_tuple(row, True, now_ts))
+                    _build_commission_tuple(row, True, now_ts, eligible_setting=eligible_setting))
 
         # Process Query 1
         for row in query_1_rows:
@@ -1247,10 +1260,10 @@ def fetch_and_create_commission():
             existing_name = existing_map.get(key)
             if existing_name:
                 update_tuples.append(_build_commission_tuple(
-                    row, False, now_ts, doc_name=existing_name))
+                    row, False, now_ts, doc_name=existing_name, eligible_setting=eligible_setting))
             else:
                 insert_tuples.append(
-                    _build_commission_tuple(row, False, now_ts))
+                    _build_commission_tuple(row, False, now_ts, eligible_setting=eligible_setting))
 
         # Execute Bulk Inserts
         if insert_tuples:

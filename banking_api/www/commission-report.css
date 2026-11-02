@@ -539,3 +539,29 @@ input {
 	border-color: var(--primary);
 	box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
 }
+
+.report_type {
+	margin-bottom: 12px;
+}
+
+.report-type-select {
+	width: 100%;
+	height: 45px;
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	padding: 0 12px;
+	background: #ffffff;
+	color: var(--text);
+	outline: none;
+	font-size: 14px;
+	cursor: pointer;
+	transition:
+		border-color 0.15s ease,
+		box-shadow 0.15s ease;
+	margin-bottom: 16px;
+}
+
+.report-type-select:focus {
+	border-color: var(--primary);
+	box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
+}

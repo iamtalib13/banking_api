@@ -21,6 +21,16 @@
             </div>
 
             <form id="commission-report-form" class="report-form">
+                <!-- <div class="section-label">Report Type</div> -->
+
+                <div class="form-group full-width">
+                    <label for="report_type">Report Type <span>*</span></label>
+                    <select id="report_type" name="report_type" class="report-type-select" required>
+                        <option value="product_wise_summary">Product Wise Summary</option>
+                        <option value="agent_wise_summary">Agent Wise Summary</option>
+                        <option value="commission_detailed_report" selected>Commission Detailed Report</option>
+                    </select>
+                </div>
                 <div class="section-label">Report Period</div>
 
                 <div class="form-grid">
@@ -143,8 +153,8 @@
                             <span id="progress-text">Preparing report...</span>
                             <span id="progress-percent">0%</span>
                         </div>
-                        <div id="progress-track" class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100"
-                            aria-valuenow="0">
+                        <div id="progress-track" class="progress-track" role="progressbar" aria-valuemin="0"
+                            aria-valuemax="100" aria-valuenow="0">
                             <div id="progress-bar" class="progress-bar"></div>
                         </div>
                     </div>
@@ -167,6 +177,14 @@
                 values: [],
                 selected: new Set()
             }
+        };
+
+        // Map report type to its download API method
+        // Later, change the method names for product/agent wise summary here
+        const REPORT_TYPE_METHODS = {
+            product_wise_summary: "banking_api.www.commission-report.download_commission_report",
+            agent_wise_summary: "banking_api.www.commission-report.download_commission_report",
+            commission_detailed_report: "banking_api.www.commission-report.download_commission_report"
         };
 
         const form = document.getElementById("commission-report-form");
@@ -291,50 +309,6 @@
             });
         }
 
-        // function renderOptions(type, searchText = "") {
-        //     const optionList = document.getElementById(`${type}_options`);
-        //     const query = searchText.trim().toLowerCase();
-
-        //     const matchingValues = filterState[type].values.filter(value =>
-        //         value.toLowerCase().includes(query)
-        //     );
-
-        //     optionList.innerHTML = "";
-
-        //     if (!matchingValues.length) {
-        //         optionList.innerHTML = '<div class="empty-options">No matching values found.</div>';
-        //         return;
-        //     }
-
-        //     matchingValues.forEach(value => {
-        //         const label = document.createElement("label");
-        //         label.className = "option-row";
-
-        //         const checkbox = document.createElement("input");
-        //         checkbox.type = "checkbox";
-        //         checkbox.value = value;
-        //         checkbox.checked = filterState[type].selected.has(value);
-
-        //         checkbox.addEventListener("change", function () {
-        //             if (checkbox.checked) {
-        //                 filterState[type].selected.add(value);
-        //             } else {
-        //                 filterState[type].selected.delete(value);
-        //             }
-
-        //             updateHiddenInput(type);
-        //             updateSelectedDisplay(type);
-        //         });
-
-        //         const text = document.createElement("span");
-        //         text.textContent = value;
-
-        //         label.appendChild(checkbox);
-        //         label.appendChild(text);
-        //         optionList.appendChild(label);
-        //     });
-        // }
-
 
         function renderOptions(type, searchText = "") {
             const optionList = document.getElementById(`${type}_options`);
@@ -401,47 +375,6 @@
             });
         }
 
-        // function setupMultiSelect(type) {
-        //     const toggle = document.querySelector(`[data-toggle="${type}"]`);
-        //     const panel = document.getElementById(`${type}_panel`);
-        //     const searchInput = document.getElementById(`${type}_search`);
-
-        //     toggle.addEventListener("click", function () {
-        //         const willOpen = panel.hidden;
-
-        //         closeAllDropdowns(type);
-        //         panel.hidden = !willOpen;
-
-        //         if (willOpen) {
-        //             searchInput.focus();
-        //             renderOptions(type, searchInput.value);
-        //         }
-        //     });
-
-        //     searchInput.addEventListener("input", function () {
-        //         renderOptions(type, searchInput.value);
-        //     });
-
-        //     document.querySelector(`[data-select-all="${type}"]`)
-        //         .addEventListener("click", function () {
-        //             filterState[type].values.forEach(value => {
-        //                 filterState[type].selected.add(value);
-        //             });
-
-        //             updateHiddenInput(type);
-        //             updateSelectedDisplay(type);
-        //             renderOptions(type, searchInput.value);
-        //         });
-
-        //     document.querySelector(`[data-clear-all="${type}"]`)
-        //         .addEventListener("click", function () {
-        //             filterState[type].selected.clear();
-
-        //             updateHiddenInput(type);
-        //             updateSelectedDisplay(type);
-        //             renderOptions(type, searchInput.value);
-        //         });
-        // }
 
         function setupMultiSelect(type) {
             const multiSelect = document.querySelector(`.multi-select[data-filter="${type}"]`);
@@ -640,58 +573,6 @@
         ["sol_id", "agent_code", "scheme_code"].forEach(setupMultiSelect);
 
 
-
-        // form.addEventListener("submit", function (event) {
-        //     event.preventDefault();
-        //     clearError();
-
-        //     const fromDate = document.getElementById("from_date").value;
-        //     const toDate = document.getElementById("to_date").value;
-
-        //     if (!fromDate || !toDate) {
-        //         showError("Please select both From Date and To Date.");
-        //         return;
-        //     }
-
-        //     const fromDateISO = parseDDMMYYYY(fromDate);
-        //     const toDateISO = parseDDMMYYYY(toDate);
-
-        //     if (!fromDateISO || !toDateISO) {
-        //         showError("Invalid date format. Please use DD-MM-YYYY.");
-        //         return;
-        //     }
-
-        //     if (fromDateISO > toDateISO) {
-        //         showError("From Date cannot be later than To Date.");
-        //         return;
-        //     }
-
-        //     downloadBtn.disabled = true;
-        //     progressSection.hidden = false;
-
-        //     updateProgress(20, "Preparing report...");
-
-        //     const params = new URLSearchParams({
-        //         from_date: fromDateISO,
-        //         to_date: toDateISO,
-        //         sol_id: document.getElementById("sol_id").value,
-        //         agent_code: document.getElementById("agent_code").value,
-        //         scheme_code: document.getElementById("scheme_code").value
-        //     });
-
-        //     window.location.href =
-        //         "/api/method/banking_api.www.commission_report.download_commission_report?"
-        //         + params.toString();
-
-        //     updateProgress(75, "Generating report...");
-
-        //     updateProgress(100, "Download started.");
-
-        //     setTimeout(() => {
-        //         downloadBtn.disabled = false;
-        //     }, 1200);
-        // });
-
         form.addEventListener("submit", async function (event) {
             event.preventDefault();
             clearError();
@@ -723,8 +604,15 @@
                 scheme_code: document.getElementById("scheme_code").value
             });
 
+            // const downloadUrl =
+            //     "/api/method/banking_api.www.commission-report.download_commission_report?"
+            //     + params.toString();
+
+            const reportType = document.getElementById("report_type").value;
+            const downloadMethod = REPORT_TYPE_METHODS[reportType] || REPORT_TYPE_METHODS.commission_detailed_report;
+
             const downloadUrl =
-                "/api/method/banking_api.www.commission-report.download_commission_report?"
+                "/api/method/" + downloadMethod + "?"
                 + params.toString();
 
             downloadBtn.disabled = true;
