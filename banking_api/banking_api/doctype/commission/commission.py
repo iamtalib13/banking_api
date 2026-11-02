@@ -461,7 +461,7 @@ flow_data AS (
         AND tdt.flow_code = 'NI'
     WHERE tdt.flow_date BETWEEN
         DATE '2026-10-01'
-        AND DATE '2026-10-27'
+        AND DATE '2026-10-31'
     GROUP BY
         d.rm_id,
         g.foracid,
@@ -494,25 +494,25 @@ tran_data AS (
             (
                 dtt.tran_date BETWEEN
                     DATE '2026-10-01'
-                    AND DATE '2026-10-27'
+                    AND DATE '2026-10-31'
                 AND dtt.value_date >
                     DATE '2026-09-30'
             )
             OR
             (
                 dtt.tran_date >
-                    DATE '2026-10-27'
+                    DATE '2026-10-31'
                 AND dtt.value_date BETWEEN
                     DATE '2026-10-01'
-                    AND DATE '2026-10-27'
+                    AND DATE '2026-10-31'
             )
             OR
             (
                 dtt.value_date BETWEEN
                     DATE '2026-10-01'
-                    AND DATE '2026-10-27'
+                    AND DATE '2026-10-31'
                 AND dtt.tran_date >
-                    DATE '2026-10-27'
+                    DATE '2026-10-31'
             )
         )
     GROUP BY
@@ -563,7 +563,7 @@ SELECT
     ) AS commission_amount,
     CASE
         WHEN ad.acct_opn_date + INTERVAL '1 year' >=
-            DATE '2026-10-27'
+            DATE '2026-10-31'
             THEN 'YES'
         ELSE 'NO'
     END AS one_year_completed,
@@ -635,7 +635,7 @@ WITH account_data AS (
         )
         AND g.acct_opn_date BETWEEN
             DATE '2026-10-01'
-            AND DATE '2026-10-27'
+            AND DATE '2026-10-31'
         AND g.acct_cls_flg = 'N'
     LEFT JOIN tbaadm.tam AS tam
         ON tam.acid = g.acid
@@ -644,7 +644,7 @@ WITH account_data AS (
         AND dtt.flow_code = 'PI'
         AND dtt.tran_date BETWEEN
             DATE '2026-10-01'
-            AND DATE '2026-10-27'
+            AND DATE '2026-10-31'
         AND NOT (
             dtt.value_date >=
                 DATE '2026-09-01'
@@ -656,7 +656,7 @@ WITH account_data AS (
         AND tdt.flow_code = 'PI'
         AND tdt.flow_date BETWEEN
             DATE '2026-10-01'
-            AND DATE '2026-10-27'
+            AND DATE '2026-10-31'
     LEFT JOIN custom.dsaauth AS d2
         ON UPPER(ds.rm_id) = UPPER(d2.user_id)
     LEFT JOIN tbaadm.get AS g2
@@ -717,7 +717,7 @@ SELECT
     ) AS commission_amount,
     CASE
         WHEN ad.acct_opn_date + INTERVAL '1 year' <=
-            DATE '2026-10-27'
+            DATE '2026-10-31'
             THEN 'YES'
         ELSE 'NO'
     END AS one_year_completed,
