@@ -11,6 +11,7 @@
   "tenure_months",
   "sol_id",
   "scheme_code",
+  "group_name",
   "demand",
   "pan_card",
   "remarks",
@@ -97,10 +98,11 @@
   },
   {
    "fieldname": "scheme_code",
-   "fieldtype": "Int",
+   "fieldtype": "Link",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Scheme Code",
+   "options": "Product",
    "search_index": 1
   },
   {
@@ -210,11 +212,11 @@
    "fieldname": "section_break_vlms",
    "fieldtype": "Section Break"
   },
- {
-    "fieldname": "commission_items",
-    "fieldtype": "Table",
-    "label": "Commission Items",
-    "options": "Commission Item"
+  {
+   "fieldname": "commission_items",
+   "fieldtype": "Table",
+   "label": "Commission Items",
+   "options": "Commission Item"
   },
   {
    "fieldname": "deduction",
@@ -231,12 +233,18 @@
    "fieldname": "agent_saving_account",
    "fieldtype": "Data",
    "label": "Agent Saving Account"
+  },
+  {
+   "fetch_from": "scheme_code.group_name",
+   "fieldname": "group_name",
+   "fieldtype": "Data",
+   "label": "Group Name"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-13 14:07:36.251623",
+ "modified": "2026-11-03 10:55:32.173005",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Commission",
