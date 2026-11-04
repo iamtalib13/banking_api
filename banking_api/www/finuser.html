@@ -787,6 +787,7 @@ if ($("btn-missing")) {
   $("btn-missing").onclick = async () => {
     closeBranchDrawer();
     closeResignedDrawer();
+    if ($("mq")) $("mq").value = "";
     ovMissing.classList.add("on");
     document.body.classList.add("dr");
 
@@ -801,6 +802,7 @@ if ($("btn-missing")) {
 }
 
 const closeMissingDrawer = () => {
+  if ($("mq")) $("mq").value = "";
   if (ovMissing) ovMissing.classList.remove("on");
   if ((!ov || !ov.classList.contains("on")) && (!ovResigned || !ovResigned.classList.contains("on"))) {
     document.body.classList.remove("dr");
@@ -871,6 +873,8 @@ if ($("btn-resigned")) {
 
   $("btn-resigned").onclick = async () => {
     closeBranchDrawer();
+    if (typeof closeMissingDrawer === "function") closeMissingDrawer();
+    if ($("rq")) $("rq").value = "";
     ovResigned.classList.add("on");
     document.body.classList.add("dr");
     $("rq").value = "";
@@ -977,6 +981,7 @@ const closeBranchDrawer = () => {
 };
 
 const closeResignedDrawer = () => {
+  if ($("rq")) $("rq").value = "";
   if (ovResigned) ovResigned.classList.remove("on");
   if (!ov || !ov.classList.contains("on")) {
     document.body.classList.remove("dr");
