@@ -752,6 +752,14 @@ function renderMissingList() {
            (e.branch_name && e.branch_name.toLowerCase().includes(q));
   });
 
+  if ($("missing-sub")) {
+    if (q) {
+      $("missing-sub").innerHTML = `Showing <b style="color:#1d4ed8;">${filtered.length} of ${emps.length} users</b> for "${$("mq").value.trim()}"`;
+    } else {
+      $("missing-sub").innerHTML = `<b style="color:#1d4ed8;">${emps.length} users</b> active in ZingHR/MySahayog but MISSING in Finacle`;
+    }
+  }
+
   if (!filtered.length) {
     $("missing-list").innerHTML = '<div class="none">No missing employee records found.</div>';
     return;
