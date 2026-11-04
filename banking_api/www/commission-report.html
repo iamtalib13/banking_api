@@ -200,8 +200,61 @@
 
         let progressTimer = null;
 
+        function parseErrorMessage(errData, fallback = "Failed to process request.") {
+            if (!errData) return fallback;
+
+            if (typeof errData === "string") {
+                try {
+                    const parsed = JSON.parse(errData);
+                    return parseErrorMessage(parsed, fallback);
+                } catch (e) {}
+
+                if (errData.includes("Traceback (most recent call last):")) {
+                    const lines = errData.trim().split("\n");
+                    const lastLine = lines[lines.length - 1];
+                    if (lastLine.includes(":")) {
+                        return lastLine.split(":").slice(1).join(":").trim();
+                    }
+                    return lastLine.trim();
+                }
+
+                const doc = new DOMParser().parseFromString(errData, "text/html");
+                const text = doc.body.textContent || "";
+                if (text && !errData.includes("<html")) {
+                    return text.trim();
+                }
+                return errData.trim();
+            }
+
+            if (Array.isArray(errData)) {
+                for (const item of errData) {
+                    const parsed = parseErrorMessage(item, "");
+                    if (parsed) return parsed;
+                }
+            }
+
+            if (typeof errData === "object") {
+                if (errData._server_messages) {
+                    try {
+                        const msgs = typeof errData._server_messages === "string"
+                            ? JSON.parse(errData._server_messages)
+                            : errData._server_messages;
+                        const msgObj = typeof msgs[0] === "string" ? JSON.parse(msgs[0]) : msgs[0];
+                        if (msgObj && msgObj.message) return parseErrorMessage(msgObj.message, fallback);
+                    } catch (e) {}
+                }
+
+                if (errData.message) return parseErrorMessage(errData.message, fallback);
+                if (errData.exc) return parseErrorMessage(errData.exc, fallback);
+                if (errData.exception) return parseErrorMessage(errData.exception, fallback);
+                if (errData.error) return parseErrorMessage(errData.error, fallback);
+            }
+
+            return fallback;
+        }
+
         function showError(message) {
-            errorMessage.textContent = message;
+            errorMessage.textContent = parseErrorMessage(message, "Failed to download report. Please try again.");
             errorMessage.hidden = false;
         }
 
@@ -470,7 +523,7 @@
             const result = await response.json();
 
             if (!response.ok) {
-                throw new Error(result.message || result.exc || "API call failed");
+                throw new Error(parseErrorMessage(result, "API call failed"));
             }
 
             return result.message;
@@ -628,25 +681,21 @@
                 const contentType = response.headers.get("Content-Type") || "";
 
                 if (!response.ok) {
-                    let message = "Failed to generate report. Please try again.";
+                    let errPayload = "Failed to generate report. Please try again.";
                     try {
                         if (contentType.includes("application/json")) {
-                            const err = await response.json();
-                            message = err.message || err.exc || message;
+                            errPayload = await response.json();
                         } else {
-                            message = await response.text() || message;
+                            errPayload = await response.text();
                         }
                     } catch (e) { /* keep default message */ }
-                    throw new Error(message);
+                    throw new Error(parseErrorMessage(errPayload, "Failed to generate report. Please try again."));
                 }
 
                 // Frappe may return JSON error with 200 status — detect it.
                 if (contentType.includes("application/json")) {
                     const data = await response.json();
-                    if (data.message && typeof data.message === "string" && data.message.includes("<")) {
-                        throw new Error("Failed to generate report.");
-                    }
-                    throw new Error(data.message || data.exc || "Failed to generate report.");
+                    throw new Error(parseErrorMessage(data, "Failed to generate report."));
                 }
 
                 const blob = await response.blob();
