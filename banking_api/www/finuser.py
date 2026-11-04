@@ -415,6 +415,7 @@ def get_missing_in_finacle_employees():
         FROM `tabEmployee`
         WHERE status = 'Active'
           AND IFNULL(department, '') NOT IN ('Teaching', 'Non - Teaching', 'Housekeeping', 'Establishment')
+          AND name REGEXP '^[0-9]+$'
         ORDER BY date_of_joining DESC, name DESC;
         """,
         as_dict=True,
