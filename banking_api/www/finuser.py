@@ -414,7 +414,7 @@ def get_missing_in_finacle_employees():
             IFNULL(cell_number, '') AS cell_number
         FROM `tabEmployee`
         WHERE status = 'Active'
-          AND IFNULL(department, '') NOT IN ('Teaching', 'Non - Teaching')
+          AND IFNULL(department, '') NOT IN ('Teaching', 'Non - Teaching', 'Housekeeping')
         ORDER BY date_of_joining DESC, name DESC;
         """,
         as_dict=True,
