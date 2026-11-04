@@ -397,6 +397,89 @@ def get_resigned_employees():
 
 
 @frappe.whitelist()
+def get_missing_in_finacle_employees():
+    check_resigned_access()
+    if not frappe.session.user or frappe.session.user == "Guest":
+        frappe.throw(_("Authentication required"), frappe.PermissionError)
+
+    # 1. Fetch Active employees from ERPNext (ZingHR / MySahayog)
+    active_emps = frappe.db.sql(
+        """
+        SELECT 
+            name, 
+            employee_name, 
+            IFNULL(designation, '') AS designation, 
+            IFNULL(sol_id, '') AS sol_id, 
+            date_of_joining,
+            IFNULL(cell_number, '') AS cell_number
+        FROM `tabEmployee`
+        WHERE status = 'Active'
+        ORDER BY date_of_joining DESC, name DESC;
+        """,
+        as_dict=True,
+    )
+
+    # 2. Query Finacle DR tbaadm."get" table
+    finacle_emp_ids = set()
+    try:
+        conn = get_finacle_dr_connection()
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT emp_id, entity_cre_flg, del_flg, sol_id, emp_name, emp_short_name
+            FROM tbaadm."get"
+            WHERE emp_id LIKE '%SAH%'
+              AND del_flg = 'N';
+            """
+        )
+        rows = cur.fetchall()
+        conn.close()
+
+        for r in rows:
+            uid = str(r[0] or "").strip()
+            # extract numeric part for matching: SAH00483 -> 483
+            digits = re.sub(r"^[^\d]*0*", "", uid)
+            if digits:
+                finacle_emp_ids.add(digits)
+            finacle_emp_ids.add(uid)
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "Failed fetching Finacle get table for Missing Employees")
+
+    # 3. Fetch branch names map
+    branch_rows = frappe.db.sql("SELECT sol_id, branch FROM `tabSahayog Branch` WHERE IFNULL(sol_id, '') != ''", as_dict=True)
+    branch_map = {str(b.sol_id).strip(): b.branch for b in branch_rows}
+
+    # 4. Filter employees missing in Finacle
+    missing_list = []
+    for emp in active_emps:
+        raw_id = str(emp.name or "").strip()
+        digits = re.sub(r"^[^\d]*0*", "", raw_id)
+        # Expected finacle id with SAH0
+        expected_fin_id = f"SAH0{digits.zfill(4)}" if digits else f"SAH0{raw_id}"
+
+        # Match check by normalized digits or raw_id
+        if digits not in finacle_emp_ids and raw_id not in finacle_emp_ids and expected_fin_id not in finacle_emp_ids:
+            sol_code = str(emp.sol_id or "").strip()
+            branch_title = branch_map.get(sol_code, "")
+            missing_list.append({
+                "emp_id": raw_id,
+                "expected_fin_id": expected_fin_id,
+                "emp_name": emp.employee_name,
+                "designation": emp.designation,
+                "sol_id": sol_code,
+                "branch_name": branch_title,
+                "date_of_joining": str(emp.date_of_joining or ""),
+                "cell_number": emp.cell_number,
+            })
+
+    return {
+        "employees": missing_list,
+        "total": len(missing_list),
+    }
+
+
+
+@frappe.whitelist()
 def update_user_role(user_id, old_role, new_role):
     check_role_update_access()
 

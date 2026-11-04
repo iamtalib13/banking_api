@@ -59,6 +59,8 @@ body.dr main, body.dr #users-view{margin-right:440px}
 .f.on{background:var(--ink);color:var(--surf);border-color:var(--ink)}
 .f.resigned-btn{background:var(--danger-bg);color:var(--danger);border-color:var(--danger)}
 .f.resigned-btn:hover{background:var(--danger);color:#fff}
+.f.missing-btn{background:#eff6ff;color:#1d4ed8;border-color:#3b82f6}
+.f.missing-btn:hover{background:#2563eb;color:#fff}
 
 @media(max-width:760px){
   .drawer{width:100%;top:auto;height:75%;transform:translateY(100%)}
@@ -175,6 +177,9 @@ body.dr main, body.dr #users-view{margin-right:440px}
 <select id="srt" aria-label="Sort"><option value="code">Sort: SOL ID</option><option value="name">Sort: Branch name</option><option value="few">Sort: Fewest active users</option></select>
 <button id="grp" class="f on">Group by zone</button>
 {% if can_manage_resigned %}
+<button id="btn-missing" class="f missing-btn">
+  <span class="dot" style="background:#2563eb;"></span>HEFM <span id="missing-cnt" class="badge-cnt" style="background:#dbeafe;color:#1d4ed8;margin-left:4px;">0</span>
+</button>
 <button id="btn-resigned" class="f resigned-btn">
   <span class="dot red"></span>Resigned Employees <span id="resigned-cnt" class="badge-cnt" style="background:#fee2e2;color:#b91c1c;margin-left:4px;">0</span>
 </button>
@@ -195,6 +200,19 @@ body.dr main, body.dr #users-view{margin-right:440px}
 
 <!-- Resigned Employees Drawer -->
 {% if can_manage_resigned %}
+<div id="ov-missing" class="drawer" role="complementary" aria-label="Missing in Finacle"><div class="pop">
+<div class="ph">
+  <div style="flex:1;min-width:0;">
+    <h2 style="color:#1d4ed8;"><span class="dot" style="background:#2563eb;"></span>Employees Missing in Finacle</h2>
+    <p id="missing-sub">Active in MySahayog/ZingHR but not present in Finacle</p>
+  </div>
+  <button id="exp-missing" class="f" style="padding:4px 10px;font-size:12px;margin-left:auto;margin-right:6px;" title="Export Missing List to CSV">Export</button>
+  <button id="x-missing" aria-label="Close">✕</button>
+</div>
+<input id="mq" type="search" placeholder="Search by Employee ID, Name or SOL ID" aria-label="Search missing" autocomplete="off" style="margin-top:12px;">
+<div id="missing-list" class="drawer-list"></div>
+</div></div>
+
 <div id="ov-resigned" class="drawer" role="complementary" aria-label="Resigned employees"><div class="pop">
 <div class="ph">
   <div style="flex:1;min-width:0;">
@@ -279,7 +297,7 @@ BRANCHES.forEach(b => {
 });
 
 const $ = id => document.getElementById(id);
-const grid = $("grid"), usersView = $("users-view"), ov = $("ov"), ovResigned = $("ov-resigned");
+const grid = $("grid"), usersView = $("users-view"), ov = $("ov"), ovResigned = $("ov-resigned"), ovMissing = $("ov-missing");
 let cur = null, role = "ALL";
 let sortK = "code", grouped = true;
 let utRole = "ALL", utWorkClass = "ALL", utZone = "ALL", utSidebarTab = "roles";
@@ -696,6 +714,145 @@ function render() {
   }).join("") : '<div class="none">No active Finacle users found matching criteria.</div>';
 }
 
+/* ===== MISSING IN FINACLE DRAWER LOGIC ===== */
+let MISSING_CACHE = null;
+
+function updateMissingBadge(count) {
+  const badge = $("missing-cnt");
+  if (badge) {
+    badge.textContent = count != null ? count : 0;
+    badge.style.display = "inline-block";
+  }
+}
+
+async function fetchMissingCache() {
+  if (MISSING_CACHE) return MISSING_CACHE;
+  try {
+    const res = await fetch(`/api/method/banking_api.www.finuser.get_missing_in_finacle_employees`);
+    const data = await res.json();
+    MISSING_CACHE = data.message || { employees: [], total: 0 };
+    updateMissingBadge((MISSING_CACHE.employees || []).length);
+    return MISSING_CACHE;
+  } catch(err) {
+    return null;
+  }
+}
+
+function renderMissingList() {
+  if (!MISSING_CACHE || !$("missing-list")) return;
+  const emps = MISSING_CACHE.employees || [];
+  const q = $("mq") ? $("mq").value.trim().toLowerCase() : "";
+
+  const filtered = emps.filter(e => {
+    if (!q) return true;
+    return (e.emp_id && e.emp_id.toLowerCase().includes(q)) ||
+           (e.expected_fin_id && e.expected_fin_id.toLowerCase().includes(q)) ||
+           (e.emp_name && e.emp_name.toLowerCase().includes(q)) ||
+           (e.sol_id && e.sol_id.toLowerCase().includes(q)) ||
+           (e.branch_name && e.branch_name.toLowerCase().includes(q));
+  });
+
+  if ($("missing-sub")) {
+    if (q) {
+      $("missing-sub").innerHTML = `Showing <b style="color:#1d4ed8;">${filtered.length} of ${emps.length} users</b> for "${$("mq").value.trim()}"`;
+    } else {
+      $("missing-sub").innerHTML = `<b style="color:#1d4ed8;">${emps.length} users</b> active in ZingHR/MySahayog but MISSING in Finacle`;
+    }
+  }
+
+  if (!filtered.length) {
+    $("missing-list").innerHTML = '<div class="none">No missing employee records found.</div>';
+    return;
+  }
+
+  $("missing-list").innerHTML = filtered.map(e => {
+    const initials = (e.emp_name || e.emp_id || "").split(" ").map(w => w[0]).filter(Boolean).slice(0, 2).join("");
+    return `
+      <div class="u" style="flex-direction:column;align-items:stretch;gap:8px;padding:12px;background:var(--surf);border:1px solid var(--line);border-radius:10px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="av" style="background:#dbeafe;color:#1d4ed8;">${initials}</div>
+          <div style="flex:1;min-width:0;">
+            <div class="n" style="font-size:13px;font-weight:700;">
+              ${escapeHtml(e.emp_name)}
+              <span style="font-weight:500;color:var(--mute);font-size:11px;">(ID: ${escapeHtml(e.emp_id)})</span>
+            </div>
+            <div class="m" style="color:var(--mute);font-size:11px;">Expected Finacle ID: <b style="color:#1d4ed8;">${escapeHtml(e.expected_fin_id)}</b></div>
+            <div class="m" style="color:var(--mute);font-size:11px;">${escapeHtml(e.designation || 'N/A')} &bull; SOL: <b>${escapeHtml(e.sol_id || 'N/A')}</b> ${e.branch_name ? '(' + escapeHtml(e.branch_name) + ')' : ''}</div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mute);border-top:1px dashed var(--line);padding-top:6px;margin-top:2px;">
+          <span>DOJ: <b>${escapeHtml(e.date_of_joining || 'N/A')}</b></span>
+          <span>Contact: <b>${escapeHtml(e.cell_number || 'N/A')}</b></span>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+if ($("btn-missing")) {
+  fetchMissingCache();
+
+  $("btn-missing").onclick = async () => {
+    closeBranchDrawer();
+    closeResignedDrawer();
+    if ($("mq")) $("mq").value = "";
+    ovMissing.classList.add("on");
+    document.body.classList.add("dr");
+
+    if (!MISSING_CACHE) {
+      $("missing-list").innerHTML = '<div class="none">Loading missing employees...</div>';
+      await fetchMissingCache();
+    }
+    const emps = (MISSING_CACHE && MISSING_CACHE.employees) || [];
+    $("missing-sub").innerHTML = `<b style="color:#1d4ed8;">${emps.length} users</b> active in ZingHR/MySahayog but MISSING in Finacle`;
+    renderMissingList();
+  };
+}
+
+const closeMissingDrawer = () => {
+  if ($("mq")) $("mq").value = "";
+  if (ovMissing) ovMissing.classList.remove("on");
+  if ((!ov || !ov.classList.contains("on")) && (!ovResigned || !ovResigned.classList.contains("on"))) {
+    document.body.classList.remove("dr");
+  }
+};
+
+if ($("x-missing")) $("x-missing").onclick = closeMissingDrawer;
+if ($("mq")) $("mq").addEventListener("input", () => renderMissingList());
+
+if ($("exp-missing")) {
+  $("exp-missing").onclick = () => {
+    const emps = (MISSING_CACHE && MISSING_CACHE.employees) || [];
+    if (!emps.length) {
+      alert("No missing employee data to export.");
+      return;
+    }
+    const q = $("mq") ? $("mq").value.trim().toLowerCase() : "";
+    const filtered = emps.filter(e => {
+      if (!q) return true;
+      return (e.emp_id && e.emp_id.toLowerCase().includes(q)) ||
+             (e.expected_fin_id && e.expected_fin_id.toLowerCase().includes(q)) ||
+             (e.emp_name && e.emp_name.toLowerCase().includes(q)) ||
+             (e.sol_id && e.sol_id.toLowerCase().includes(q));
+    });
+
+    const rows = [
+      ["Employee ID", "Expected Finacle ID", "Employee Name", "Designation", "SOL ID", "Branch Name", "Date of Joining", "Contact Number"],
+      ...filtered.map(e => [
+        e.emp_id,
+        e.expected_fin_id,
+        e.emp_name,
+        e.designation,
+        e.sol_id,
+        e.branch_name,
+        e.date_of_joining,
+        e.cell_number
+      ])
+    ];
+    downloadCsv(rows, "missing-in-finacle-employees.csv");
+  };
+}
+
 /* ===== RESIGNED EMPLOYEES DRAWER LOGIC ===== */
 function updateResignedBadge(count) {
   const badge = $("resigned-cnt");
@@ -724,6 +881,8 @@ if ($("btn-resigned")) {
 
   $("btn-resigned").onclick = async () => {
     closeBranchDrawer();
+    if (typeof closeMissingDrawer === "function") closeMissingDrawer();
+    if ($("rq")) $("rq").value = "";
     ovResigned.classList.add("on");
     document.body.classList.add("dr");
     $("rq").value = "";
@@ -830,6 +989,7 @@ const closeBranchDrawer = () => {
 };
 
 const closeResignedDrawer = () => {
+  if ($("rq")) $("rq").value = "";
   if (ovResigned) ovResigned.classList.remove("on");
   if (!ov || !ov.classList.contains("on")) {
     document.body.classList.remove("dr");
