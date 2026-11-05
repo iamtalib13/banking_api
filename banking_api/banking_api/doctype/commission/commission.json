@@ -235,7 +235,6 @@
    "label": "Agent Saving Account"
   },
   {
-   "fetch_from": "scheme_code.group_name",
    "fieldname": "group_name",
    "fieldtype": "Data",
    "label": "Group Name"
@@ -244,7 +243,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-11-03 10:55:32.173005",
+ "modified": "2026-11-05 12:00:02.832146",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Commission",
