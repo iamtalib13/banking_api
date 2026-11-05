@@ -886,7 +886,7 @@ COMMISSION_BULK_FIELDS = [
 def _sync_agent_fetch_from_fields():
     """
     Simulate Frappe ORM fetch_from across all inserted Commission records
-    via a single lightning-fast bulk UPDATE JOIN.
+    via single lightning-fast bulk UPDATE JOINs.
     """
     frappe.db.sql("""
         UPDATE `tabCommission` c
@@ -906,6 +906,16 @@ def _sync_agent_fetch_from_fields():
                 OR c.agent_saving_account IS NULL
                 OR c.agent_security_account IS NULL
             )
+    """)
+
+    frappe.db.sql("""
+        UPDATE `tabCommission` c
+        INNER JOIN `tabProduct` p ON c.scheme_code = p.product_code
+        SET
+            c.group_name = p.group_name
+        WHERE
+            c.scheme_code IS NOT NULL
+            AND (c.group_name IS NULL OR c.group_name = '')
     """)
     frappe.db.commit()
 
