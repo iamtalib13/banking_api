@@ -196,13 +196,13 @@ scheduler_events = {
 
     "cron": {
         # Daily Commission auto-fetch at
-        "0 2 * * *": [
-            "banking_api.banking_api.doctype.commission.commission.fetch_and_create_commission"
-        ],
+        # "0 2 * * *": [
+        #     "banking_api.banking_api.doctype.commission.commission.fetch_and_create_commission"
+        # ],
 
-        "30 2 * * *": [
-            "banking_api.banking_api.doctype.commission.commission.calculate_commission_for_all"
-        ],
+        # "30 2 * * *": [
+        #     "banking_api.banking_api.doctype.commission.commission.calculate_commission_for_all"
+        # ],
 
         # sync employees to finacle every night at 2 AM
         # "0 2 * * *": [
