@@ -417,6 +417,7 @@ def get_missing_in_finacle_employees():
           AND IFNULL(department, '') NOT IN ('Teaching', 'Non - Teaching', 'Housekeeping', 'Establishment')
           AND IFNULL(branch, '') != 'Janhit'
           AND IFNULL(sol_id, '') != 'Janhit'
+          AND IFNULL(sol_id, '') != ''
           AND name != 'Admin'
           AND name REGEXP '^[0-9]+$'
           AND IFNULL(custom_exclude_from_hefm, 0) = 0
