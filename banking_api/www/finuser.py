@@ -419,6 +419,7 @@ def get_missing_in_finacle_employees():
           AND IFNULL(sol_id, '') != 'Janhit'
           AND name != 'Admin'
           AND name REGEXP '^[0-9]+$'
+          AND IFNULL(custom_exclude_from_hefm, 0) = 0
         ORDER BY date_of_joining DESC, name DESC;
         """,
         as_dict=True,
