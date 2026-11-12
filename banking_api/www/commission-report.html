@@ -182,7 +182,7 @@
         // Map report type to its download API method
         // Later, change the method names for product/agent wise summary here
         const REPORT_TYPE_METHODS = {
-            product_wise_summary: "banking_api.www.commission-report.download_commission_report",
+            product_wise_summary: "banking_api.www.commission-report.download_product_wise_summary",
             agent_wise_summary: "banking_api.www.commission-report.download_agent_wise_summary",
             commission_detailed_report: "banking_api.www.commission-report.download_commission_report"
         };
@@ -207,7 +207,7 @@
                 try {
                     const parsed = JSON.parse(errData);
                     return parseErrorMessage(parsed, fallback);
-                } catch (e) {}
+                } catch (e) { }
 
                 if (errData.includes("Traceback (most recent call last):")) {
                     const lines = errData.trim().split("\n");
@@ -241,7 +241,7 @@
                             : errData._server_messages;
                         const msgObj = typeof msgs[0] === "string" ? JSON.parse(msgs[0]) : msgs[0];
                         if (msgObj && msgObj.message) return parseErrorMessage(msgObj.message, fallback);
-                    } catch (e) {}
+                    } catch (e) { }
                 }
 
                 if (errData.message) return parseErrorMessage(errData.message, fallback);

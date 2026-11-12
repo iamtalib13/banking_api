@@ -629,3 +629,103 @@ def download_agent_wise_summary(
     frappe.local.response.type = "download"
 
     return None
+
+
+@frappe.whitelist()
+def download_product_wise_summary(
+    from_date,
+    to_date,
+    sol_id=None,
+    agent_code=None,
+    scheme_code=None,
+):
+    """Generate and download Product Wise Summary as CSV.
+
+    Each row represents one unique scheme_code, aggregated across all
+    matching Commission records.
+    """
+    filters = get_agent_wise_report_filters(
+        from_date=from_date,
+        to_date=to_date,
+        sol_id=sol_id,
+        agent_code=agent_code,
+        scheme_code=scheme_code,
+    )
+
+    records = frappe.get_all(
+        COMMISSION_DOCTYPE,
+        filters=filters,
+        fields=[
+            "scheme_code",
+            "scheme_description",
+            "group_name",
+            "eligible_amount",
+            "commission_amount",
+            "netpay",
+        ],
+        order_by="scheme_code asc",
+        limit_page_length=0,
+    )
+
+    if not records:
+        frappe.throw(
+            _("No Commission records found for the selected filters."))
+
+    # Aggregate by scheme_code
+    product_summary = {}
+
+    for row in records:
+        scheme_code = row.scheme_code or ""
+        if not scheme_code:
+            continue
+
+        if scheme_code not in product_summary:
+            product_summary[scheme_code] = {
+                "scheme_description": row.scheme_description or "",
+                "group_name": row.group_name or "",
+                "eligible_amount": 0.0,
+                "commission_amount": 0.0,
+                "netpay": 0.0,
+            }
+
+        product_summary[scheme_code]["eligible_amount"] += float(
+            row.eligible_amount or 0)
+        product_summary[scheme_code]["commission_amount"] += float(
+            row.commission_amount or 0)
+        product_summary[scheme_code]["netpay"] += float(row.netpay or 0)
+
+    # Build CSV
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    headers = [
+        "Scheme Code",
+        "Scheme Description",
+        "Group Name",
+        "Eligible Amount",
+        "Commission Amount",
+        "Netpay",
+    ]
+
+    writer.writerow(headers)
+
+    for scheme_code, summary in product_summary.items():
+        writer.writerow([
+            scheme_code,
+            summary["scheme_description"],
+            summary["group_name"],
+            summary["eligible_amount"],
+            summary["commission_amount"],
+            summary["netpay"],
+        ])
+
+    safe_from_date = from_date.replace("-", "")
+    safe_to_date = to_date.replace("-", "")
+
+    frappe.local.response.filename = (
+        f"product_wise_summary_{safe_from_date}_to_{safe_to_date}.csv"
+    )
+    frappe.local.response.filecontent = output.getvalue()
+    frappe.local.response.type = "download"
+
+    return None
