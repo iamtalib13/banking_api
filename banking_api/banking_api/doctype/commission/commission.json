@@ -5,6 +5,7 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "date",
   "agent_code",
   "agent_operative_account",
   "deposit_amount",
@@ -40,6 +41,14 @@
   "commission_items"
  ],
  "fields": [
+  {
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Date",
+   "search_index": 1
+  },
   {
    "fieldname": "agent_code",
    "fieldtype": "Link",

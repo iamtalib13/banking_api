@@ -47,53 +47,43 @@ def db_connection():
         frappe.throw(_("Database Connection Error"))
 
 
-def get_commission_query_dates():
+def get_commission_query_dates(from_date=None, to_date=None):
     """
-    Return dynamic reporting dates based on today's date.
-
-    Example for 2026-09-04:
-        present_date         = 2026-09-04
-        current_month_start  = 2026-09-01
-        current_month_end    = 2026-09-30
-        previous_month_start = 2026-08-01
-        previous_month_end   = 2026-08-31
+    Return dynamic reporting dates based on provided dates or T-1 (yesterday) for current month.
     """
-    present_date = date.today()
+    if from_date and to_date:
+        start_dt = frappe.utils.getdate(from_date)
+        end_dt = frappe.utils.getdate(to_date)
+        current_month_start = start_dt
+        report_date = end_dt
+        current_month_end = end_dt
+        previous_month_start = start_dt - relativedelta(months=1)
+        previous_month_end = start_dt - relativedelta(days=1)
+    else:
+        today = date.today()
+        # T-1: yesterday's date
+        report_date = today - relativedelta(days=1)
 
-    current_month_start = present_date.replace(
-        day=1
-    )
+        # Current month start based on report_date (T-1)
+        current_month_start = report_date.replace(day=1)
 
-    current_month_end = (
-        current_month_start
-        + relativedelta(months=1)
-        - relativedelta(days=1)
-    )
+        # Current month end
+        current_month_end = (
+            current_month_start
+            + relativedelta(months=1)
+            - relativedelta(days=1)
+        )
 
-    previous_month_start = (
-        current_month_start
-        - relativedelta(months=1)
-    )
-
-    previous_month_end = (
-        current_month_start
-        - relativedelta(days=1)
-    )
+        # Previous month start and end
+        previous_month_start = current_month_start - relativedelta(months=1)
+        previous_month_end = current_month_start - relativedelta(days=1)
 
     return {
-        "present_date": present_date.isoformat(),
-        "current_month_start": (
-            current_month_start.isoformat()
-        ),
-        "current_month_end": (
-            current_month_end.isoformat()
-        ),
-        "previous_month_start": (
-            previous_month_start.isoformat()
-        ),
-        "previous_month_end": (
-            previous_month_end.isoformat()
-        ),
+        "present_date": report_date.isoformat(),           # T-1 or custom end_date
+        "current_month_start": current_month_start.isoformat(),
+        "current_month_end": current_month_end.isoformat(),
+        "previous_month_start": previous_month_start.isoformat(),
+        "previous_month_end": previous_month_end.isoformat(),
     }
 
 
@@ -391,8 +381,8 @@ def get_commission_query_dates():
 # """
 
 
-def get_query_1():
-    dates = get_commission_query_dates()
+def get_query_1(from_date=None, to_date=None):
+    dates = get_commission_query_dates(from_date=from_date, to_date=to_date)
 
     return f"""
 WITH account_data AS (
@@ -460,8 +450,9 @@ flow_data AS (
         ON tdt.acid = g.acid
         AND tdt.flow_code = 'NI'
     WHERE tdt.flow_date BETWEEN
-        DATE '2026-10-01'
-        AND DATE '2026-10-31'
+        -- Dynamic reporting dates (Current month start to T-1)
+        DATE '{dates['current_month_start']}'
+        AND DATE '{dates['present_date']}'
     GROUP BY
         d.rm_id,
         g.foracid,
@@ -493,26 +484,26 @@ tran_data AS (
         (
             (
                 dtt.tran_date BETWEEN
-                    DATE '2026-10-01'
-                    AND DATE '2026-10-31'
+                    DATE '{dates['current_month_start']}'
+                    AND DATE '{dates['present_date']}'
                 AND dtt.value_date >
-                    DATE '2026-09-30'
+                    DATE '{dates['previous_month_end']}'
             )
             OR
             (
                 dtt.tran_date >
-                    DATE '2026-10-31'
+                    DATE '{dates['present_date']}'
                 AND dtt.value_date BETWEEN
-                    DATE '2026-10-01'
-                    AND DATE '2026-10-31'
+                    DATE '{dates['current_month_start']}'
+                    AND DATE '{dates['present_date']}'
             )
             OR
             (
                 dtt.value_date BETWEEN
-                    DATE '2026-10-01'
-                    AND DATE '2026-10-31'
+                    DATE '{dates['current_month_start']}'
+                    AND DATE '{dates['present_date']}'
                 AND dtt.tran_date >
-                    DATE '2026-10-31'
+                    DATE '{dates['present_date']}'
             )
         )
     GROUP BY
@@ -563,7 +554,7 @@ SELECT
     ) AS commission_amount,
     CASE
         WHEN ad.acct_opn_date + INTERVAL '1 year' >=
-            DATE '2026-10-31'
+            DATE '{dates['present_date']}'
             THEN 'YES'
         ELSE 'NO'
     END AS one_year_completed,
@@ -598,8 +589,8 @@ ORDER BY
 """
 
 
-def get_query_2():
-    dates = get_commission_query_dates()
+def get_query_2(from_date=None, to_date=None):
+    dates = get_commission_query_dates(from_date=from_date, to_date=to_date)
 
     return f"""
 WITH account_data AS (
@@ -634,8 +625,9 @@ WITH account_data AS (
             '9001','9002'
         )
         AND g.acct_opn_date BETWEEN
-            DATE '2026-10-01'
-            AND DATE '2026-10-31'
+            -- Dynamic reporting dates (Current month start to T-1)
+            DATE '{dates['current_month_start']}'
+            AND DATE '{dates['present_date']}'
         AND g.acct_cls_flg = 'N'
     LEFT JOIN tbaadm.tam AS tam
         ON tam.acid = g.acid
@@ -643,20 +635,20 @@ WITH account_data AS (
         ON dtt.acid = g.acid
         AND dtt.flow_code = 'PI'
         AND dtt.tran_date BETWEEN
-            DATE '2026-10-01'
-            AND DATE '2026-10-31'
+            DATE '{dates['current_month_start']}'
+            AND DATE '{dates['present_date']}'
         AND NOT (
             dtt.value_date >=
-                DATE '2026-09-01'
+                DATE '{dates['previous_month_start']}'
             AND dtt.value_date <
-                DATE '2026-10-01'
+                DATE '{dates['current_month_start']}'
         )
     LEFT JOIN tbaadm.tdt AS tdt
         ON tdt.acid = g.acid
         AND tdt.flow_code = 'PI'
         AND tdt.flow_date BETWEEN
-            DATE '2026-10-01'
-            AND DATE '2026-10-31'
+            DATE '{dates['current_month_start']}'
+            AND DATE '{dates['present_date']}'
     LEFT JOIN custom.dsaauth AS d2
         ON UPPER(ds.rm_id) = UPPER(d2.user_id)
     LEFT JOIN tbaadm.get AS g2
@@ -717,7 +709,7 @@ SELECT
     ) AS commission_amount,
     CASE
         WHEN ad.acct_opn_date + INTERVAL '1 year' <=
-            DATE '2026-10-31'
+            DATE '{dates['present_date']}'
             THEN 'YES'
         ELSE 'NO'
     END AS one_year_completed,
@@ -863,6 +855,7 @@ COMMISSION_BULK_FIELDS = [
     "owner",
     "docstatus",
     "idx",
+    "date",
     "agent_code",
     "agent_name",
     "customer_account_number",
@@ -920,20 +913,32 @@ def _sync_agent_fetch_from_fields():
     frappe.db.commit()
 
 
-def _get_existing_commission_map():
+def _get_existing_commission_map(from_date=None):
     """
-    Get mapping of (customer_account_number_scheme_code) -> name created in the current month.
+    Get mapping of (customer_account_number_scheme_code) -> name created in the targeted period.
     Allows lightning-fast O(1) distinction between INSERT and UPDATE.
     """
-    rows = frappe.db.sql("""
-        SELECT name, CONCAT(COALESCE(customer_account_number, ''), '_', COALESCE(scheme_code, '')) as `key`
-        FROM `tabCommission`
-        WHERE creation >= DATE_FORMAT(NOW(), '%%Y-%%m-01')
-    """, as_dict=True)
+    if from_date:
+        start_date = frappe.utils.getdate(from_date).strftime('%Y-%m-01')
+    else:
+        start_date = None
+
+    if start_date:
+        rows = frappe.db.sql("""
+            SELECT name, CONCAT(COALESCE(customer_account_number, ''), '_', COALESCE(scheme_code, '')) as `key`
+            FROM `tabCommission`
+            WHERE creation >= %(start_date)s
+        """, {"start_date": start_date}, as_dict=True)
+    else:
+        rows = frappe.db.sql("""
+            SELECT name, CONCAT(COALESCE(customer_account_number, ''), '_', COALESCE(scheme_code, '')) as `key`
+            FROM `tabCommission`
+            WHERE creation >= DATE_FORMAT(NOW(), '%%Y-%%m-01')
+        """, as_dict=True)
     return {r["key"]: r["name"] for r in rows if r.get("key")}
 
 
-def _build_commission_tuple(row, is_query_2, now_ts, doc_name=None, eligible_setting=None):
+def _build_commission_tuple(row, is_query_2, now_ts, doc_name=None, eligible_setting=None, sync_date=None):
     collection_val = row.get(
         "total_tran_amt_dtt") if is_query_2 else row.get("total_tran_amt")
 
@@ -954,6 +959,7 @@ def _build_commission_tuple(row, is_query_2, now_ts, doc_name=None, eligible_set
         "Administrator",
         0,
         0,
+        sync_date,
         _safe_str(row.get("rm_id")),
         _safe_str(row.get("rm_name")),
         _safe_str(row.get("foracid")),
@@ -985,6 +991,7 @@ def _bulk_update_commissions(update_tuples, chunk_size=2000):
         UPDATE `tabCommission`
         SET
             modified = %s,
+            `date` = %s,
             agent_code = %s,
             agent_name = %s,
             customer_account_number = %s,
@@ -1011,23 +1018,24 @@ def _bulk_update_commissions(update_tuples, chunk_size=2000):
         params = [
             (
                 t[2],   # modified
-                t[7],   # agent_code
-                t[8],   # agent_name
-                t[9],   # customer_account_number
-                t[10],  # customer_account_name
-                t[11],  # deposit_amount
-                t[12],  # tenure_months
-                t[13],  # tenure_days
-                t[14],  # demand
-                t[15],  # collection
-                t[16],  # eligible_amount
-                t[17],  # account_opening_date
-                t[18],  # remarks
-                t[19],  # pan_card
-                t[20],  # scheme_code
-                t[21],  # scheme_description
-                t[22],  # sol_id
-                t[23],  # sol_description
+                t[7],   # date
+                t[8],   # agent_code
+                t[9],   # agent_name
+                t[10],  # customer_account_number
+                t[11],  # customer_account_name
+                t[12],  # deposit_amount
+                t[13],  # tenure_months
+                t[14],  # tenure_days
+                t[15],  # demand
+                t[16],  # collection
+                t[17],  # eligible_amount
+                t[18],  # account_opening_date
+                t[19],  # remarks
+                t[20],  # pan_card
+                t[21],  # scheme_code
+                t[22],  # scheme_description
+                t[23],  # sol_id
+                t[24],  # sol_description
                 t[0],   # name (WHERE clause)
             )
             for t in chunk
@@ -1036,12 +1044,12 @@ def _bulk_update_commissions(update_tuples, chunk_size=2000):
         frappe.db.commit()
 
 
-def _create_commission_from_query_1(row, commit=True):
+def _create_commission_from_query_1(row, commit=True, sync_date=None):
     agent_code = _safe_str(row.get("rm_id")) or "0"
 
     doc = frappe.get_doc({
         "doctype": "Commission",
-
+        "date": sync_date,
         "agent_code": agent_code,
         "agent_name": _safe_str(row.get("rm_name")) or "0",
 
@@ -1114,12 +1122,12 @@ def _create_commission_from_query_1(row, commit=True):
     return doc.name
 
 
-def _create_commission_from_query_2(row, commit=True):
+def _create_commission_from_query_2(row, commit=True, sync_date=None):
     agent_code = _safe_str(row.get("rm_id")) or "0"
 
     doc = frappe.get_doc({
         "doctype": "Commission",
-
+        "date": sync_date,
         "agent_code": agent_code,
         "agent_name": _safe_str(row.get("rm_name")) or "0",
 
@@ -1199,7 +1207,7 @@ def _run_query(connection, query):
 
 
 @frappe.whitelist()
-def fetch_and_create_commission():
+def fetch_and_create_commission(from_date=None, to_date=None):
     """
     Execute Query 2 first, then Query 1.
     Uses bulk_insert for lightning-fast performance across 80,000+ records.
@@ -1208,6 +1216,15 @@ def fetch_and_create_commission():
     if not frappe.flags.in_scheduler and not frappe.flags.in_test:
         frappe.only_for(("System Manager",))
 
+    if to_date:
+        max_allowed_date = frappe.utils.add_days(frappe.utils.today(), -1)
+        if str(to_date) > str(max_allowed_date):
+            frappe.throw(
+                _("To Date cannot be today or a future date. Maximum allowed date is {0} (T-1).").format(max_allowed_date)
+            )
+        if from_date and str(from_date) > str(to_date):
+            frappe.throw(_("From Date cannot be after To Date."))
+
     conn = None
     errors = []
 
@@ -1215,7 +1232,7 @@ def fetch_and_create_commission():
         conn = db_connection()
 
         now_ts = now_datetime()
-        existing_map = _get_existing_commission_map()
+        existing_map = _get_existing_commission_map(from_date=from_date)
         processed_keys = set()
 
         try:
@@ -1230,12 +1247,12 @@ def fetch_and_create_commission():
         # Fetch rows from external Postgres immediately while connection is fresh
         query_2_rows = _run_query(
             conn,
-            get_query_2(),
+            get_query_2(from_date=from_date, to_date=to_date),
         )
 
         query_1_rows = _run_query(
             conn,
-            get_query_1(),
+            get_query_1(from_date=from_date, to_date=to_date),
         )
 
         # Close Postgres connection early to avoid holding standby slots
@@ -1244,6 +1261,10 @@ def fetch_and_create_commission():
 
         insert_tuples = []
         update_tuples = []
+
+        # Determine effective sync date (custom to_date, or T-1 report_date)
+        query_dates = get_commission_query_dates(from_date=from_date, to_date=to_date)
+        sync_date = query_dates.get("present_date")
 
         # Process Query 2
         for row in query_2_rows:
@@ -1255,10 +1276,10 @@ def fetch_and_create_commission():
             existing_name = existing_map.get(key)
             if existing_name:
                 update_tuples.append(_build_commission_tuple(
-                    row, True, now_ts, doc_name=existing_name, eligible_setting=eligible_setting))
+                    row, True, now_ts, doc_name=existing_name, eligible_setting=eligible_setting, sync_date=sync_date))
             else:
                 insert_tuples.append(
-                    _build_commission_tuple(row, True, now_ts, eligible_setting=eligible_setting))
+                    _build_commission_tuple(row, True, now_ts, eligible_setting=eligible_setting, sync_date=sync_date))
 
         # Process Query 1
         for row in query_1_rows:
@@ -1270,10 +1291,10 @@ def fetch_and_create_commission():
             existing_name = existing_map.get(key)
             if existing_name:
                 update_tuples.append(_build_commission_tuple(
-                    row, False, now_ts, doc_name=existing_name, eligible_setting=eligible_setting))
+                    row, False, now_ts, doc_name=existing_name, eligible_setting=eligible_setting, sync_date=sync_date))
             else:
                 insert_tuples.append(
-                    _build_commission_tuple(row, False, now_ts, eligible_setting=eligible_setting))
+                    _build_commission_tuple(row, False, now_ts, eligible_setting=eligible_setting, sync_date=sync_date))
 
         # Execute Bulk Inserts
         if insert_tuples:
@@ -1314,7 +1335,7 @@ def fetch_and_create_commission():
 
 
 @frappe.whitelist()
-def run_fetch_and_create_commission_with_progress(limit=None):
+def run_fetch_and_create_commission_with_progress(limit=None, from_date=None, to_date=None):
     """
     Execute Query 1 and Query 2 with terminal progress using high-speed bulk batches.
     """
@@ -1331,8 +1352,8 @@ def run_fetch_and_create_commission_with_progress(limit=None):
 
         conn = db_connection()
 
-        query_1_rows = _run_query(conn, get_query_1())
-        query_2_rows = _run_query(conn, get_query_2())
+        query_1_rows = _run_query(conn, get_query_1(from_date=from_date, to_date=to_date))
+        query_2_rows = _run_query(conn, get_query_2(from_date=from_date, to_date=to_date))
 
         if limit:
             if len(query_2_rows) >= limit:
@@ -1343,7 +1364,7 @@ def run_fetch_and_create_commission_with_progress(limit=None):
                 query_1_rows = query_1_rows[:rem]
 
         now_ts = now_datetime()
-        existing_map = _get_existing_commission_map()
+        existing_map = _get_existing_commission_map(from_date=from_date)
         processed_keys = set()
 
         total_to_process = len(query_2_rows) + len(query_1_rows)
@@ -1352,6 +1373,9 @@ def run_fetch_and_create_commission_with_progress(limit=None):
 
         insert_tuples = []
         update_tuples = []
+
+        query_dates = get_commission_query_dates(from_date=from_date, to_date=to_date)
+        sync_date = query_dates.get("present_date")
 
         try:
             # Process Query 2
@@ -1365,10 +1389,10 @@ def run_fetch_and_create_commission_with_progress(limit=None):
                 existing_name = existing_map.get(key)
                 if existing_name:
                     update_tuples.append(_build_commission_tuple(
-                        row, True, now_ts, doc_name=existing_name))
+                        row, True, now_ts, doc_name=existing_name, sync_date=sync_date))
                 else:
                     insert_tuples.append(
-                        _build_commission_tuple(row, True, now_ts))
+                        _build_commission_tuple(row, True, now_ts, sync_date=sync_date))
                 progress.update(1)
 
             # Process Query 1
@@ -1382,10 +1406,10 @@ def run_fetch_and_create_commission_with_progress(limit=None):
                 existing_name = existing_map.get(key)
                 if existing_name:
                     update_tuples.append(_build_commission_tuple(
-                        row, False, now_ts, doc_name=existing_name))
+                        row, False, now_ts, doc_name=existing_name, sync_date=sync_date))
                 else:
                     insert_tuples.append(
-                        _build_commission_tuple(row, False, now_ts))
+                        _build_commission_tuple(row, False, now_ts, sync_date=sync_date))
                 progress.update(1)
 
             if insert_tuples:
@@ -1519,6 +1543,35 @@ def debug_create_one_commission():
     finally:
         if conn:
             conn.close()
+
+
+@frappe.whitelist()
+def truncate_commission_and_payments(clear_commission=1, clear_payments=1):
+    """
+    Clear Commission (including items) and/or Commission Payment records based on selection.
+    Restricted to System Manager.
+    """
+    frappe.only_for(("System Manager",))
+
+    cleared = []
+    clear_commission = cint(clear_commission)
+    clear_payments = cint(clear_payments)
+
+    if clear_commission:
+        frappe.db.sql("TRUNCATE TABLE `tabCommission Item`")
+        frappe.db.sql("TRUNCATE TABLE `tabCommission`")
+        cleared.append("Commission & Items")
+
+    if clear_payments:
+        frappe.db.sql("TRUNCATE TABLE `tabCommission Payment`")
+        cleared.append("Commission Payment")
+
+    frappe.db.commit()
+
+    if not cleared:
+        return {"status": "none", "message": _("No tables were selected to clear.")}
+
+    return {"status": "success", "message": _("Successfully cleared: {0}").format(", ".join(cleared))}
 
 
 def _get_deferred_product(product_name):
@@ -2599,6 +2652,12 @@ def _create_normal_agent_payment_if_missing(agent_code, due_date=None):
         payment_doc.payment_status = "Pending"
         payment_doc.save(ignore_permissions=True)
 
+        _link_commission_items_to_payment(
+            payment_name=payment_doc.name,
+            agent_code=agent_code,
+            due_date=due_date,
+        )
+
         return {
             "created": False,
             "updated": True,
@@ -2662,11 +2721,49 @@ def _create_normal_agent_payment_if_missing(agent_code, due_date=None):
 
     payment_doc.insert(ignore_permissions=True)
 
+    _link_commission_items_to_payment(
+        payment_name=payment_doc.name,
+        agent_code=agent_code,
+        due_date=due_date,
+    )
+
     return {
         "created": True,
         "updated": False,
         "name": payment_doc.name,
     }
+
+
+def _link_commission_items_to_payment(payment_name, agent_code, due_date=None):
+    """
+    Link Commission Payment reference to Commission Item child table rows
+    for the agent and month of due_date, preventing duplicate payments.
+    """
+    if not payment_name or not agent_code:
+        return
+
+    due_date = due_date or frappe.utils.today()
+    dt = frappe.utils.getdate(due_date)
+
+    frappe.db.sql(
+        """
+        UPDATE `tabCommission Item` ci
+        INNER JOIN `tabCommission` c ON c.name = ci.parent
+        SET ci.payment_reference = %(payment_name)s
+        WHERE c.agent_code = %(agent_code)s
+          AND YEAR(c.creation) = %(year)s
+          AND MONTH(c.creation) = %(month)s
+          AND (ci.payment_reference IS NULL OR ci.payment_reference = '' OR ci.payment_reference = %(payment_name)s)
+          AND ci.status IN ('Pending', 'Due')
+          AND c.docstatus < 2
+        """,
+        {
+            "payment_name": payment_name,
+            "agent_code": agent_code,
+            "year": dt.year,
+            "month": dt.month,
+        },
+    )
 
 
 def _get_commission_calculation_settings():

@@ -1110,6 +1110,18 @@ def pay_now_commission_payment(payment_name):
 
             payment_doc.save(ignore_permissions=True)
 
+            frappe.db.sql(
+                """
+                UPDATE `tabCommission Item`
+                SET status = 'Paid', paid_on = %(paid_on)s
+                WHERE payment_reference = %(payment_name)s
+                """,
+                {
+                    "paid_on": payment_doc.paid_on or now_datetime(),
+                    "payment_name": payment_doc.name,
+                },
+            )
+
             frappe.db.set_single_value(
                 "Commission Settings",
                 "last_payment_run",

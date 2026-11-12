@@ -76,8 +76,10 @@
   },
   {
    "fieldname": "payment_reference",
-   "fieldtype": "Data",
-   "label": "Payment Reference"
+   "fieldtype": "Link",
+   "label": "Payment Reference",
+   "options": "Commission Payment",
+   "search_index": 1
   },
   {
    "fieldname": "column_break_avtt",

@@ -78,18 +78,52 @@ frappe.listview_settings["Commission"] = {
             page.add_inner_button(
                 __("Fetch Commission Data"),
                 () => {
-                    frappe.confirm(
-                        __(
-                            "This will fetch commission records and create Commission documents. Do you want to continue?"
-                        ),
-                        () => {
+                    const today = frappe.datetime.get_today();
+                    const default_start = frappe.datetime.month_start();
+                    const default_end = frappe.datetime.add_days(today, -1);
+
+                    const d = new frappe.ui.Dialog({
+                        title: __("Fetch Commission Data from DB"),
+                        fields: [
+                            {
+                                label: __("From Date"),
+                                fieldname: "from_date",
+                                fieldtype: "Date",
+                                default: default_start,
+                                reqd: 1
+                            },
+                            {
+                                label: __("To Date"),
+                                fieldname: "to_date",
+                                fieldtype: "Date",
+                                default: default_end,
+                                reqd: 1
+                            }
+                        ],
+                        primary_action_label: __("Fetch"),
+                        primary_action(values) {
+                            const max_date = frappe.datetime.add_days(frappe.datetime.get_today(), -1);
+                            if (values.to_date > max_date) {
+                                frappe.msgprint(__("To Date cannot be today or a future date. Maximum allowed date is {0} (T-1).", [max_date]));
+                                return;
+                            }
+                            if (values.from_date > values.to_date) {
+                                frappe.msgprint(__("From Date cannot be after To Date."));
+                                return;
+                            }
+                            d.hide();
+
                             frappe.call({
                                 method: "banking_api.banking_api.doctype.commission.commission.fetch_and_create_commission",
+                                args: {
+                                    from_date: values.from_date,
+                                    to_date: values.to_date
+                                },
                                 freeze: true,
                                 freeze_message: __(
-                                    "Fetching commission data..."
+                                    "Fetching commission data ({0} to {1})...",
+                                    [values.from_date, values.to_date]
                                 ),
-
                                 callback(r) {
                                     if (!r.message) {
                                         return;
@@ -112,15 +146,23 @@ frappe.listview_settings["Commission"] = {
                                         )}</p>
 
                                                 <p><b>Query 1 Rows:</b> ${cint(
-                                            data.query_1_count || 0
+                                            data.query_1_fetched || data.query_1_count || 0
                                         )}</p>
 
                                                 <p><b>Query 2 Rows:</b> ${cint(
-                                            data.query_2_count || 0
+                                            data.query_2_fetched || data.query_2_count || 0
                                         )}</p>
 
                                                 <p><b>Inserted Docs:</b> ${cint(
                                             data.inserted_count || 0
+                                        )}</p>
+
+                                                <p><b>Updated Docs:</b> ${cint(
+                                            data.updated_count || 0
+                                        )}</p>
+
+                                                <p><b>Total Processed:</b> ${cint(
+                                            data.total_processed || 0
                                         )}</p>
 
                                                 <p><b>Errors:</b> ${cint(
@@ -134,7 +176,8 @@ frappe.listview_settings["Commission"] = {
                                 }
                             });
                         }
-                    );
+                    });
+                    d.show();
                 },
                 action_label
             );
@@ -301,6 +344,73 @@ frappe.listview_settings["Commission"] = {
                 },
                 action_label
             );
+
+            // 6. Clear Data (Testing/Developer)
+            if (frappe.user_roles.includes("System Manager")) {
+                page.add_inner_button(
+                    __("Clear Commission / Payment Data"),
+                    () => {
+                        const d = new frappe.ui.Dialog({
+                            title: __("Clear Data (Testing Mode)"),
+                            fields: [
+                                {
+                                    fieldtype: "HTML",
+                                    fieldname: "warning_html",
+                                    options: `<div class="alert alert-danger" style="margin-bottom: 12px; font-size: 13px;">
+                                        <b>Warning:</b> Truncating tables is irreversible. Selected tables will be permanently cleared.
+                                    </div>`
+                                },
+                                {
+                                    label: __("Commission Records (Includes Commission Items)"),
+                                    fieldname: "clear_commission",
+                                    fieldtype: "Check",
+                                    default: 1
+                                },
+                                {
+                                    label: __("Commission Payment Records"),
+                                    fieldname: "clear_payments",
+                                    fieldtype: "Check",
+                                    default: 1
+                                }
+                            ],
+                            primary_action_label: __("Truncate Selected"),
+                            primary_action(values) {
+                                if (!values.clear_commission && !values.clear_payments) {
+                                    frappe.msgprint(__("Please select at least one option to clear."));
+                                    return;
+                                }
+
+                                frappe.confirm(
+                                    __("Are you sure you want to permanently clear the selected data?"),
+                                    () => {
+                                        d.hide();
+                                        frappe.call({
+                                            method: "banking_api.banking_api.doctype.commission.commission.truncate_commission_and_payments",
+                                            args: {
+                                                clear_commission: values.clear_commission ? 1 : 0,
+                                                clear_payments: values.clear_payments ? 1 : 0
+                                            },
+                                            freeze: true,
+                                            freeze_message: __("Clearing selected data..."),
+                                            callback(r) {
+                                                if (r.message && r.message.status === "success") {
+                                                    frappe.show_alert({
+                                                        message: r.message.message,
+                                                        indicator: "green"
+                                                    });
+                                                    listview.refresh();
+                                                }
+                                            }
+                                        });
+                                    }
+                                );
+                            }
+                        });
+                        d.show();
+                    },
+                    action_label
+                );
+            }
         }
 
         /*
