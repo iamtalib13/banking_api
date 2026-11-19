@@ -35,10 +35,39 @@ ORDER BY
     u.role_id;"""
 
 
-ALLOWED_ROLES = {"Operations Support Executive", "CBS Support Executive", "System Manager", "Administrator"}
+ALLOWED_ROLES = {
+    "Operations Support Executive",
+    "CBS Support Executive",
+    "System Manager",
+    "Administrator",
+    "Branch Manager",
+    "Branch Operations Manager",
+    "FinUser Maker",
+    "FinUser Checker"
+}
+
+ALL_BRANCH_ROLES = {
+    "Operations Support Executive",
+    "CBS Support Executive",
+    "System Manager",
+    "Administrator"
+}
+
+MAKER_ROLES = {
+    "Branch Manager",
+    "FinUser Maker",
+    "System Manager",
+    "Administrator"
+}
+
+CHECKER_ROLES = {
+    "Branch Operations Manager",
+    "FinUser Checker",
+    "System Manager",
+    "Administrator"
+}
+
 RESIGNED_ACCESS_ROLES = {"CBS Support Executive", "System Manager", "Administrator"}
-
-
 ROLE_UPDATE_ACCESS_ROLES = {"CBS Support Executive", "System Manager", "Administrator"}
 
 
@@ -49,6 +78,60 @@ def check_access():
     user_roles = set(frappe.get_roles(frappe.session.user))
     if frappe.session.user != "Administrator" and not (user_roles & ALLOWED_ROLES):
         frappe.throw(_("Access Denied: You do not have permission to access Finacle User Management."), frappe.PermissionError)
+
+
+def can_approve_requests():
+    """Checks if current logged in user has Checker permissions."""
+    if frappe.session.user == "Administrator":
+        return True
+    user_roles = set(frappe.get_roles(frappe.session.user))
+    return bool(user_roles & CHECKER_ROLES)
+
+
+def can_create_deputation():
+    """Checks if current logged in user has Maker permissions."""
+    if frappe.session.user == "Administrator":
+        return True
+    user_roles = set(frappe.get_roles(frappe.session.user))
+    return bool(user_roles & MAKER_ROLES)
+
+
+def get_user_allowed_sol_ids():
+    """
+    Returns list of SOL IDs allowed for the logged in user.
+    Admin and Head Office roles get None (meaning ALL branches allowed).
+    Branch Managers and local users get only their mapped SOL ID(s).
+    """
+    if frappe.session.user == "Administrator":
+        return None
+
+    user_roles = set(frappe.get_roles(frappe.session.user))
+    if user_roles & ALL_BRANCH_ROLES:
+        return None
+
+    # Fetch SOL ID mapped to user from Employee master
+    emp = frappe.db.get_value(
+        "Employee",
+        {"user_id": frappe.session.user, "status": "Active"},
+        ["name", "sol_id", "branch", "sahayog_branch"],
+        as_dict=True
+    )
+
+    allowed_sols = set()
+    if emp:
+        if emp.sol_id:
+            allowed_sols.add(str(emp.sol_id).strip())
+        if emp.branch:
+            # Check if branch name matches sol_id or code
+            sol = frappe.db.get_value("Sahayog Branch", {"name": emp.branch}, "sol_id") or frappe.db.get_value("Sahayog Branch", {"branch": emp.branch}, "sol_id")
+            if sol:
+                allowed_sols.add(str(sol).strip())
+        if emp.sahayog_branch:
+            sol = frappe.db.get_value("Sahayog Branch", {"name": emp.sahayog_branch}, "sol_id")
+            if sol:
+                allowed_sols.add(str(sol).strip())
+
+    return list(allowed_sols) if allowed_sols else []
 
 
 def check_role_update_access():
@@ -94,12 +177,16 @@ def get_context(context):
     context.can_manage_resigned = can_manage_resigned()
     context.can_update_role = can_update_role()
     context.can_disable_user = can_disable_user()
+    context.can_create_deputation = can_create_deputation()
+    context.can_approve_requests = can_approve_requests()
 
     context.is_guest = False
 
-    # 1. Fetch Sahayog Branches from MariaDB
-    branches = frappe.db.sql(
-        """
+    # Get allowed SOL IDs for logged in user (BM gets only their branch, Admin gets None = all)
+    allowed_sol_ids = get_user_allowed_sol_ids()
+
+    # 1. Fetch Sahayog Branches from MariaDB (filtered by user's authorized branch if restricted)
+    branch_query = """
         SELECT 
             sol_id AS code,
             branch AS name,
@@ -108,10 +195,18 @@ def get_context(context):
             IFNULL(district, '') AS district
         FROM `tabSahayog Branch`
         WHERE IFNULL(sol_id, '') != ''
-        ORDER BY CAST(sol_id AS UNSIGNED) ASC, sol_id ASC
-        """,
-        as_dict=True,
-    )
+    """
+    if allowed_sol_ids is not None:
+        if not allowed_sol_ids:
+            # BM has no mapped branch
+            branch_query += " AND 1=0 "
+            branches = frappe.db.sql(branch_query, as_dict=True)
+        else:
+            branch_query += " AND sol_id IN %(sols)s ORDER BY CAST(sol_id AS UNSIGNED) ASC, sol_id ASC "
+            branches = frappe.db.sql(branch_query, {"sols": tuple(allowed_sol_ids)}, as_dict=True)
+    else:
+        branch_query += " ORDER BY CAST(sol_id AS UNSIGNED) ASC, sol_id ASC "
+        branches = frappe.db.sql(branch_query, as_dict=True)
 
     # 2. Execute query on Finacle DR including NULL date users as active
     fin_counts = {}
@@ -274,7 +369,7 @@ def get_branch_users(sol_id):
         "total": len(users_list),
     }
 
-
+# resign employee: Fetches all resigned employees from ERPNext and matches with Finacle Production DR users to identify those still active in Finacle.
 @frappe.whitelist()
 def get_resigned_employees():
     check_resigned_access()
@@ -395,7 +490,7 @@ def get_resigned_employees():
         "active_in_finacle_count": len(resigned_list),
     }
 
-
+# get_missing_in_finacle_employees: Fetches all Active employees from ERPNext and identifies those missing in Finacle DR "get" table.
 @frappe.whitelist()
 def get_missing_in_finacle_employees():
     check_resigned_access()
@@ -486,6 +581,7 @@ def get_missing_in_finacle_employees():
 
 
 
+# update_user_role: Updates user role in Finacle database table finfadm.urm_user_role_tbl.
 @frappe.whitelist()
 def update_user_role(user_id, old_role, new_role):
     check_role_update_access()
@@ -512,11 +608,13 @@ def update_user_role(user_id, old_role, new_role):
 
         cur = conn.cursor()
         if old_role:
+            # role id updation query with old_role in WHERE clause to ensure correct update
             cur.execute(
                 "UPDATE finfadm.urm_user_role_tbl SET role_id = %s WHERE user_id = %s AND role_id = %s",
                 (new_role, user_id, old_role),
             )
         else:
+            # role id updation query without old_role in WHERE clause (for cases where old_role is unknown)
             cur.execute(
                 "UPDATE finfadm.urm_user_role_tbl SET role_id = %s WHERE user_id = %s",
                 (new_role, user_id),
@@ -536,6 +634,7 @@ def update_user_role(user_id, old_role, new_role):
         }
 
 
+# disable_finacle_user: Disables user login in Finacle database table finfadm.user_creds_tbl.
 @frappe.whitelist()
 def disable_finacle_user(user_id, emp_id=None):
     """
@@ -565,6 +664,7 @@ def disable_finacle_user(user_id, emp_id=None):
             conn = get_finacle_dr_connection()
 
         cur = conn.cursor()
+        # deactivation query: disables user in Finacle
         query = """
             UPDATE finfadm.user_creds_tbl
             SET
@@ -586,4 +686,325 @@ def disable_finacle_user(user_id, emp_id=None):
             "status": "error",
             "message": _("Failed to update Finacle database: {0}").format(str(e))
         }
+
+
+# create_deputation_request: BM creates temporary deputation request in Employee finuser_items child table.
+@frappe.whitelist()
+def create_deputation_request(user_id, current_sol_id, depute_sol_id, from_date, to_date, remarks=None):
+    """
+    Creates a new Deputation item under Employee.finuser_items child table.
+    """
+    check_access()
+
+    if not can_create_deputation():
+        frappe.throw(_("Permission Denied: Only Branch Manager or authorized FinUser Maker can initiate deputation."), frappe.PermissionError)
+
+    allowed_sols = get_user_allowed_sol_ids()
+    if allowed_sols is not None and str(current_sol_id).strip() not in allowed_sols:
+        frappe.throw(_("Permission Denied: You can only depute users from your authorized branch ({0}).").format(", ".join(allowed_sols)), frappe.PermissionError)
+
+    if not user_id or not current_sol_id or not depute_sol_id or not from_date or not to_date:
+        frappe.throw(_("Please provide all required fields: User ID, Current SOL, Depute SOL, From Date, and To Date."))
+
+    if current_sol_id == depute_sol_id:
+        frappe.throw(_("Depute SOL ID cannot be identical to Current SOL ID."))
+
+    if str(to_date) < str(from_date):
+        frappe.throw(_("To Date cannot be before From Date."))
+
+    emp_name = _get_employee_by_user_id(user_id)
+    if not emp_name:
+        frappe.throw(_("No active Employee record found linked to Finacle User {0}.").format(user_id))
+
+    emp_doc = frappe.get_doc("Employee", emp_name)
+    emp_doc.append("finuser_items", {
+        "action_type": "Deputation",
+        "status": "Pending Checker Approval",
+        "current_sol_id": current_sol_id,
+        "depute_sol_id": depute_sol_id,
+        "from_date": from_date,
+        "to_date": to_date,
+        "remarks": remarks,
+        "maker_id": frappe.session.user,
+        "maker_datetime": frappe.utils.now_datetime(),
+    })
+    emp_doc.save(ignore_permissions=True)
+
+    return {
+        "status": "success",
+        "employee": emp_doc.name,
+        "message": _("Deputation request for {0} submitted to Checker for approval.").format(emp_doc.employee_name or user_id)
+    }
+
+
+# approve_finuser_item: BOM approves pending deputation, validates maker!=checker, and updates SOL in Finacle.
+@frappe.whitelist()
+def approve_finuser_item(employee, row_name, remarks=None):
+    """
+    Approves a pending FinUser item row in Employee child table.
+    """
+    check_access()
+
+    if not can_approve_requests():
+        frappe.throw(_("Permission Denied: Only Branch Operations Manager (BOM) or authorized FinUser Checker can approve requests."), frappe.PermissionError)
+
+    emp_doc = frappe.get_doc("Employee", employee)
+    row = next((r for r in emp_doc.finuser_items if r.name == row_name), None)
+    if not row:
+        frappe.throw(_("FinUser item row not found."))
+
+    if row.status != "Pending Checker Approval":
+        frappe.throw(_("Only pending items can be approved."))
+
+    if frappe.session.user == row.maker_id:
+        frappe.throw(_("Maker and Checker cannot be the same user."))
+
+    row.checker_id = frappe.session.user
+    row.checker_datetime = frappe.utils.now_datetime()
+    row.checker_remarks = remarks
+    row.status = "Active" if row.action_type == "Deputation" else "Approved"
+
+    if row.action_type == "Deputation":
+        finacle_user_id = emp_doc.user_id or emp_doc.name
+        _update_finacle_sol(
+            user_id=finacle_user_id,
+            target_sol=row.depute_sol_id,
+            current_sol=row.current_sol_id,
+            action="Deputation"
+        )
+
+    emp_doc.save(ignore_permissions=True)
+    return {"status": "success", "message": _("Request approved successfully.")}
+
+
+# reject_finuser_item: BOM rejects pending deputation with mandatory remarks, ensuring maker!=checker.
+@frappe.whitelist()
+def reject_finuser_item(employee, row_name, remarks):
+    """
+    Rejects a pending FinUser item row in Employee child table.
+    """
+    check_access()
+
+    if not can_approve_requests():
+        frappe.throw(_("Permission Denied: Only Branch Operations Manager (BOM) or authorized FinUser Checker can reject requests."), frappe.PermissionError)
+
+    if not remarks:
+        frappe.throw(_("Remarks are required to reject."))
+
+    emp_doc = frappe.get_doc("Employee", employee)
+    row = next((r for r in emp_doc.finuser_items if r.name == row_name), None)
+    if not row:
+        frappe.throw(_("FinUser item row not found."))
+
+    if row.status != "Pending Checker Approval":
+        frappe.throw(_("Only pending items can be rejected."))
+
+    if frappe.session.user == row.maker_id:
+        frappe.throw(_("Maker and Checker cannot be the same user."))
+
+    row.checker_id = frappe.session.user
+    row.checker_datetime = frappe.utils.now_datetime()
+    row.checker_remarks = remarks
+    row.status = "Rejected"
+
+    emp_doc.save(ignore_permissions=True)
+    return {"status": "success", "message": _("Request rejected.")}
+
+
+# reverse_deputation_item: Manually reverts active deputation early and restores base SOL ID in Finacle.
+@frappe.whitelist()
+def reverse_deputation_item(employee, row_name, remarks=None):
+    """
+    Manually reverses an active deputation and restores base SOL ID.
+    """
+    check_access()
+
+    emp_doc = frappe.get_doc("Employee", employee)
+    row = next((r for r in emp_doc.finuser_items if r.name == row_name), None)
+    if not row or row.action_type != "Deputation" or row.status != "Active":
+        frappe.throw(_("Only active deputations can be reversed."))
+
+    row.is_reversed = 1
+    row.reversal_date = frappe.utils.now_datetime()
+    row.status = "Reversed"
+    if remarks:
+        row.remarks = (row.remarks or "") + f"\nReversal Remark: {remarks}"
+
+    finacle_user_id = emp_doc.user_id or emp_doc.name
+    _update_finacle_sol(
+        user_id=finacle_user_id,
+        target_sol=row.current_sol_id,
+        current_sol=row.depute_sol_id,
+        action="Reversal"
+    )
+
+    emp_doc.save(ignore_permissions=True)
+    return {"status": "success", "message": _("Deputation reversed and base SOL restored.")}
+
+
+# _get_employee_by_user_id: Helper to find Employee document name from Finacle user ID.
+def _get_employee_by_user_id(user_id):
+    """Finds Frappe Employee doc name mapped to user_id."""
+    emp = frappe.db.get_value("Employee", {"user_id": user_id}, "name")
+    if emp:
+        return emp
+    emp = frappe.db.get_value("Employee", {"name": user_id}, "name")
+    if emp:
+        return emp
+    return frappe.db.get_value("Employee", {"status": "Active"}, "name")
+
+
+# _update_finacle_sol: Executes DBA query UPDATE tbaadm.upr SET sol_id = %s WHERE user_id = %s AND sol_id = %s in Finacle.
+def _update_finacle_sol(user_id, target_sol, current_sol=None, action="Update"):
+    """
+    Executes SOL update query in Finacle DB as per DBA recommendation:
+    UPDATE tbaadm.upr SET sol_id = %s WHERE user_id = %s AND sol_id = %s;
+    """
+    if not user_id or not target_sol:
+        return
+
+    from banking_api.banking_api.doctype.database_configuration.database_configuration import get_db_connection
+    # dabase_name = "Finacle Production"
+    db_config = frappe.db.get_value(
+        "Database Configuration",
+        {"database_name": ["in", ["Finacle", "postgres", "finfadm"]]},
+        "name"
+    ) or frappe.db.get_value("Database Configuration", {}, "name")
+
+    if not db_config:
+        frappe.log_error(f"No Database Configuration found. Skipped {action} for {user_id}", f"Finacle {action} DB Config Missing")
+        return
+
+    conn = None
+    try:
+        conn = get_db_connection(name=db_config, timeout=15)
+        cur = conn.cursor()
+        # If current_sol is provided, use it in WHERE clause; else update based on user_id only
+        # deputation / SOL update query (DBA approved): updates user sol_id in Finacle (tbaadm.upr)
+        if current_sol:
+            query = "UPDATE tbaadm.upr SET sol_id = %s WHERE user_id = %s AND sol_id = %s;"
+            cur.execute(query, (str(target_sol).strip(), str(user_id).strip(), str(current_sol).strip()))
+        else:
+            query = "UPDATE tbaadm.upr SET sol_id = %s WHERE user_id = %s;"
+            cur.execute(query, (str(target_sol).strip(), str(user_id).strip()))
+
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        if conn:
+            try:
+                conn.rollback()
+                conn.close()
+            except Exception:
+                pass
+        frappe.log_error(frappe.get_traceback(), f"Finacle {action} failed for {user_id}")
+        frappe.throw(_("Failed to update SOL in Finacle: {0}").format(str(e)))
+
+
+# process_deputation_daily_scheduler: Daily cron to send 3-day advance alerts and auto-revert expired deputations back to base SOL.
+def process_deputation_daily_scheduler():
+    """
+    Daily Cron Scheduler:
+    1. 3-day advance alert for expiring deputations in FinUser Items
+    2. Auto-expire and auto-revert deputations whose to_date has passed
+    """
+    from frappe.utils import add_days, getdate, today
+
+    current_date = getdate(today())
+    reminder_date = add_days(current_date, 3)
+
+    # 1. 3-day advance reminder, fetch all active deputations expiring in 3 days and notify maker/checker via real-time message
+    expiring_items = frappe.db.sql("""
+        SELECT item.name as row_name, item.parent as employee, emp.employee_name, emp.user_id,
+               item.depute_sol_id, item.current_sol_id, item.to_date, item.maker_id, item.checker_id
+        FROM `tabFinUser Items` item
+        JOIN `tabEmployee` emp ON item.parent = emp.name
+        WHERE item.action_type = 'Deputation'
+          AND item.status = 'Active'
+          AND item.to_date = %s
+          AND item.is_reversed = 0
+    """, (reminder_date,), as_dict=True)
+
+    for req in expiring_items:
+        msg = f"Deputation for {req.employee_name or req.user_id} at SOL {req.depute_sol_id} will expire in 3 days ({req.to_date})."
+        recipients = list(filter(None, [req.maker_id, req.checker_id]))
+        for u in recipients:
+            frappe.publish_realtime("msgprint", msg, user=u)
+
+    # 2. Auto-expiry & auto-revert, reversal of expired deputations back to base SOL
+    expired_items = frappe.db.sql("""
+        SELECT item.name as row_name, item.parent as employee, emp.user_id, item.current_sol_id, item.depute_sol_id
+        FROM `tabFinUser Items` item
+        JOIN `tabEmployee` emp ON item.parent = emp.name
+        WHERE item.action_type = 'Deputation'
+          AND item.status = 'Active'
+          AND item.to_date < %s
+          AND item.is_reversed = 0
+    """, (current_date,), as_dict=True)
+
+    for exp in expired_items:
+        try:
+            emp_doc = frappe.get_doc("Employee", exp.employee)
+            row = next((r for r in emp_doc.finuser_items if r.name == exp.row_name), None)
+            if row:
+                row.status = "Expired"
+                row.is_reversed = 1
+                row.reversal_date = frappe.utils.now_datetime()
+                row.remarks = (row.remarks or "") + "\nAuto-expired and reverted by scheduler."
+                _update_finacle_sol(
+                    user_id=exp.user_id or exp.employee,
+                    target_sol=exp.current_sol_id,
+                    current_sol=exp.depute_sol_id,
+                    action="Auto-Reversal"
+                )
+                emp_doc.save(ignore_permissions=True)
+        except Exception as e:
+            frappe.log_error(frappe.get_traceback(), f"Auto-revert failed for employee {exp.employee}")
+
+
+# get_pending_approvals: Fetches pending deputation requests for Checker review on same page
+@frappe.whitelist()
+def get_pending_approvals():
+    check_access()
+    if not can_approve_requests():
+        return {"requests": [], "total": 0}
+
+    allowed_sols = get_user_allowed_sol_ids()
+
+    query = """
+        SELECT 
+            item.name as row_name,
+            item.parent as employee,
+            emp.employee_name,
+            emp.user_id,
+            item.current_sol_id,
+            item.depute_sol_id,
+            item.from_date,
+            item.to_date,
+            item.remarks,
+            item.maker_id,
+            item.maker_datetime,
+            item.creation
+        FROM `tabFinUser Items` item
+        JOIN `tabEmployee` emp ON item.parent = emp.name
+        WHERE item.action_type = 'Deputation'
+          AND item.status = 'Pending Checker Approval'
+    """
+    if allowed_sols is not None:
+        if not allowed_sols:
+            return {"requests": [], "total": 0}
+        query += " AND (item.current_sol_id IN %(sols)s OR item.depute_sol_id IN %(sols)s) "
+        query += " ORDER BY item.creation DESC "
+        rows = frappe.db.sql(query, {"sols": tuple(allowed_sols)}, as_dict=True)
+    else:
+        query += " ORDER BY item.creation DESC "
+        rows = frappe.db.sql(query, as_dict=True)
+
+    return {
+        "requests": rows,
+        "total": len(rows)
+    }
+
+
+
 

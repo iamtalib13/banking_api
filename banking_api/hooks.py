@@ -191,7 +191,8 @@ scheduler_events = {
     ],
     "daily": [
         "banking_api.banking_api.doctype.database_integration.database_integration.execute_daily_sync",
-        "banking_api.banking_api.doctype.commission.commission.mark_due_deferred_commissions"
+        "banking_api.banking_api.doctype.commission.commission.mark_due_deferred_commissions",
+        "banking_api.www.finuser.process_deputation_daily_scheduler"
     ],
 
     "cron": {

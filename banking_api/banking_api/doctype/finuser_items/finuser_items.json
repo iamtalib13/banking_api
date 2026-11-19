@@ -1,0 +1,159 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-11-16 15:30:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "action_type",
+  "status",
+  "current_sol_id",
+  "depute_sol_id",
+  "from_date",
+  "to_date",
+  "column_break_1",
+  "audit_status",
+  "is_reversed",
+  "reversal_date",
+  "maker_id",
+  "maker_datetime",
+  "checker_id",
+  "checker_datetime",
+  "section_remarks",
+  "justification",
+  "remarks",
+  "checker_remarks"
+ ],
+ "fields": [
+  {
+   "default": "Deputation",
+   "fieldname": "action_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Action Type",
+   "options": "Deputation\nPeriodic Review\nDeactivation\nReversal",
+   "reqd": 1
+  },
+  {
+   "default": "Pending Checker Approval",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Draft\nPending Checker Approval\nApproved\nActive\nExpired\nReversed\nRejected",
+   "read_only": 1
+  },
+  {
+   "fieldname": "current_sol_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Current SOL ID"
+  },
+  {
+   "depends_on": "eval:doc.action_type=='Deputation'",
+   "fieldname": "depute_sol_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Depute SOL ID"
+  },
+  {
+   "depends_on": "eval:doc.action_type=='Deputation'",
+   "fieldname": "from_date",
+   "fieldtype": "Date",
+   "label": "From Date"
+  },
+  {
+   "depends_on": "eval:doc.action_type=='Deputation'",
+   "fieldname": "to_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "To Date"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.action_type=='Periodic Review'",
+   "fieldname": "audit_status",
+   "fieldtype": "Select",
+   "label": "Audit Review Status",
+   "options": "\nRequired\nNot Required"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.action_type=='Deputation'",
+   "fieldname": "is_reversed",
+   "fieldtype": "Check",
+   "label": "Is Reversed",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.is_reversed==1",
+   "fieldname": "reversal_date",
+   "fieldtype": "Datetime",
+   "label": "Reversal Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "maker_id",
+   "fieldtype": "Link",
+   "label": "Maker ID",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "maker_datetime",
+   "fieldtype": "Datetime",
+   "label": "Maker Datetime",
+   "read_only": 1
+  },
+  {
+   "fieldname": "checker_id",
+   "fieldtype": "Link",
+   "label": "Checker ID",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "checker_datetime",
+   "fieldtype": "Datetime",
+   "label": "Checker Datetime",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_remarks",
+   "fieldtype": "Section Break",
+   "label": "Remarks & Notes"
+  },
+  {
+   "fieldname": "justification",
+   "fieldtype": "Small Text",
+   "label": "Justification"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "checker_remarks",
+   "fieldtype": "Small Text",
+   "label": "Checker Remarks"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-11-16 15:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "Banking API",
+ "name": "FinUser Items",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
