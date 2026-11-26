@@ -7,7 +7,7 @@ import psycopg2
 import psycopg2.extras
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import now_datetime, now
+from frappe.utils import now_datetime, now, getdate
 import random
 from datetime import datetime
 import time
@@ -177,6 +177,263 @@ def get_share_application_query():
     """
 
 
+
+
+def get_share_loan_account_query(cif_id=None):
+    cif_filter = ''
+    if cif_id:
+        cif_filter = f""" AND l.cif_id = '{str(cif_id).strip()}' """
+
+    return """
+        WITH cr_bacid_leg AS (
+            SELECT
+                h.tran_id,
+                h.tran_date,
+                SUM(h.tran_amt) AS cr_bacid_amt
+            FROM tbaadm.htd h
+            INNER JOIN tbaadm.gam g
+                ON h.acid = g.acid
+            WHERE h.pstd_flg = 'Y'
+              AND h.part_tran_type = 'C'
+              AND g.bacid IN ('41001006', '41001001')
+            GROUP BY h.tran_id, h.tran_date
+        ),
+        casa_accounts AS (
+            SELECT
+                cif_id,
+                foracid AS casa_acct_num,
+                schm_type AS casa_schm_type,
+                ROW_NUMBER() OVER (
+                    PARTITION BY cif_id
+                    ORDER BY
+                        CASE WHEN acct_cls_flg = 'N' THEN 1 ELSE 2 END,
+                        CASE WHEN schm_type = 'SBA' THEN 1 ELSE 2 END,
+                        acct_opn_date DESC,
+                        acid DESC
+                ) AS casa_rn
+            FROM tbaadm.gam
+            WHERE schm_type IN ('SBA', 'CAA')
+              AND del_flg = 'N'
+        ),
+        loan_debit_records AS (
+            SELECT
+                g.cif_id,
+                g.foracid,
+                g.bacid,
+                g.acct_name,
+                g.acct_opn_date,
+                g.acct_cls_date,
+                g.sol_id,
+                g.schm_code,
+                g.schm_type,
+                s.schm_desc,
+                lam.dis_amt,
+                lam.rep_perd_mths,
+                lam.rep_perd_days,
+                g.gl_sub_head_code,
+                g.clr_bal_amt,
+                cr.cr_bacid_amt,
+                h.tran_id,
+                h.tran_date,
+                h.part_tran_srl_num,
+                h.part_tran_type,
+                h.tran_particular,
+                h.entry_user_id,
+                h.pstd_user_id,
+                ROW_NUMBER() OVER (
+                    PARTITION BY g.acid
+                    ORDER BY h.tran_date DESC, h.tran_id DESC, h.part_tran_srl_num DESC
+                ) AS rn
+            FROM tbaadm.gam g
+            INNER JOIN tbaadm.htd h
+                ON g.acid = h.acid
+               AND h.pstd_flg = 'Y'
+               AND h.part_tran_type = 'D'
+            INNER JOIN cr_bacid_leg cr
+                ON h.tran_id = cr.tran_id
+               AND h.tran_date = cr.tran_date
+            LEFT JOIN tbaadm.gsp s
+                ON g.schm_code = s.schm_code
+               AND g.schm_type = s.schm_type
+               AND s.del_flg = 'N'
+            LEFT JOIN tbaadm.lam lam
+                ON g.acid = lam.acid
+            WHERE g.schm_type = 'LAA'
+        )
+        SELECT
+            l.cif_id,
+            l.foracid AS loan_acct_num,
+            casa.casa_acct_num,
+            casa.casa_schm_type,
+            l.bacid,
+            l.acct_name,
+            l.acct_opn_date,
+            l.acct_cls_date,
+            l.sol_id,
+            l.schm_code,
+            l.schm_type,
+            l.schm_desc,
+            l.dis_amt,
+            l.rep_perd_mths,
+            l.rep_perd_days,
+            l.gl_sub_head_code,
+            l.clr_bal_amt,
+            l.cr_bacid_amt AS tran_amt,
+            l.tran_id,
+            l.tran_date,
+            l.part_tran_srl_num,
+            l.part_tran_type,
+            l.tran_particular,
+            l.entry_user_id,
+            l.pstd_user_id
+        FROM loan_debit_records l
+        LEFT JOIN casa_accounts casa
+            ON l.cif_id = casa.cif_id
+           AND casa.casa_rn = 1
+        WHERE l.rn = 1
+    {cif_filter};
+    """.format(cif_filter=cif_filter)
+
+
+def calculate_loan_expiry_date(acct_opn_date, rep_perd_mths=0, rep_perd_days=0):
+    if not acct_opn_date:
+        return None
+    try:
+        from dateutil.relativedelta import relativedelta
+        exp_date = getdate(acct_opn_date)
+        mths = cint_safe(rep_perd_mths, 0)
+        days = cint_safe(rep_perd_days, 0)
+        if mths or days:
+            return exp_date + relativedelta(months=mths, days=days)
+        return None
+    except Exception:
+        return None
+
+
+@frappe.whitelist()
+def sync_share_loan_accounts(cif_id=None):
+    conn = None
+    cursor = None
+    created_count = 0
+    updated_count = 0
+    skipped_count = 0
+
+    try:
+        conn = db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        query = get_share_loan_account_query(cif_id=cif_id)
+        cursor.execute(query)
+        rows = cursor.fetchall()
+
+        for row in rows:
+            cif_id = row.get('cif_id')
+            loan_acct_num = str(row.get('loan_acct_num') or '').strip()
+
+            if not cif_id or not loan_acct_num:
+                skipped_count += 1
+                continue
+
+            app_name = frappe.db.get_value('Share Application', {'cif': cif_id}, 'name')
+            if not app_name:
+                skipped_count += 1
+                continue
+
+            app_doc = frappe.get_doc('Share Application', app_name)
+            existing_rows = [
+                child for child in app_doc.loan_accounts
+                if (child.loan_acct_num or '').strip() == loan_acct_num
+            ]
+            # Ensure strictly only 1 row exists per loan account in child table
+            if len(existing_rows) > 1:
+                # Remove duplicate occurrences from child table
+                for duplicate in existing_rows[1:]:
+                    app_doc.remove(duplicate)
+            existing_row = existing_rows[0] if existing_rows else None
+
+            expiry_dt = calculate_loan_expiry_date(
+                row.get('acct_opn_date'),
+                row.get('rep_perd_mths'),
+                row.get('rep_perd_days')
+            )
+
+            current_dt = getdate(now_datetime().date())
+            row_status = 'Active'
+            refund_status = 'Pending'
+            if row.get('acct_cls_date'):
+                row_status = 'Closed'
+                refund_status = 'Eligible'
+            elif expiry_dt and expiry_dt <= current_dt:
+                row_status = 'Expired'
+                refund_status = 'Eligible'
+
+            if existing_row:
+                existing_row.casa_acct_num = row.get('casa_acct_num')
+                existing_row.casa_schm_type = row.get('casa_schm_type')
+                existing_row.acct_name = row.get('acct_name')
+                existing_row.acct_opn_date = row.get('acct_opn_date')
+                existing_row.acct_cls_date = row.get('acct_cls_date')
+                existing_row.schm_code = row.get('schm_code')
+                existing_row.schm_type = row.get('schm_type')
+                existing_row.schm_desc = row.get('schm_desc')
+                existing_row.loan_amount = row.get('dis_amt')
+                existing_row.sol_id = str(row.get('sol_id') or '')
+                existing_row.rep_perd_mths = row.get('rep_perd_mths')
+                existing_row.rep_perd_days = row.get('rep_perd_days')
+                existing_row.expiry_date = expiry_dt
+                existing_row.tran_amt = row.get('tran_amt')
+                existing_row.tran_id = row.get('tran_id')
+                existing_row.tran_date = row.get('tran_date')
+                if existing_row.refund_status not in ['Success', 'In Progress']:
+                    existing_row.status = row_status
+                    existing_row.refund_status = refund_status
+                updated_count += 1
+            else:
+                app_doc.append('loan_accounts', {
+                    'loan_acct_num': loan_acct_num,
+                    'casa_acct_num': row.get('casa_acct_num'),
+                    'casa_schm_type': row.get('casa_schm_type'),
+                    'acct_name': row.get('acct_name'),
+                    'acct_opn_date': row.get('acct_opn_date'),
+                    'acct_cls_date': row.get('acct_cls_date'),
+                    'schm_code': row.get('schm_code'),
+                    'schm_type': row.get('schm_type'),
+                    'schm_desc': row.get('schm_desc'),
+                    'loan_amount': row.get('dis_amt'),
+                    'sol_id': str(row.get('sol_id') or ''),
+                    'rep_perd_mths': row.get('rep_perd_mths'),
+                    'rep_perd_days': row.get('rep_perd_days'),
+                    'expiry_date': expiry_dt,
+                    'tran_amt': row.get('tran_amt'),
+                    'tran_id': row.get('tran_id'),
+                    'tran_date': row.get('tran_date'),
+                    'status': row_status,
+                    'refund_status': refund_status
+                })
+                created_count += 1
+
+            app_doc.save(ignore_permissions=True)
+            frappe.db.commit()
+
+        return {
+            'status': 'success',
+            'created_count': created_count,
+            'updated_count': updated_count,
+            'skipped_count': skipped_count,
+            'message': f'Share Loan Accounts sync done. Created: {created_count}, Updated: {updated_count}, Skipped: {skipped_count}'
+        }
+
+    except Exception:
+        frappe.db.rollback()
+        frappe.log_error(frappe.get_traceback(), 'Share Loan Account Sync Failed')
+        raise
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
 def run_share_application_sync():
     settings = frappe.get_single("Share Application Settings")
 
@@ -283,6 +540,12 @@ def run_share_application_sync():
             now()
         )
         frappe.db.commit()
+
+        # Auto sync loan accounts for all CIFs
+        try:
+            sync_share_loan_accounts()
+        except Exception:
+            frappe.log_error(frappe.get_traceback(), "Auto Sync Share Loan Accounts in Sync Failed")
 
         return {
             "status": "success",
@@ -1195,3 +1458,328 @@ def get_share_certificate_image():
         "status": "success",
         "image_url": image
     }
+
+
+
+@frappe.whitelist()
+def daily_check_loan_accounts_status():
+    """
+    Daily job: Finacle se sabhi pending loan accounts ka latest acct_cls_date check karta hai.
+    Strict rule: Jab tak acct_cls_date nahi aati tab tak refund_status 'Pending' rahega.
+    Jab Finacle me acct_cls_date aa jayegi tabhi status='Closed' aur refund_status='Eligible' hoga.
+    """
+    conn = None
+    cursor = None
+    updated_count = 0
+
+    try:
+        conn = db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        # Get all child loan accounts where refund_status != 'Success'
+        pending_loans = frappe.get_all(
+            "Share Loan Account",
+            filters={"refund_status": ["!=", "Success"]},
+            fields=["name", "parent", "loan_acct_num", "refund_status", "expiry_date", "acct_cls_date"]
+        )
+
+        if not pending_loans:
+            return {"status": "skipped", "message": "No pending loan accounts to check."}
+
+        loan_nums = [d.loan_acct_num.strip() for d in pending_loans if d.loan_acct_num]
+        if not loan_nums:
+            return {"status": "skipped", "message": "No valid loan account numbers."}
+
+        # Batch query Finacle for latest acct_cls_date & acct_cls_flg
+        batch_size = 500
+        finacle_status_map = {}
+        for i in range(0, len(loan_nums), batch_size):
+            batch = loan_nums[i:i + batch_size]
+            formatted_accs = ",".join(f"'{acc}'" for acc in batch)
+            query = f"""
+                SELECT foracid, acct_cls_date, acct_cls_flg
+                FROM tbaadm.gam
+                WHERE foracid IN ({formatted_accs})
+            """
+            cursor.execute(query)
+            for r in cursor.fetchall():
+                finacle_status_map[str(r['foracid']).strip()] = r
+
+        current_dt = getdate(now_datetime().date())
+
+        for loan in pending_loans:
+            foracid = (loan.loan_acct_num or '').strip()
+            fin_info = finacle_status_map.get(foracid)
+            if not fin_info:
+                continue
+
+            cls_date = fin_info.get('acct_cls_date')
+            updates = {}
+
+            if cls_date:
+                updates['acct_cls_date'] = cls_date
+                updates['status'] = 'Closed'
+                if loan.refund_status != 'Success':
+                    updates['refund_status'] = 'Eligible'
+            else:
+                # Jab tak acct_cls_date nahi aati tab tak refund ka sochna bhi nahi (Pending strictly)
+                if loan.expiry_date and getdate(loan.expiry_date) <= current_dt:
+                    updates['status'] = 'Expired'
+                else:
+                    updates['status'] = 'Active'
+                if loan.refund_status not in ['Success']:
+                    updates['refund_status'] = 'Pending'
+
+            if updates:
+                frappe.db.set_value("Share Loan Account", loan.name, updates)
+                updated_count += 1
+
+        frappe.db.commit()
+        return {
+            "status": "success",
+            "updated_count": updated_count,
+            "message": f"Daily check completed. {updated_count} accounts checked & updated."
+        }
+
+    except Exception:
+        frappe.db.rollback()
+        frappe.log_error(frappe.get_traceback(), "Daily Check Loan Status Failed")
+        raise
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+def get_daily_incremental_loan_account_query():
+    return """
+        WITH cr_bacid_leg AS (
+            SELECT
+                h.tran_id,
+                h.tran_date,
+                SUM(h.tran_amt) AS cr_bacid_amt
+            FROM tbaadm.htd h
+            INNER JOIN tbaadm.gam g
+                ON h.acid = g.acid
+            WHERE h.pstd_flg = 'Y'
+              AND h.part_tran_type = 'C'
+              AND g.bacid IN ('41001006', '41001001')
+              AND h.tran_date >= CURRENT_DATE - INTERVAL '3 days'
+            GROUP BY h.tran_id, h.tran_date
+        ),
+        casa_accounts AS (
+            SELECT
+                cif_id,
+                foracid AS casa_acct_num,
+                schm_type AS casa_schm_type,
+                ROW_NUMBER() OVER (
+                    PARTITION BY cif_id
+                    ORDER BY
+                        CASE WHEN acct_cls_flg = 'N' THEN 1 ELSE 2 END,
+                        CASE WHEN schm_type = 'SBA' THEN 1 ELSE 2 END,
+                        acct_opn_date DESC,
+                        acid DESC
+                ) AS casa_rn
+            FROM tbaadm.gam
+            WHERE schm_type IN ('SBA', 'CAA')
+              AND del_flg = 'N'
+        ),
+        loan_debit_records AS (
+            SELECT
+                g.cif_id,
+                g.foracid,
+                g.bacid,
+                g.acct_name,
+                g.acct_opn_date,
+                g.acct_cls_date,
+                g.sol_id,
+                g.schm_code,
+                g.schm_type,
+                s.schm_desc,
+                lam.dis_amt,
+                lam.rep_perd_mths,
+                lam.rep_perd_days,
+                g.gl_sub_head_code,
+                g.clr_bal_amt,
+                cr.cr_bacid_amt,
+                h.tran_id,
+                h.tran_date,
+                h.part_tran_srl_num,
+                h.part_tran_type,
+                h.tran_particular,
+                h.entry_user_id,
+                h.pstd_user_id,
+                ROW_NUMBER() OVER (
+                    PARTITION BY g.acid
+                    ORDER BY h.tran_date DESC, h.tran_id DESC, h.part_tran_srl_num DESC
+                ) AS rn
+            FROM tbaadm.gam g
+            INNER JOIN tbaadm.htd h
+                ON g.acid = h.acid
+               AND h.pstd_flg = 'Y'
+               AND h.part_tran_type = 'D'
+               AND h.tran_date >= CURRENT_DATE - INTERVAL '3 days'
+            INNER JOIN cr_bacid_leg cr
+                ON h.tran_id = cr.tran_id
+               AND h.tran_date = cr.tran_date
+            LEFT JOIN tbaadm.gsp s
+                ON g.schm_code = s.schm_code
+               AND g.schm_type = s.schm_type
+               AND s.del_flg = 'N'
+            LEFT JOIN tbaadm.lam lam
+                ON g.acid = lam.acid
+            WHERE g.schm_type = 'LAA'
+        )
+        SELECT
+            l.cif_id,
+            l.foracid AS loan_acct_num,
+            casa.casa_acct_num,
+            casa.casa_schm_type,
+            l.bacid,
+            l.acct_name,
+            l.acct_opn_date,
+            l.acct_cls_date,
+            l.sol_id,
+            l.schm_code,
+            l.schm_type,
+            l.schm_desc,
+            l.dis_amt,
+            l.rep_perd_mths,
+            l.rep_perd_days,
+            l.gl_sub_head_code,
+            l.clr_bal_amt,
+            l.cr_bacid_amt AS tran_amt,
+            l.tran_id,
+            l.tran_date,
+            l.part_tran_srl_num,
+            l.part_tran_type,
+            l.tran_particular,
+            l.entry_user_id,
+            l.pstd_user_id
+        FROM loan_debit_records l
+        LEFT JOIN casa_accounts casa
+            ON l.cif_id = casa.cif_id
+           AND casa.casa_rn = 1
+        WHERE l.rn = 1;
+    """
+
+
+@frappe.whitelist()
+def daily_sync_new_loan_accounts():
+    """
+    Daily job: Roz sirf naye bane 100-200 loan accounts ko Finacle se fetch karke child table me add/update karta hai.
+    Fast execution with date index filter.
+    """
+    conn = None
+    cursor = None
+    created_count = 0
+    updated_count = 0
+
+    try:
+        conn = db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        query = get_daily_incremental_loan_account_query()
+        cursor.execute(query)
+        rows = cursor.fetchall()
+
+        current_dt = getdate(now_datetime().date())
+
+        for row in rows:
+            cif_id = row.get('cif_id')
+            loan_acct_num = str(row.get('loan_acct_num') or '').strip()
+
+            if not cif_id or not loan_acct_num:
+                continue
+
+            app_name = frappe.db.get_value('Share Application', {'cif': cif_id}, 'name')
+            if not app_name:
+                continue
+
+            app_doc = frappe.get_doc('Share Application', app_name)
+            existing_rows = [
+                child for child in app_doc.loan_accounts
+                if (child.loan_acct_num or '').strip() == loan_acct_num
+            ]
+
+            expiry_dt = calculate_loan_expiry_date(
+                row.get('acct_opn_date'),
+                row.get('rep_perd_mths'),
+                row.get('rep_perd_days')
+            )
+
+            row_status = 'Active'
+            refund_status = 'Pending'
+            if row.get('acct_cls_date'):
+                row_status = 'Closed'
+                refund_status = 'Eligible'
+            elif expiry_dt and expiry_dt <= current_dt:
+                row_status = 'Expired'
+                refund_status = 'Pending'
+
+            if existing_rows:
+                existing_row = existing_rows[0]
+                existing_row.casa_acct_num = row.get('casa_acct_num')
+                existing_row.casa_schm_type = row.get('casa_schm_type')
+                existing_row.acct_name = row.get('acct_name')
+                existing_row.acct_opn_date = row.get('acct_opn_date')
+                existing_row.acct_cls_date = row.get('acct_cls_date')
+                existing_row.schm_code = row.get('schm_code')
+                existing_row.schm_type = row.get('schm_type')
+                existing_row.schm_desc = row.get('schm_desc')
+                existing_row.loan_amount = row.get('dis_amt')
+                existing_row.sol_id = str(row.get('sol_id') or '')
+                existing_row.rep_perd_mths = row.get('rep_perd_mths')
+                existing_row.rep_perd_days = row.get('rep_perd_days')
+                existing_row.expiry_date = expiry_dt
+                existing_row.tran_amt = row.get('tran_amt')
+                existing_row.tran_id = row.get('tran_id')
+                existing_row.tran_date = row.get('tran_date')
+                if existing_row.refund_status not in ['Success', 'In Progress']:
+                    existing_row.status = row_status
+                    existing_row.refund_status = refund_status
+                updated_count += 1
+            else:
+                app_doc.append('loan_accounts', {
+                    'loan_acct_num': loan_acct_num,
+                    'casa_acct_num': row.get('casa_acct_num'),
+                    'casa_schm_type': row.get('casa_schm_type'),
+                    'acct_name': row.get('acct_name'),
+                    'acct_opn_date': row.get('acct_opn_date'),
+                    'acct_cls_date': row.get('acct_cls_date'),
+                    'schm_code': row.get('schm_code'),
+                    'schm_type': row.get('schm_type'),
+                    'schm_desc': row.get('schm_desc'),
+                    'loan_amount': row.get('dis_amt'),
+                    'sol_id': str(row.get('sol_id') or ''),
+                    'rep_perd_mths': row.get('rep_perd_mths'),
+                    'rep_perd_days': row.get('rep_perd_days'),
+                    'expiry_date': expiry_dt,
+                    'tran_amt': row.get('tran_amt'),
+                    'tran_id': row.get('tran_id'),
+                    'tran_date': row.get('tran_date'),
+                    'status': row_status,
+                    'refund_status': refund_status
+                })
+                created_count += 1
+
+            app_doc.save(ignore_permissions=True)
+            frappe.db.commit()
+
+        return {
+            'status': 'success',
+            'created_count': created_count,
+            'updated_count': updated_count,
+            'message': f'Daily loan sync completed. Created: {created_count}, Updated: {updated_count}'
+        }
+
+    except Exception:
+        frappe.db.rollback()
+        frappe.log_error(frappe.get_traceback(), 'Daily Loan Sync Failed')
+        raise
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()

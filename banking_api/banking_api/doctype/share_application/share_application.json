@@ -32,7 +32,10 @@
   "column_break_ysjv",
   "address",
   "scheme_code",
-  "amount"
+  "amount",
+  "loan_accounts_section",
+  "column_break_zaqf",
+  "loan_accounts"
  ],
  "fields": [
   {
@@ -220,13 +223,30 @@
    "fieldname": "branch",
    "fieldtype": "Data",
    "label": "Branch"
+  },
+  {
+   "fieldname": "loan_accounts_section",
+   "fieldtype": "Section Break",
+   "label": "Loan Accounts & Share Expiry"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "loan_accounts",
+   "fieldtype": "Table",
+   "label": "Loan Accounts",
+   "options": "Share Loan Account"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "column_break_zaqf",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-08-18 12:11:36.155891",
+ "modified": "2026-11-26 15:46:02.677964",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Share Application",

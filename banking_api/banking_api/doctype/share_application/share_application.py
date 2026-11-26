@@ -191,6 +191,34 @@ class ShareApplication(Document):
                 frappe.throw(
                     _("Transaction ID is mandatory before submission."))
 
+        self.prevent_deleting_success_loan_accounts()
+
+    def before_update_after_submit(self):
+        self.prevent_deleting_success_loan_accounts()
+
+    def prevent_deleting_success_loan_accounts(self):
+        if self.is_new():
+            return
+        existing_success = frappe.get_all(
+            "Share Loan Account",
+            filters={
+                "parent": self.name,
+                "parenttype": "Share Application",
+                "refund_status": "Success",
+            },
+            pluck="name",
+        )
+        if not existing_success:
+            return
+        current_names = {row.name for row in (self.get("loan_accounts") or []) if row.name}
+        deleted = [name for name in existing_success if name not in current_names]
+        if deleted:
+            frappe.throw(
+                _("Cannot delete Loan Account row(s) with Refund Status 'Success': {0}").format(
+                    ", ".join(deleted)
+                )
+            )
+
 #########################################################################################
 
 

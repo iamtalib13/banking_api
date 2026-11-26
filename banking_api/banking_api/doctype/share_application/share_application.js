@@ -1,4 +1,11 @@
 frappe.ui.form.on("Share Application", {
+	before_loan_accounts_remove(frm, cdt, cdn) {
+		const row = locals[cdt] && locals[cdt][cdn];
+		if (row && row.refund_status === "Success") {
+			frappe.throw(__("Cannot delete a Loan Account row with Refund Status 'Success'."));
+		}
+	},
+
 	// refresh(frm) {
 	// 	if (frm.is_new()) return;
 
@@ -47,6 +54,7 @@ frappe.ui.form.on("Share Application", {
 
 	refresh(frm) {
 		if (frm.is_new()) return;
+		lock_success_loan_account_rows(frm);
 
 		if (frm.doc.docstatus === 1) {
 			setTimeout(() => {
@@ -67,6 +75,29 @@ frappe.ui.form.on("Share Application", {
 			});
 
 			frm.change_custom_button_type(__("Print Share Certificate"), null, "primary");
+		}
+
+		if (frm.doc.cif) {
+			frm.add_custom_button(__("Sync Loan Accounts"), function () {
+				frappe.call({
+					method: "banking_api.banking_api.doctype.share_application_settings.share_application_settings.sync_share_loan_accounts",
+					args: {
+						cif_id: frm.doc.cif
+					},
+					freeze: true,
+					freeze_message: __("Syncing Loan Accounts from Finacle..."),
+					callback: function (r) {
+						if (r.message) {
+							frappe.msgprint({
+								title: __("Sync Result"),
+								message: r.message.message || __("Sync completed."),
+								indicator: r.message.status === "success" ? "green" : "red"
+							});
+						}
+						frm.reload_doc();
+					}
+				});
+			});
 		}
 
 		const can_pay = frm.doc.docstatus === 0 && frm.doc.payment_status !== "Success";
@@ -441,4 +472,45 @@ function download_share_certificate_pdf(frm) {
 		console.error(err);
 		frappe.msgprint(__("Could not load PDF libraries."));
 	});
+}
+
+frappe.ui.form.on("Share Loan Account", {
+	form_render(frm, cdt, cdn) {
+		apply_loan_account_row_lock(frm, cdn);
+	},
+	refund_status(frm, cdt, cdn) {
+		apply_loan_account_row_lock(frm, cdn);
+	}
+});
+
+function lock_success_loan_account_rows(frm) {
+	const grid = frm.fields_dict.loan_accounts && frm.fields_dict.loan_accounts.grid;
+	if (!grid || !grid.grid_rows) return;
+
+	grid.grid_rows.forEach((grid_row) => {
+		if (grid_row.doc && grid_row.doc.refund_status === "Success") {
+			apply_loan_account_row_lock(frm, grid_row.doc.name);
+		}
+	});
+}
+
+function apply_loan_account_row_lock(frm, cdn) {
+	const grid = frm.fields_dict.loan_accounts && frm.fields_dict.loan_accounts.grid;
+	const grid_row = grid && grid.grid_rows_by_docname && grid.grid_rows_by_docname[cdn];
+	if (!grid_row || !grid_row.doc) return;
+
+	const is_success = grid_row.doc.refund_status === "Success";
+	if (is_success) {
+		grid_row.toggle_editable_row = () => false;
+	}
+	if (grid_row.row) {
+		grid_row.row.find(".grid-row-check").prop("disabled", is_success).toggle(!is_success);
+	}
+
+	if (grid_row.grid_form) {
+		Object.keys(grid_row.grid_form.fields_dict || {}).forEach((fieldname) => {
+			grid_row.toggle_editable(fieldname, !is_success);
+		});
+		grid_row.grid_form.wrapper.find(".grid-delete-row").toggle(!is_success);
+	}
 }

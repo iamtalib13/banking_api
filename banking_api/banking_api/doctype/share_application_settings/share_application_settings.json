@@ -1,6 +1,5 @@
 {
  "actions": [],
- "allow_rename": 1,
  "creation": "2026-05-25 11:55:59.698822",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -34,7 +33,9 @@
   "proceeding_form_configuration",
   "chairman_signature",
   "column_break_xhzx",
-  "ceo_signature"
+  "ceo_signature",
+  "loan_gl_settings_section",
+  "loan_share_account_gl"
  ],
  "fields": [
   {
@@ -176,6 +177,7 @@
    "label": "Share Certificate Image"
   },
   {
+   "collapsible": 1,
    "fieldname": "proceeding_form_configuration",
    "fieldtype": "Section Break",
    "label": "Proceeding Form Configuration"
@@ -193,13 +195,25 @@
   {
    "fieldname": "column_break_xhzx",
    "fieldtype": "Column Break"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "loan_gl_settings_section",
+   "fieldtype": "Section Break",
+   "label": "Loan GL Settings"
+  },
+  {
+   "description": "Last 11 Digit of Branch Loan GL",
+   "fieldname": "loan_share_account_gl",
+   "fieldtype": "Data",
+   "label": "Loan Share Account GL"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-28 17:48:09.166235",
+ "modified": "2026-11-25 16:55:18.654742",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Share Application Settings",

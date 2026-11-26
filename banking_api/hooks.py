@@ -191,7 +191,9 @@ scheduler_events = {
     ],
     "daily": [
         "banking_api.banking_api.doctype.database_integration.database_integration.execute_daily_sync",
-        "banking_api.banking_api.doctype.commission.commission.mark_due_deferred_commissions"
+        "banking_api.banking_api.doctype.commission.commission.mark_due_deferred_commissions",
+        "banking_api.banking_api.doctype.share_application_settings.share_application_settings.daily_sync_new_loan_accounts",
+        "banking_api.banking_api.doctype.share_application_settings.share_application_settings.daily_check_loan_accounts_status"
     ],
 
     "cron": {

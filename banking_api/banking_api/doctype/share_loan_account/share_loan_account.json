@@ -1,0 +1,169 @@
+{
+ "actions": [],
+ "creation": "2026-11-13 11:20:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "loan_acct_num",
+  "casa_acct_num",
+  "casa_schm_type",
+  "acct_name",
+  "schm_code",
+  "schm_type",
+  "schm_desc",
+  "loan_amount",
+  "sol_id",
+  "column_break_1",
+  "acct_opn_date",
+  "acct_cls_date",
+  "rep_perd_mths",
+  "rep_perd_days",
+  "expiry_date",
+  "tran_amt",
+  "tran_id",
+  "tran_date",
+  "refund_status",
+  "refund_date",
+  "refund_transaction_id",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "loan_acct_num",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Loan Account Number",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "casa_acct_num",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "CASA Account Number"
+  },
+  {
+   "fieldname": "casa_schm_type",
+   "fieldtype": "Data",
+   "label": "CASA Scheme Type"
+  },
+  {
+   "fieldname": "acct_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Account Name"
+  },
+  {
+   "fieldname": "loan_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Loan Amount"
+  },
+  {
+   "fieldname": "schm_code",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Scheme Code"
+  },
+  {
+   "fieldname": "schm_type",
+   "fieldtype": "Data",
+   "label": "Scheme Type"
+  },
+  {
+   "fieldname": "schm_desc",
+   "fieldtype": "Data",
+   "label": "Scheme Description"
+  },
+  {
+   "fieldname": "sol_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "SOL ID"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "acct_opn_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Account Open Date"
+  },
+  {
+   "fieldname": "acct_cls_date",
+   "fieldtype": "Date",
+   "label": "Account Close Date"
+  },
+  {
+   "fieldname": "rep_perd_mths",
+   "fieldtype": "Int",
+   "label": "Repayment Period (Months)"
+  },
+  {
+   "fieldname": "rep_perd_days",
+   "fieldtype": "Int",
+   "label": "Repayment Period (Days)"
+  },
+  {
+   "fieldname": "expiry_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Expiry Date"
+  },
+  {
+   "fieldname": "tran_amt",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Transaction Amount"
+  },
+  {
+   "fieldname": "tran_id",
+   "fieldtype": "Data",
+   "label": "Tran ID"
+  },
+  {
+   "fieldname": "tran_date",
+   "fieldtype": "Date",
+   "label": "Tran Date"
+  },
+  {
+   "default": "Pending",
+   "fieldname": "refund_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Refund Status",
+   "options": "Pending\nEligible\nIn Progress\nSuccess\nFailed"
+  },
+  {
+   "fieldname": "refund_date",
+   "fieldtype": "Date",
+   "label": "Refund Date"
+  },
+  {
+   "fieldname": "refund_transaction_id",
+   "fieldtype": "Data",
+   "label": "Refund Transaction ID"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-11-13 12:00:05.137746",
+ "modified_by": "Administrator",
+ "module": "Banking Api",
+ "name": "Share Loan Account",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
