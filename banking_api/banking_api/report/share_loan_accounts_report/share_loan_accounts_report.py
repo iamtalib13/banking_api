@@ -5,6 +5,9 @@ from frappe.utils import flt
 
 def execute(filters=None):
 	filters = filters or {}
+	if frappe.session.user != "Administrator" and "Share User" not in frappe.get_roles():
+		frappe.throw(_("Only users with the 'Share User' role can access this report."), frappe.PermissionError)
+
 	columns = get_columns()
 	data = get_data(filters)
 	report_summary = get_report_summary(data)
@@ -59,6 +62,14 @@ def get_columns():
 def get_data(filters):
 	conditions = ["sla.parenttype = 'Share Application'", "sla.parentfield = 'loan_accounts'"]
 	values = {}
+
+	if frappe.session.user != "Administrator":
+		emp_sol = frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "sahayog_branch")
+		emp_sol = str(emp_sol or "").strip()
+		if not emp_sol:
+			return []
+		conditions.append("sla.sol_id = %(emp_sol_id)s")
+		values["emp_sol_id"] = emp_sol
 
 	if filters.get("share_application"):
 		conditions.append("sla.parent = %(share_application)s")

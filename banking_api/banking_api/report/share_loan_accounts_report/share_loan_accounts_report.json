@@ -2,17 +2,19 @@
  "add_total_row": 1,
  "add_translate_data": 0,
  "columns": [],
- "creation": "2026-11-25 16:19:30.000000",
+ "creation": "2026-11-25 16:19:44.871225",
+ "disable_prepared_report_automation": 0,
  "disabled": 0,
  "docstatus": 0,
  "doctype": "Report",
+ "doctype_to_sync": [],
  "filters": [],
  "idx": 0,
  "is_standard": "Yes",
  "letter_head": null,
- "modified": "2026-11-25 16:19:30.000000",
+ "modified": "2026-11-27 15:46:38.575657",
  "modified_by": "Administrator",
- "module": "Banking API",
+ "module": "Banking Api",
  "name": "Share Loan Accounts Report",
  "owner": "Administrator",
  "prepared_report": 0,
@@ -21,8 +23,9 @@
  "report_type": "Script Report",
  "roles": [
   {
-   "role": "System Manager"
+   "role": "Share User"
   }
  ],
+ "snapshot_report": 0,
  "timeout": 0
 }

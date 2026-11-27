@@ -187,6 +187,24 @@ def sync_share_application_by_cif(cif_id):
 			conn.close()
 
 
+def _validate_share_user_sol_access(sol_id):
+	"""Restrict Share User API actions to their own Employee sahayog_branch (SOL ID)."""
+	if frappe.session.user == "Administrator":
+		return
+	if "Share User" not in frappe.get_roles():
+		frappe.throw(_("Only users with the 'Share User' role can perform this action."), frappe.PermissionError)
+	emp_sol = str(
+		frappe.db.get_value("Employee", {"user_id": frappe.session.user}, "sahayog_branch") or ""
+	).strip()
+	if not emp_sol or emp_sol != str(sol_id or "").strip():
+		frappe.throw(
+			_("You are only permitted to access Loan Accounts for your branch ({0}).").format(
+				emp_sol or _("Not Set")
+			),
+			frappe.PermissionError,
+		)
+
+
 @frappe.whitelist()
 def get_loan_refund_preview(share_application, loan_acct_num):
 	"""Return Debit & Credit preview details for a Share Loan Account refund."""
@@ -211,6 +229,8 @@ def get_loan_refund_preview(share_application, loan_acct_num):
 	)
 	if not row:
 		frappe.throw(_("Loan Account {0} not found under Share Application {1}.").format(loan_acct_num, share_application))
+
+	_validate_share_user_sol_access(row.sol_id)
 
 	loan_share_gl = str(frappe.db.get_single_value("Share Application Settings", "loan_share_account_gl") or "").strip()
 	sol_id = str(row.sol_id or "").strip()
@@ -286,6 +306,7 @@ def execute_loan_refund_transfer(share_application, loan_acct_num):
 		frappe.throw(_("Loan Account {0} not found under Share Application {1}.").format(loan_acct_num, share_application))
 
 	row = rows[0]
+	_validate_share_user_sol_access(row.sol_id)
 	if row.refund_status != "Eligible":
 		return {
 			"status": "error",
