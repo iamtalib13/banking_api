@@ -87,6 +87,32 @@ def _get_single_cif_priority_query():
 	"""
 
 
+def ensure_share_application_for_cif(cif_id, cursor):
+	"""Return existing Share Application name for CIF, or create one from Finacle if missing."""
+	existing = frappe.db.get_value("Share Application", {"cif": cif_id}, "name")
+	if existing:
+		return existing
+
+	cursor.execute(_get_single_cif_priority_query(), {"cif_id": cif_id})
+	row = cursor.fetchone()
+	if not row:
+		return None
+
+	doc = frappe.new_doc("Share Application")
+	doc.cif = row.get("cif_id")
+	doc.account_number = row.get("account_no")
+	doc.sol_id = row.get("sol_id")
+	doc.cif_creation_date = row.get("cif_opening_date")
+	doc.status = "Pending"
+	doc.customer_name = row.get("customer_name") or row.get("acct_name") or ""
+	doc.address = row.get("address") or ""
+	doc.scheme_code = row.get("schm_code") or ""
+	doc.scheme_type = row.get("schm_type") or ""
+	doc.account_opening_date = row.get("acct_opn_date")
+	doc.insert(ignore_permissions=True)
+	return doc.name
+
+
 @frappe.whitelist()
 def sync_share_application_by_cif(cif_id):
 	"""Sync a single CIF into Share Application using priority account query and fetch its loan accounts."""

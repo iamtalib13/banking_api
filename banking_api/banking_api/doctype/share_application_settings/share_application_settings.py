@@ -1690,6 +1690,9 @@ def daily_sync_new_loan_accounts():
 
             app_name = frappe.db.get_value('Share Application', {'cif': cif_id}, 'name')
             if not app_name:
+                from banking_api.api.share_application_sync import ensure_share_application_for_cif
+                app_name = ensure_share_application_for_cif(cif_id, cursor)
+            if not app_name:
                 continue
 
             app_doc = frappe.get_doc('Share Application', app_name)
