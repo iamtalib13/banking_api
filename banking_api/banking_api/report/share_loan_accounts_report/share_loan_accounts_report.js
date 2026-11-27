@@ -152,7 +152,7 @@ function open_report_row_actions(ev, row_key) {
 	const items = [
 		`<a class="dropdown-item" href="#" data-action="print"><i class="fa fa-print mr-2"></i>${__("Print Certificate")}</a>`,
 	];
-	if (row_info.refund_status === "Eligible") {
+	if (["Eligible", "Failed"].includes(row_info.refund_status)) {
 		items.push(
 			`<a class="dropdown-item text-success" href="#" data-action="pay"><i class="fa fa-credit-card mr-2"></i>${__("Pay Now")}</a>`
 		);

@@ -307,7 +307,7 @@ def execute_loan_refund_transfer(share_application, loan_acct_num):
 
 	row = rows[0]
 	_validate_share_user_sol_access(row.sol_id)
-	if row.refund_status != "Eligible":
+	if row.refund_status not in ("Eligible", "Failed"):
 		return {
 			"status": "error",
 			"message": _("Refund cannot be processed because current status is '{0}'.").format(row.refund_status or "Unknown"),
