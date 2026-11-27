@@ -1518,15 +1518,10 @@ def daily_check_loan_accounts_status():
 
             if cls_date:
                 updates['acct_cls_date'] = cls_date
-                updates['status'] = 'Closed'
                 if loan.refund_status != 'Success':
                     updates['refund_status'] = 'Eligible'
             else:
                 # Jab tak acct_cls_date nahi aati tab tak refund ka sochna bhi nahi (Pending strictly)
-                if loan.expiry_date and getdate(loan.expiry_date) <= current_dt:
-                    updates['status'] = 'Expired'
-                else:
-                    updates['status'] = 'Active'
                 if loan.refund_status not in ['Success']:
                     updates['refund_status'] = 'Pending'
 
