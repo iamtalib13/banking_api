@@ -465,10 +465,10 @@ def sync_share_loan_accounts_from_report():
 
 	from banking_api.banking_api.doctype.share_application_settings.share_application_settings import (
 		daily_check_loan_accounts_status,
-		daily_sync_new_loan_accounts,
+		sync_share_loan_accounts,
 	)
 
-	sync_res = daily_sync_new_loan_accounts() or {}
+	sync_res = sync_share_loan_accounts() or {}
 	status_res = daily_check_loan_accounts_status() or {}
 
 	created = sync_res.get("created_count", 0)

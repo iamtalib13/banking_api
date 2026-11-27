@@ -336,6 +336,9 @@ def sync_share_loan_accounts(cif_id=None):
 
             app_name = frappe.db.get_value('Share Application', {'cif': cif_id}, 'name')
             if not app_name:
+                from banking_api.api.share_application_sync import ensure_share_application_for_cif
+                app_name = ensure_share_application_for_cif(cif_id, cursor)
+            if not app_name:
                 skipped_count += 1
                 continue
 
@@ -412,6 +415,7 @@ def sync_share_loan_accounts(cif_id=None):
                 })
                 created_count += 1
 
+            app_doc.flags.ignore_validate_update_after_submit = True
             app_doc.save(ignore_permissions=True)
             frappe.db.commit()
 
@@ -1762,6 +1766,7 @@ def daily_sync_new_loan_accounts():
                 })
                 created_count += 1
 
+            app_doc.flags.ignore_validate_update_after_submit = True
             app_doc.save(ignore_permissions=True)
             frappe.db.commit()
 
