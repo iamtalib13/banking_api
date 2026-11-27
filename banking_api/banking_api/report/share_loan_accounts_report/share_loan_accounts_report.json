@@ -12,7 +12,7 @@
  "idx": 0,
  "is_standard": "Yes",
  "letter_head": null,
- "modified": "2026-11-27 15:53:03.798754",
+ "modified": "2026-11-27 17:30:00.083696",
  "modified_by": "Administrator",
  "module": "Banking Api",
  "name": "Share Loan Accounts Report",
@@ -26,7 +26,7 @@
    "role": "System Manager"
   },
   {
-   "role": "Share User"
+   "role": "Share Admin"
   }
  ],
  "snapshot_report": 0,
