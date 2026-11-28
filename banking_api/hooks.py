@@ -161,7 +161,7 @@ doc_events = {
         "on_trash": "banking_api.www.share_tracker.publish_share_tracker_update"
     },
     "Share Loan Account": {
-        "autoname": "banking_api.api.share_application_sync.autoname_share_loan_account"
+        "autoname": "banking_api.share_api.share_application_sync.autoname_share_loan_account"
     }
 }
 

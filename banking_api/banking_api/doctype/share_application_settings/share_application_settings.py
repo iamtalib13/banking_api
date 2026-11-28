@@ -177,8 +177,6 @@ def get_share_application_query():
     """
 
 
-
-
 def get_share_loan_account_query(cif_id=None):
     cif_filter = ''
     if cif_id:
@@ -334,9 +332,10 @@ def sync_share_loan_accounts(cif_id=None):
                 skipped_count += 1
                 continue
 
-            app_name = frappe.db.get_value('Share Application', {'cif': cif_id}, 'name')
+            app_name = frappe.db.get_value(
+                'Share Application', {'cif': cif_id}, 'name')
             if not app_name:
-                from banking_api.api.share_application_sync import ensure_share_application_for_cif
+                from banking_api.share_api.share_application_sync import ensure_share_application_for_cif
                 app_name = ensure_share_application_for_cif(cif_id, cursor)
             if not app_name:
                 skipped_count += 1
@@ -429,7 +428,8 @@ def sync_share_loan_accounts(cif_id=None):
 
     except Exception:
         frappe.db.rollback()
-        frappe.log_error(frappe.get_traceback(), 'Share Loan Account Sync Failed')
+        frappe.log_error(frappe.get_traceback(),
+                         'Share Loan Account Sync Failed')
         raise
     finally:
         if cursor:
@@ -549,7 +549,8 @@ def run_share_application_sync():
         try:
             sync_share_loan_accounts()
         except Exception:
-            frappe.log_error(frappe.get_traceback(), "Auto Sync Share Loan Accounts in Sync Failed")
+            frappe.log_error(frappe.get_traceback(),
+                             "Auto Sync Share Loan Accounts in Sync Failed")
 
         return {
             "status": "success",
@@ -1464,7 +1465,6 @@ def get_share_certificate_image():
     }
 
 
-
 @frappe.whitelist()
 def daily_check_loan_accounts_status():
     """
@@ -1484,13 +1484,15 @@ def daily_check_loan_accounts_status():
         pending_loans = frappe.get_all(
             "Share Loan Account",
             filters={"refund_status": ["!=", "Success"]},
-            fields=["name", "parent", "loan_acct_num", "refund_status", "expiry_date", "acct_cls_date"]
+            fields=["name", "parent", "loan_acct_num",
+                    "refund_status", "expiry_date", "acct_cls_date"]
         )
 
         if not pending_loans:
             return {"status": "skipped", "message": "No pending loan accounts to check."}
 
-        loan_nums = [d.loan_acct_num.strip() for d in pending_loans if d.loan_acct_num]
+        loan_nums = [d.loan_acct_num.strip()
+                     for d in pending_loans if d.loan_acct_num]
         if not loan_nums:
             return {"status": "skipped", "message": "No valid loan account numbers."}
 
@@ -1542,7 +1544,8 @@ def daily_check_loan_accounts_status():
 
     except Exception:
         frappe.db.rollback()
-        frappe.log_error(frappe.get_traceback(), "Daily Check Loan Status Failed")
+        frappe.log_error(frappe.get_traceback(),
+                         "Daily Check Loan Status Failed")
         raise
     finally:
         if cursor:
@@ -1692,9 +1695,10 @@ def daily_sync_new_loan_accounts():
             if not cif_id or not loan_acct_num:
                 continue
 
-            app_name = frappe.db.get_value('Share Application', {'cif': cif_id}, 'name')
+            app_name = frappe.db.get_value(
+                'Share Application', {'cif': cif_id}, 'name')
             if not app_name:
-                from banking_api.api.share_application_sync import ensure_share_application_for_cif
+                from banking_api.share_api.share_application_sync import ensure_share_application_for_cif
                 app_name = ensure_share_application_for_cif(cif_id, cursor)
             if not app_name:
                 continue

@@ -83,7 +83,7 @@ frappe.query_reports["Share Loan Accounts Report"] = {
 
 		report.page.add_inner_button(__("Sync Loan Accounts"), () => {
 			frappe.call({
-				method: "banking_api.api.share_application_sync.sync_share_loan_accounts_from_report",
+				method: "banking_api.share_api.share_application_sync.sync_share_loan_accounts_from_report",
 				freeze: true,
 				freeze_message: __("Syncing latest Loan Accounts from Finacle..."),
 				callback(r) {
@@ -193,7 +193,7 @@ function pay_now_report_share_app(row_key) {
 	if (!row_info || !row_info.parent || !row_info.loan_acct_num) return;
 
 	frappe.call({
-		method: "banking_api.api.share_application_sync.get_loan_refund_preview",
+		method: "banking_api.share_api.share_application_sync.get_loan_refund_preview",
 		args: {
 			share_application: row_info.parent,
 			loan_acct_num: row_info.loan_acct_num,
@@ -257,7 +257,7 @@ function pay_now_report_share_app(row_key) {
 						]),
 						() => {
 							frappe.call({
-								method: "banking_api.api.share_application_sync.execute_loan_refund_transfer",
+								method: "banking_api.share_api.share_application_sync.execute_loan_refund_transfer",
 								args: {
 									share_application: info.share_application,
 									loan_acct_num: info.loan_acct_num,

@@ -187,7 +187,7 @@ function open_sync_by_cif_dialog(listview) {
         primary_action(values) {
             d.disable_primary_action();
             frappe.call({
-                method: "banking_api.api.share_application_sync.sync_share_application_by_cif",
+                method: "banking_api.share_api.share_application_sync.sync_share_application_by_cif",
                 args: { cif_id: values.cif_id },
                 freeze: true,
                 freeze_message: __("Syncing CIF and Loan Accounts..."),
@@ -198,8 +198,8 @@ function open_sync_by_cif_dialog(listview) {
                         res.status === "success"
                             ? "green"
                             : res.status === "exists"
-                            ? "blue"
-                            : "red";
+                                ? "blue"
+                                : "red";
                     frappe.show_alert({ message: res.message || __("Completed"), indicator });
                     if (res.status === "success") {
                         d.hide();
