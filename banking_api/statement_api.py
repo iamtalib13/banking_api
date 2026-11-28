@@ -183,7 +183,7 @@ def test_db(branch_code, ac_code, ac_no, start_date, end_date, export_format="pd
 
 		# Skip the first row as it's the opening balance row
 		for record in results[1:]:
-			tdate, credit, debit, prtcls, doc_no, _ = record
+			tdate, credit, debit, prtcls, doc_no, _val = record
 			credit = float(credit) if credit else 0.0
 			debit = float(debit) if debit else 0.0
 			current_balance += (credit - debit)
